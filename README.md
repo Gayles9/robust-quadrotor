@@ -8,4 +8,13 @@ This project will build and validate a simulated quadrotor stack involving nonli
 
 The canonical development environment is a Lenovo Yoga 9 running a Windows host with WSL2, Ubuntu 24.04 LTS, and Python 3.12.
 
-Setup and usage commands will be added only after they have been tested.
+## Tested Setup
+
+With uv 0.12.3 installed:
+
+```sh
+uv sync
+make check
+```
+
+Core algorithms live in `src/quadrotor_math`, and tests live under `tests/`.
