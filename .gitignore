@@ -6,8 +6,12 @@ __pycache__/
 # Virtual environments
 .venv/
 
+# Generated ROS 2/colcon workspace directories
+/build/
+/install/
+/log/
+
 # Build artifacts and package metadata
-build/
 dist/
 *.egg-info/
 
