@@ -23,3 +23,41 @@ def skew_symmetric(vector: NDArray[np.float64]) -> NDArray[np.float64]:
         ],
         dtype=np.float64,
     )
+
+
+def rotation_matrix_body_to_world(
+    q_WB: NDArray[np.float64],
+) -> NDArray[np.float64]:
+    """Return the active body-to-world rotation matrix from ``q_WB``.
+
+    Args:
+        q_WB: Hamilton scalar-first ``[w, x, y, z]`` quaternion representing
+            body-to-world orientation.
+
+    Returns:
+        ``R_WB``, which actively maps body-coordinate vectors into world coordinates.
+
+    Raises:
+        ValueError: If ``q_WB`` does not have shape ``(4,)`` or unit norm.
+    """
+    if q_WB.shape != (4,):
+        raise ValueError(f"q_WB must have shape (4,), got {q_WB.shape}")
+
+    squared_norm = float(np.dot(q_WB, q_WB))
+    if not np.isclose(
+        squared_norm,
+        1.0,
+        rtol=1e-12,
+        atol=1e-12,
+    ):
+        raise ValueError(f"q_WB must have unit norm; squared norm is {squared_norm}")
+
+    w, x, y, z = q_WB
+    return np.array(
+        [
+            [1.0 - 2.0 * (y**2 + z**2), 2.0 * (x * y - w * z), 2.0 * (x * z + w * y)],
+            [2.0 * (x * y + w * z), 1.0 - 2.0 * (x**2 + z**2), 2.0 * (y * z - w * x)],
+            [2.0 * (x * z - w * y), 2.0 * (y * z + w * x), 1.0 - 2.0 * (x**2 + y**2)],
+        ],
+        dtype=np.float64,
+    )
