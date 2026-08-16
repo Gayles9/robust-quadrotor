@@ -2,7 +2,11 @@ import numpy as np
 import pytest
 from numpy.typing import NDArray
 
-from quadrotor_math.rotations import rotation_matrix_body_to_world, skew_symmetric
+from quadrotor_math.rotations import (
+    normalize_quaternion_body_to_world,
+    rotation_matrix_body_to_world,
+    skew_symmetric,
+)
 
 
 def test_skew_symmetric_represents_cross_product() -> None:
@@ -23,6 +27,57 @@ def test_skew_symmetric_represents_cross_product() -> None:
     vector_b = np.array([4.0, 5.0, -6.0], dtype=np.float64)
 
     np.testing.assert_allclose(skew_matrix @ vector_b, np.cross(vector_a, vector_b))
+
+
+def test_normalize_quaternion_body_to_world_returns_unit_quaternion() -> None:
+    q_WB = np.array([2.0, -2.0, 1.0, -1.0], dtype=np.float64)
+
+    normalized_q_WB = normalize_quaternion_body_to_world(q_WB)
+
+    expected_q_WB = q_WB / np.sqrt(10.0)
+    np.testing.assert_allclose(normalized_q_WB, expected_q_WB, atol=1e-12)
+    assert np.linalg.norm(normalized_q_WB) == pytest.approx(1.0, abs=1e-12)
+    np.testing.assert_array_equal(
+        q_WB,
+        np.array([2.0, -2.0, 1.0, -1.0], dtype=np.float64),
+    )
+
+
+@pytest.mark.parametrize(
+    "q_WB",
+    [
+        np.zeros(3, dtype=np.float64),
+        np.zeros((4, 1), dtype=np.float64),
+        np.zeros(5, dtype=np.float64),
+    ],
+)
+def test_normalize_quaternion_body_to_world_rejects_invalid_shape(
+    q_WB: NDArray[np.float64],
+) -> None:
+    with pytest.raises(ValueError, match=r"q_WB must have shape \(4,\)"):
+        normalize_quaternion_body_to_world(q_WB)
+
+
+def test_normalize_quaternion_body_to_world_rejects_zero_norm() -> None:
+    q_WB = np.zeros(4, dtype=np.float64)
+
+    with pytest.raises(ValueError, match="q_WB must have nonzero norm"):
+        normalize_quaternion_body_to_world(q_WB)
+
+
+@pytest.mark.parametrize(
+    "q_WB",
+    [
+        np.array([np.nan, 0.0, 0.0, 0.0], dtype=np.float64),
+        np.array([np.inf, 0.0, 0.0, 0.0], dtype=np.float64),
+        np.array([-np.inf, 0.0, 0.0, 0.0], dtype=np.float64),
+    ],
+)
+def test_normalize_quaternion_body_to_world_rejects_non_finite_values(
+    q_WB: NDArray[np.float64],
+) -> None:
+    with pytest.raises(ValueError, match="q_WB must contain only finite values"):
+        normalize_quaternion_body_to_world(q_WB)
 
 
 def test_rotation_matrix_body_to_world_maps_forward_east_for_positive_quarter_turn_yaw() -> None:

@@ -25,6 +25,34 @@ def skew_symmetric(vector: NDArray[np.float64]) -> NDArray[np.float64]:
     )
 
 
+def normalize_quaternion_body_to_world(
+    q_WB: NDArray[np.float64],
+) -> NDArray[np.float64]:
+    """Return a new unit-norm body-to-world quaternion.
+
+    Args:
+        q_WB: Hamilton scalar-first body-to-world quaternion.
+
+    Returns:
+        A new unit-norm quaternion.
+
+    Raises:
+        ValueError: If ``q_WB`` does not have shape ``(4,)``, contains a non-finite
+            component, or has zero norm.
+    """
+    if q_WB.shape != (4,):
+        raise ValueError(f"q_WB must have shape (4,), got {q_WB.shape}")
+
+    if not np.all(np.isfinite(q_WB)):
+        raise ValueError("q_WB must contain only finite values")
+
+    norm = float(np.linalg.norm(q_WB))
+    if norm == 0.0:
+        raise ValueError("q_WB must have nonzero norm")
+
+    return q_WB / norm
+
+
 def rotation_matrix_body_to_world(
     q_WB: NDArray[np.float64],
 ) -> NDArray[np.float64]:
