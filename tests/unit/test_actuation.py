@@ -2,7 +2,10 @@ import numpy as np
 import pytest
 from numpy.typing import NDArray
 
-from quadrotor_math.actuation import rotor_thrusts_from_speeds
+from quadrotor_math.actuation import (
+    rotor_thrusts_from_speeds,
+    thrust_force_body_from_rotor_thrusts,
+)
 
 
 def test_rotor_thrusts_from_speeds_uses_quadratic_law() -> None:
@@ -26,6 +29,59 @@ def test_rotor_thrusts_from_speeds_uses_quadratic_law() -> None:
         expected_rotor_thrusts,
         atol=1e-12,
     )
+
+
+def test_thrust_force_body_from_rotor_thrusts_sums_upward_force() -> None:
+    rotor_thrusts = np.array([1.0, 2.0, 3.0, 4.0], dtype=np.float64)
+
+    thrust_force_B = thrust_force_body_from_rotor_thrusts(rotor_thrusts)
+
+    expected_thrust_force_B = np.array([0.0, 0.0, -10.0], dtype=np.float64)
+    np.testing.assert_allclose(
+        thrust_force_B,
+        expected_thrust_force_B,
+        atol=1e-12,
+    )
+
+
+@pytest.mark.parametrize(
+    "rotor_thrusts",
+    [
+        np.zeros(3, dtype=np.float64),
+        np.zeros((4, 1), dtype=np.float64),
+        np.zeros(5, dtype=np.float64),
+    ],
+)
+def test_thrust_force_body_from_rotor_thrusts_rejects_invalid_shape(
+    rotor_thrusts: NDArray[np.float64],
+) -> None:
+    with pytest.raises(ValueError, match=r"rotor_thrusts must have shape \(4,\)"):
+        thrust_force_body_from_rotor_thrusts(rotor_thrusts)
+
+
+@pytest.mark.parametrize(
+    "rotor_thrusts",
+    [
+        np.array([np.nan, 0.0, 0.0, 0.0], dtype=np.float64),
+        np.array([np.inf, 0.0, 0.0, 0.0], dtype=np.float64),
+        np.array([-np.inf, 0.0, 0.0, 0.0], dtype=np.float64),
+    ],
+)
+def test_thrust_force_body_from_rotor_thrusts_rejects_non_finite_values(
+    rotor_thrusts: NDArray[np.float64],
+) -> None:
+    with pytest.raises(
+        ValueError,
+        match="rotor_thrusts must contain only finite values",
+    ):
+        thrust_force_body_from_rotor_thrusts(rotor_thrusts)
+
+
+def test_thrust_force_body_from_rotor_thrusts_rejects_negative_thrust() -> None:
+    rotor_thrusts = np.array([1.0, 2.0, -1.0, 4.0], dtype=np.float64)
+
+    with pytest.raises(ValueError, match="rotor_thrusts must be nonnegative"):
+        thrust_force_body_from_rotor_thrusts(rotor_thrusts)
 
 
 @pytest.mark.parametrize(
