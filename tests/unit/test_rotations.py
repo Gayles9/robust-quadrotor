@@ -4,6 +4,7 @@ from numpy.typing import NDArray
 
 from quadrotor_math.rotations import (
     normalize_quaternion_body_to_world,
+    quaternion_derivative_body_to_world,
     rotation_matrix_body_to_world,
     skew_symmetric,
 )
@@ -78,6 +79,104 @@ def test_normalize_quaternion_body_to_world_rejects_non_finite_values(
 ) -> None:
     with pytest.raises(ValueError, match="q_WB must contain only finite values"):
         normalize_quaternion_body_to_world(q_WB)
+
+
+def test_quaternion_derivative_body_to_world_at_identity() -> None:
+    q_WB = np.array([1.0, 0.0, 0.0, 0.0], dtype=np.float64)
+    omega_B = np.array([0.0, 0.0, 2.0], dtype=np.float64)
+
+    q_dot_WB = quaternion_derivative_body_to_world(q_WB, omega_B)
+
+    expected_q_dot_WB = np.array([0.0, 0.0, 0.0, 1.0], dtype=np.float64)
+    np.testing.assert_allclose(q_dot_WB, expected_q_dot_WB, atol=1e-12)
+
+
+def test_quaternion_derivative_body_to_world_uses_body_frame_multiplication_order() -> None:
+    c = np.sqrt(0.5)
+    q_WB = np.array([c, 0.0, 0.0, c], dtype=np.float64)
+    omega_B = np.array([2.0, 0.0, 0.0], dtype=np.float64)
+
+    q_dot_WB = quaternion_derivative_body_to_world(q_WB, omega_B)
+
+    expected_q_dot_WB = np.array([0.0, c, c, 0.0], dtype=np.float64)
+    np.testing.assert_allclose(q_dot_WB, expected_q_dot_WB, atol=1e-12)
+    assert np.dot(q_WB, q_dot_WB) == pytest.approx(0.0, abs=1e-12)
+
+
+@pytest.mark.parametrize(
+    "q_WB",
+    [
+        np.zeros(3, dtype=np.float64),
+        np.zeros((4, 1), dtype=np.float64),
+        np.zeros(5, dtype=np.float64),
+    ],
+)
+def test_quaternion_derivative_body_to_world_rejects_invalid_quaternion_shape(
+    q_WB: NDArray[np.float64],
+) -> None:
+    omega_B = np.zeros(3, dtype=np.float64)
+
+    with pytest.raises(ValueError, match=r"q_WB must have shape \(4,\)"):
+        quaternion_derivative_body_to_world(q_WB, omega_B)
+
+
+@pytest.mark.parametrize(
+    "omega_B",
+    [
+        np.zeros(2, dtype=np.float64),
+        np.zeros((3, 1), dtype=np.float64),
+        np.zeros(4, dtype=np.float64),
+    ],
+)
+def test_quaternion_derivative_body_to_world_rejects_invalid_angular_velocity_shape(
+    omega_B: NDArray[np.float64],
+) -> None:
+    q_WB = np.array([1.0, 0.0, 0.0, 0.0], dtype=np.float64)
+
+    with pytest.raises(ValueError, match=r"omega_B must have shape \(3,\)"):
+        quaternion_derivative_body_to_world(q_WB, omega_B)
+
+
+@pytest.mark.parametrize(
+    "q_WB",
+    [
+        np.array([np.nan, 0.0, 0.0, 0.0], dtype=np.float64),
+        np.array([np.inf, 0.0, 0.0, 0.0], dtype=np.float64),
+        np.array([-np.inf, 0.0, 0.0, 0.0], dtype=np.float64),
+    ],
+)
+def test_quaternion_derivative_body_to_world_rejects_non_finite_quaternion(
+    q_WB: NDArray[np.float64],
+) -> None:
+    omega_B = np.zeros(3, dtype=np.float64)
+
+    with pytest.raises(ValueError, match="q_WB must contain only finite values"):
+        quaternion_derivative_body_to_world(q_WB, omega_B)
+
+
+@pytest.mark.parametrize(
+    "omega_B",
+    [
+        np.array([np.nan, 0.0, 0.0], dtype=np.float64),
+        np.array([np.inf, 0.0, 0.0], dtype=np.float64),
+        np.array([-np.inf, 0.0, 0.0], dtype=np.float64),
+    ],
+)
+def test_quaternion_derivative_body_to_world_rejects_non_finite_angular_velocity(
+    omega_B: NDArray[np.float64],
+) -> None:
+    q_WB = np.array([1.0, 0.0, 0.0, 0.0], dtype=np.float64)
+
+    with pytest.raises(ValueError, match="omega_B must contain only finite values"):
+        quaternion_derivative_body_to_world(q_WB, omega_B)
+
+
+def test_quaternion_derivative_body_to_world_rejects_zero_norm_quaternion() -> None:
+    q_WB = np.zeros(4, dtype=np.float64)
+    omega_B = np.array([1.0, 0.0, 0.0], dtype=np.float64)
+
+    with pytest.raises(ValueError, match="q_WB must have nonzero norm"):
+        quaternion_derivative_body_to_world(q_WB, omega_B)
 
 
 def test_rotation_matrix_body_to_world_maps_forward_east_for_positive_quarter_turn_yaw() -> None:

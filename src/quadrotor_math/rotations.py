@@ -53,6 +53,53 @@ def normalize_quaternion_body_to_world(
     return q_WB / norm
 
 
+def quaternion_derivative_body_to_world(
+    q_WB: NDArray[np.float64],
+    omega_B: NDArray[np.float64],
+) -> NDArray[np.float64]:
+    """Return the body-to-world quaternion derivative from body angular velocity.
+
+    Args:
+        q_WB: Hamilton scalar-first ``[w, x, y, z]`` body-to-world quaternion.
+        omega_B: Body-frame angular velocity ``[omega_x, omega_y, omega_z]`` in rad/s.
+
+    Returns:
+        The Hamilton derivative ``q_dot_WB = 0.5 * q_WB ⊗ [0, omega_B]``.
+
+    Raises:
+        ValueError: If ``q_WB`` does not have shape ``(4,)``, ``omega_B`` does
+            not have shape ``(3,)``, or either input contains a non-finite
+            component, or ``q_WB`` has zero norm.
+    """
+    if q_WB.shape != (4,):
+        raise ValueError(f"q_WB must have shape (4,), got {q_WB.shape}")
+
+    if omega_B.shape != (3,):
+        raise ValueError(f"omega_B must have shape (3,), got {omega_B.shape}")
+
+    if not np.all(np.isfinite(q_WB)):
+        raise ValueError("q_WB must contain only finite values")
+
+    if not np.all(np.isfinite(omega_B)):
+        raise ValueError("omega_B must contain only finite values")
+
+    q_WB_norm = float(np.linalg.norm(q_WB))
+    if q_WB_norm == 0.0:
+        raise ValueError("q_WB must have nonzero norm")
+
+    w, x, y, z = q_WB
+    omega_x, omega_y, omega_z = omega_B
+    return 0.5 * np.array(
+        [
+            -(x * omega_x + y * omega_y + z * omega_z),
+            w * omega_x + y * omega_z - z * omega_y,
+            w * omega_y + z * omega_x - x * omega_z,
+            w * omega_z + x * omega_y - y * omega_x,
+        ],
+        dtype=np.float64,
+    )
+
+
 def rotation_matrix_body_to_world(
     q_WB: NDArray[np.float64],
 ) -> NDArray[np.float64]:
