@@ -5,6 +5,7 @@ from numpy.typing import NDArray
 from quadrotor_math.actuation import (
     rotor_thrusts_from_speeds,
     thrust_force_body_from_rotor_thrusts,
+    thrust_moment_body_from_rotor_thrusts,
 )
 
 
@@ -42,6 +43,146 @@ def test_thrust_force_body_from_rotor_thrusts_sums_upward_force() -> None:
         expected_thrust_force_B,
         atol=1e-12,
     )
+
+
+def test_thrust_moment_body_from_rotor_thrusts_uses_rotor_offset() -> None:
+    rotor_positions_B = np.array(
+        [
+            [2.0, 0.0, 0.0],
+            [0.0, 0.0, 0.0],
+            [0.0, 0.0, 0.0],
+            [0.0, 0.0, 0.0],
+        ],
+        dtype=np.float64,
+    )
+    rotor_thrusts = np.array([3.0, 0.0, 0.0, 0.0], dtype=np.float64)
+
+    thrust_moment_B = thrust_moment_body_from_rotor_thrusts(
+        rotor_positions_B,
+        rotor_thrusts,
+    )
+
+    expected_thrust_moment_B = np.array([0.0, 6.0, 0.0], dtype=np.float64)
+    np.testing.assert_allclose(
+        thrust_moment_B,
+        expected_thrust_moment_B,
+        atol=1e-12,
+    )
+
+
+def test_thrust_moment_body_from_multiple_rotors_produces_roll_and_pitch() -> None:
+    rotor_positions_B = np.array(
+        [
+            [0.5, 0.0, 0.0],
+            [0.0, 0.5, 0.0],
+            [-0.5, 0.0, 0.0],
+            [0.0, -0.5, 0.0],
+        ],
+        dtype=np.float64,
+    )
+    rotor_thrusts = np.array([4.0, 2.0, 1.0, 3.0], dtype=np.float64)
+
+    moment_B = thrust_moment_body_from_rotor_thrusts(
+        rotor_positions_B,
+        rotor_thrusts,
+    )
+
+    expected_moment_B = np.array([0.5, 1.5, 0.0], dtype=np.float64)
+    np.testing.assert_allclose(moment_B, expected_moment_B, atol=1e-12)
+
+
+@pytest.mark.parametrize(
+    "rotor_positions_B",
+    [
+        np.zeros((3, 3), dtype=np.float64),
+        np.zeros((4, 2), dtype=np.float64),
+        np.zeros((4, 3, 1), dtype=np.float64),
+    ],
+)
+def test_thrust_moment_body_from_rotor_thrusts_rejects_invalid_position_shape(
+    rotor_positions_B: NDArray[np.float64],
+) -> None:
+    rotor_thrusts = np.zeros(4, dtype=np.float64)
+
+    with pytest.raises(
+        ValueError,
+        match=r"rotor_positions_B must have shape \(4, 3\)",
+    ):
+        thrust_moment_body_from_rotor_thrusts(rotor_positions_B, rotor_thrusts)
+
+
+@pytest.mark.parametrize(
+    "rotor_thrusts",
+    [
+        np.zeros(3, dtype=np.float64),
+        np.zeros((4, 1), dtype=np.float64),
+        np.zeros(5, dtype=np.float64),
+    ],
+)
+def test_thrust_moment_body_from_rotor_thrusts_rejects_invalid_thrust_shape(
+    rotor_thrusts: NDArray[np.float64],
+) -> None:
+    rotor_positions_B = np.zeros((4, 3), dtype=np.float64)
+
+    with pytest.raises(ValueError, match=r"rotor_thrusts must have shape \(4,\)"):
+        thrust_moment_body_from_rotor_thrusts(rotor_positions_B, rotor_thrusts)
+
+
+@pytest.mark.parametrize(
+    "rotor_positions_B",
+    [
+        np.array(
+            [[np.nan, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]],
+            dtype=np.float64,
+        ),
+        np.array(
+            [[np.inf, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]],
+            dtype=np.float64,
+        ),
+        np.array(
+            [[-np.inf, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]],
+            dtype=np.float64,
+        ),
+    ],
+)
+def test_thrust_moment_body_from_rotor_thrusts_rejects_non_finite_positions(
+    rotor_positions_B: NDArray[np.float64],
+) -> None:
+    rotor_thrusts = np.zeros(4, dtype=np.float64)
+
+    with pytest.raises(
+        ValueError,
+        match="rotor_positions_B must contain only finite values",
+    ):
+        thrust_moment_body_from_rotor_thrusts(rotor_positions_B, rotor_thrusts)
+
+
+@pytest.mark.parametrize(
+    "rotor_thrusts",
+    [
+        np.array([np.nan, 0.0, 0.0, 0.0], dtype=np.float64),
+        np.array([np.inf, 0.0, 0.0, 0.0], dtype=np.float64),
+        np.array([-np.inf, 0.0, 0.0, 0.0], dtype=np.float64),
+    ],
+)
+def test_thrust_moment_body_from_rotor_thrusts_rejects_non_finite_thrusts(
+    rotor_thrusts: NDArray[np.float64],
+) -> None:
+    rotor_positions_B = np.zeros((4, 3), dtype=np.float64)
+
+    with pytest.raises(
+        ValueError,
+        match="rotor_thrusts must contain only finite values",
+    ):
+        thrust_moment_body_from_rotor_thrusts(rotor_positions_B, rotor_thrusts)
+
+
+def test_thrust_moment_body_from_rotor_thrusts_rejects_negative_thrust() -> None:
+    rotor_positions_B = np.zeros((4, 3), dtype=np.float64)
+    rotor_thrusts = np.array([0.0, 0.0, -1.0, 0.0], dtype=np.float64)
+
+    with pytest.raises(ValueError, match="rotor_thrusts must be nonnegative"):
+        thrust_moment_body_from_rotor_thrusts(rotor_positions_B, rotor_thrusts)
 
 
 @pytest.mark.parametrize(

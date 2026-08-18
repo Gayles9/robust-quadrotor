@@ -64,3 +64,46 @@ def thrust_force_body_from_rotor_thrusts(
         [0.0, 0.0, -np.sum(rotor_thrusts)],
         dtype=np.float64,
     )
+
+
+def thrust_moment_body_from_rotor_thrusts(
+    rotor_positions_B: NDArray[np.float64],
+    rotor_thrusts: NDArray[np.float64],
+) -> NDArray[np.float64]:
+    """Return the moment from offset rotor thrust forces in the FRD body frame.
+
+    Args:
+        rotor_positions_B: Rotor positions with shape ``(4, 3)``, expressed in
+            the forward-right-down (FRD) body frame in metres.
+        rotor_thrusts: Rotor thrust magnitudes with shape ``(4,)`` in newtons.
+
+    Returns:
+        The body-frame moment with shape ``(3,)`` in N·m.
+
+    Raises:
+        ValueError: If ``rotor_positions_B`` does not have shape ``(4, 3)`` or
+            contains a non-finite component, or if ``rotor_thrusts`` does not
+            have shape ``(4,)``, contains a non-finite component, or contains a
+            negative component.
+    """
+    if rotor_positions_B.shape != (4, 3):
+        raise ValueError("rotor_positions_B must have shape (4, 3)")
+
+    if rotor_thrusts.shape != (4,):
+        raise ValueError("rotor_thrusts must have shape (4,)")
+
+    if not np.all(np.isfinite(rotor_positions_B)):
+        raise ValueError("rotor_positions_B must contain only finite values")
+
+    if not np.all(np.isfinite(rotor_thrusts)):
+        raise ValueError("rotor_thrusts must contain only finite values")
+
+    if not np.all(rotor_thrusts >= 0.0):
+        raise ValueError("rotor_thrusts must be nonnegative")
+
+    rotor_forces_B = np.zeros((4, 3), dtype=np.float64)
+    rotor_forces_B[:, 2] = -rotor_thrusts
+    return np.asarray(
+        np.sum(np.cross(rotor_positions_B, rotor_forces_B), axis=0),
+        dtype=np.float64,
+    )
