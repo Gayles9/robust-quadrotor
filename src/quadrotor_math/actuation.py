@@ -39,6 +39,60 @@ def rotor_thrusts_from_speeds(
     return np.asarray(thrust_coefficient * rotor_omega**2, dtype=np.float64)
 
 
+def reaction_moment_body_from_rotor_speeds(
+    rotor_omega: NDArray[np.float64],
+    rotor_spin_directions: NDArray[np.float64],
+    moment_coefficient: float,
+) -> NDArray[np.float64]:
+    """Return the body yaw reaction moment from rotor speeds.
+
+    Args:
+        rotor_omega: Four nonnegative rotor-speed magnitudes with shape ``(4,)``
+            in rad/s.
+        rotor_spin_directions: Rotor spin directions with shape ``(4,)`` that
+            contain only ``-1`` or ``+1``. A value of ``+1`` is positive rotor
+            rotation about ``+z_B``; the body reaction moment acts in the
+            opposite direction.
+        moment_coefficient: Moment coefficient ``k_m`` in N·m/(rad/s)^2.
+
+    Returns:
+        The body-frame reaction moment with shape ``(3,)`` in N·m.
+
+    Raises:
+        ValueError: If ``rotor_omega`` or ``rotor_spin_directions`` does not
+            have shape ``(4,)``, either contains a non-finite component,
+            ``rotor_omega`` contains a negative component,
+            ``rotor_spin_directions`` contains a value other than ``-1`` or
+            ``+1``, or ``moment_coefficient`` is non-finite or not positive.
+    """
+    if rotor_omega.shape != (4,):
+        raise ValueError("rotor_omega must have shape (4,)")
+
+    if rotor_spin_directions.shape != (4,):
+        raise ValueError("rotor_spin_directions must have shape (4,)")
+
+    if not np.all(np.isfinite(rotor_omega)):
+        raise ValueError("rotor_omega must contain only finite values")
+
+    if not np.all(rotor_omega >= 0.0):
+        raise ValueError("rotor_omega must be nonnegative")
+
+    if not np.all(np.isfinite(rotor_spin_directions)):
+        raise ValueError("rotor_spin_directions must contain only finite values")
+
+    if not np.all((rotor_spin_directions == -1.0) | (rotor_spin_directions == 1.0)):
+        raise ValueError("rotor_spin_directions must contain only -1 or +1")
+
+    if not np.isfinite(moment_coefficient):
+        raise ValueError("moment_coefficient must be finite")
+
+    if moment_coefficient <= 0.0:
+        raise ValueError("moment_coefficient must be positive")
+
+    tau_z = -moment_coefficient * np.sum(rotor_spin_directions * rotor_omega**2)
+    return np.array([0.0, 0.0, tau_z], dtype=np.float64)
+
+
 def thrust_force_body_from_rotor_thrusts(
     rotor_thrusts: NDArray[np.float64],
 ) -> NDArray[np.float64]:

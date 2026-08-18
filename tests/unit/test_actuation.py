@@ -3,6 +3,7 @@ import pytest
 from numpy.typing import NDArray
 
 from quadrotor_math.actuation import (
+    reaction_moment_body_from_rotor_speeds,
     rotor_thrusts_from_speeds,
     thrust_force_body_from_rotor_thrusts,
     thrust_moment_body_from_rotor_thrusts,
@@ -30,6 +31,221 @@ def test_rotor_thrusts_from_speeds_uses_quadratic_law() -> None:
         expected_rotor_thrusts,
         atol=1e-12,
     )
+
+
+def test_reaction_moment_body_from_rotor_speeds_produces_yaw() -> None:
+    rotor_omega = np.array([2.0, 1.0, 2.0, 1.0], dtype=np.float64)
+    rotor_spin_directions = np.array([1.0, -1.0, 1.0, -1.0], dtype=np.float64)
+    moment_coefficient = 0.5
+
+    reaction_moment_B = reaction_moment_body_from_rotor_speeds(
+        rotor_omega,
+        rotor_spin_directions,
+        moment_coefficient,
+    )
+
+    expected_reaction_moment_B = np.array([0.0, 0.0, -3.0], dtype=np.float64)
+    np.testing.assert_allclose(
+        reaction_moment_B,
+        expected_reaction_moment_B,
+        atol=1e-12,
+    )
+
+
+def test_balanced_counter_rotating_rotors_cancel_yaw_reaction_moment() -> None:
+    rotor_omega = np.full(4, 600.0, dtype=np.float64)
+    rotor_spin_directions = np.array(
+        [1.0, -1.0, 1.0, -1.0],
+        dtype=np.float64,
+    )
+    moment_coefficient = 2.0e-7
+
+    reaction_moment_B = reaction_moment_body_from_rotor_speeds(
+        rotor_omega,
+        rotor_spin_directions,
+        moment_coefficient,
+    )
+
+    expected_reaction_moment_B = np.zeros(3, dtype=np.float64)
+    np.testing.assert_allclose(
+        reaction_moment_B,
+        expected_reaction_moment_B,
+        atol=1e-12,
+    )
+
+
+@pytest.mark.parametrize(
+    "rotor_omega",
+    [
+        np.zeros(3, dtype=np.float64),
+        np.zeros((4, 1), dtype=np.float64),
+        np.zeros(5, dtype=np.float64),
+    ],
+)
+def test_reaction_moment_body_from_rotor_speeds_rejects_invalid_speed_shape(
+    rotor_omega: NDArray[np.float64],
+) -> None:
+    rotor_spin_directions = np.array(
+        [1.0, -1.0, 1.0, -1.0],
+        dtype=np.float64,
+    )
+
+    with pytest.raises(ValueError, match=r"rotor_omega must have shape \(4,\)"):
+        reaction_moment_body_from_rotor_speeds(
+            rotor_omega,
+            rotor_spin_directions,
+            1.0,
+        )
+
+
+@pytest.mark.parametrize(
+    "rotor_spin_directions",
+    [
+        np.zeros(3, dtype=np.float64),
+        np.zeros((4, 1), dtype=np.float64),
+        np.zeros(5, dtype=np.float64),
+    ],
+)
+def test_reaction_moment_body_from_rotor_speeds_rejects_invalid_direction_shape(
+    rotor_spin_directions: NDArray[np.float64],
+) -> None:
+    rotor_omega = np.ones(4, dtype=np.float64)
+
+    with pytest.raises(
+        ValueError,
+        match=r"rotor_spin_directions must have shape \(4,\)",
+    ):
+        reaction_moment_body_from_rotor_speeds(
+            rotor_omega,
+            rotor_spin_directions,
+            1.0,
+        )
+
+
+@pytest.mark.parametrize(
+    "rotor_omega",
+    [
+        np.array([np.nan, 1.0, 1.0, 1.0], dtype=np.float64),
+        np.array([np.inf, 1.0, 1.0, 1.0], dtype=np.float64),
+        np.array([-np.inf, 1.0, 1.0, 1.0], dtype=np.float64),
+    ],
+)
+def test_reaction_moment_body_from_rotor_speeds_rejects_non_finite_speed(
+    rotor_omega: NDArray[np.float64],
+) -> None:
+    rotor_spin_directions = np.array(
+        [1.0, -1.0, 1.0, -1.0],
+        dtype=np.float64,
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="rotor_omega must contain only finite values",
+    ):
+        reaction_moment_body_from_rotor_speeds(
+            rotor_omega,
+            rotor_spin_directions,
+            1.0,
+        )
+
+
+def test_reaction_moment_body_from_rotor_speeds_rejects_negative_speed() -> None:
+    rotor_omega = np.array([1.0, 1.0, -1.0, 1.0], dtype=np.float64)
+    rotor_spin_directions = np.array(
+        [1.0, -1.0, 1.0, -1.0],
+        dtype=np.float64,
+    )
+
+    with pytest.raises(ValueError, match="rotor_omega must be nonnegative"):
+        reaction_moment_body_from_rotor_speeds(
+            rotor_omega,
+            rotor_spin_directions,
+            1.0,
+        )
+
+
+@pytest.mark.parametrize(
+    "rotor_spin_directions",
+    [
+        np.array([np.nan, -1.0, 1.0, -1.0], dtype=np.float64),
+        np.array([np.inf, -1.0, 1.0, -1.0], dtype=np.float64),
+        np.array([-np.inf, -1.0, 1.0, -1.0], dtype=np.float64),
+    ],
+)
+def test_reaction_moment_body_from_rotor_speeds_rejects_non_finite_directions(
+    rotor_spin_directions: NDArray[np.float64],
+) -> None:
+    rotor_omega = np.ones(4, dtype=np.float64)
+
+    with pytest.raises(
+        ValueError,
+        match="rotor_spin_directions must contain only finite values",
+    ):
+        reaction_moment_body_from_rotor_speeds(
+            rotor_omega,
+            rotor_spin_directions,
+            1.0,
+        )
+
+
+@pytest.mark.parametrize(
+    "rotor_spin_directions",
+    [
+        np.array([0.0, -1.0, 1.0, -1.0], dtype=np.float64),
+        np.array([2.0, -1.0, 1.0, -1.0], dtype=np.float64),
+        np.array([-2.0, -1.0, 1.0, -1.0], dtype=np.float64),
+    ],
+)
+def test_reaction_moment_body_from_rotor_speeds_rejects_invalid_directions(
+    rotor_spin_directions: NDArray[np.float64],
+) -> None:
+    rotor_omega = np.ones(4, dtype=np.float64)
+
+    with pytest.raises(
+        ValueError,
+        match=r"rotor_spin_directions must contain only -1 or \+1",
+    ):
+        reaction_moment_body_from_rotor_speeds(
+            rotor_omega,
+            rotor_spin_directions,
+            1.0,
+        )
+
+
+@pytest.mark.parametrize("moment_coefficient", [np.nan, np.inf, -np.inf])
+def test_reaction_moment_body_from_rotor_speeds_rejects_non_finite_coefficient(
+    moment_coefficient: float,
+) -> None:
+    rotor_omega = np.ones(4, dtype=np.float64)
+    rotor_spin_directions = np.array(
+        [1.0, -1.0, 1.0, -1.0],
+        dtype=np.float64,
+    )
+
+    with pytest.raises(ValueError, match="moment_coefficient must be finite"):
+        reaction_moment_body_from_rotor_speeds(
+            rotor_omega,
+            rotor_spin_directions,
+            moment_coefficient,
+        )
+
+
+@pytest.mark.parametrize("moment_coefficient", [0.0, -1.0])
+def test_reaction_moment_body_from_rotor_speeds_rejects_non_positive_coefficient(
+    moment_coefficient: float,
+) -> None:
+    rotor_omega = np.ones(4, dtype=np.float64)
+    rotor_spin_directions = np.array(
+        [1.0, -1.0, 1.0, -1.0],
+        dtype=np.float64,
+    )
+
+    with pytest.raises(ValueError, match="moment_coefficient must be positive"):
+        reaction_moment_body_from_rotor_speeds(
+            rotor_omega,
+            rotor_spin_directions,
+            moment_coefficient,
+        )
 
 
 def test_thrust_force_body_from_rotor_thrusts_sums_upward_force() -> None:
