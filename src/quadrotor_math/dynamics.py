@@ -1,6 +1,7 @@
 import numpy as np
 from numpy.typing import NDArray
 
+from quadrotor_math.actuation import force_and_moment_body_from_rotor_speeds
 from quadrotor_math.rotations import (
     quaternion_derivative_body_to_world,
     rotation_matrix_body_to_world,
@@ -239,4 +240,79 @@ def rigid_body_state_derivative_from_body_wrench(
         velocity_derivative_W,
         quaternion_derivative_WB,
         angular_velocity_derivative_B,
+    )
+
+
+def rigid_body_state_derivative_from_rotor_speeds(
+    position_W: NDArray[np.float64],
+    velocity_W: NDArray[np.float64],
+    q_WB: NDArray[np.float64],
+    omega_B: NDArray[np.float64],
+    rotor_omega: NDArray[np.float64],
+    rotor_positions_B: NDArray[np.float64],
+    rotor_spin_directions: NDArray[np.float64],
+    mass: float,
+    inertia_B: NDArray[np.float64],
+    gravity_acceleration: float,
+    thrust_coefficient: float,
+    moment_coefficient: float,
+) -> tuple[
+    NDArray[np.float64],
+    NDArray[np.float64],
+    NDArray[np.float64],
+    NDArray[np.float64],
+]:
+    """Return the rigid-body state derivative directly from rotor speeds.
+
+    Args:
+        position_W: Position with shape ``(3,)``, expressed in the
+            north-east-down (NED) world frame in metres.
+        velocity_W: Translational velocity with shape ``(3,)``, expressed in
+            the NED world frame in m/s.
+        q_WB: Dimensionless Hamilton scalar-first body-to-world quaternion with
+            shape ``(4,)`` and components ``[w, x, y, z]``. It maps the
+            forward-right-down (FRD) body frame to the NED world frame.
+        omega_B: Angular velocity with shape ``(3,)``, expressed in the FRD
+            body frame in rad/s.
+        rotor_omega: Rotor angular speeds with shape ``(4,)`` in rad/s.
+        rotor_positions_B: Rotor positions with shape ``(4, 3)``, expressed in
+            the FRD body frame in metres.
+        rotor_spin_directions: Dimensionless rotor spin directions with shape
+            ``(4,)`` containing only ``-1`` or ``+1``.
+        mass: Scalar vehicle mass in kilograms.
+        inertia_B: Inertia tensor with shape ``(3, 3)``, expressed about the
+            centre of mass in body coordinates in kg·m².
+        gravity_acceleration: Scalar positive gravity magnitude in m/s².
+        thrust_coefficient: Scalar thrust coefficient in N/(rad/s)^2.
+        moment_coefficient: Scalar moment coefficient in N·m/(rad/s)^2.
+
+    Returns:
+        A tuple containing, in order, ``position_derivative_W`` with shape
+        ``(3,)`` in the NED world frame in m/s, ``velocity_derivative_W`` with
+        shape ``(3,)`` in the NED world frame in m/s²,
+        ``quaternion_derivative_WB`` with shape ``(4,)`` in s⁻¹, and
+        ``angular_velocity_derivative_B`` with shape ``(3,)`` in the FRD body
+        frame in rad/s².
+
+    Raises:
+        ValueError: If an input is invalid. Validation is performed by the
+            composed actuation and dynamics functions.
+    """
+    force_B, moment_B = force_and_moment_body_from_rotor_speeds(
+        rotor_omega,
+        rotor_positions_B,
+        rotor_spin_directions,
+        thrust_coefficient,
+        moment_coefficient,
+    )
+    return rigid_body_state_derivative_from_body_wrench(
+        position_W,
+        velocity_W,
+        q_WB,
+        omega_B,
+        force_B,
+        moment_B,
+        mass,
+        inertia_B,
+        gravity_acceleration,
     )

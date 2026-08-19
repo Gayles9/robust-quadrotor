@@ -5,6 +5,7 @@ from numpy.typing import NDArray
 from quadrotor_math.dynamics import (
     angular_acceleration_body_from_moment,
     rigid_body_state_derivative_from_body_wrench,
+    rigid_body_state_derivative_from_rotor_speeds,
     translational_acceleration_world_from_body_force,
 )
 
@@ -55,6 +56,91 @@ def test_rigid_body_state_derivative_combines_kinematics_and_dynamics() -> None:
     )
     expected_angular_velocity_derivative_B = np.array(
         [1.0, 0.0, 0.0],
+        dtype=np.float64,
+    )
+
+    np.testing.assert_allclose(
+        position_derivative_W,
+        expected_position_derivative_W,
+        atol=1e-12,
+    )
+    np.testing.assert_allclose(
+        velocity_derivative_W,
+        expected_velocity_derivative_W,
+        atol=1e-12,
+    )
+    np.testing.assert_allclose(
+        quaternion_derivative_WB,
+        expected_quaternion_derivative_WB,
+        atol=1e-12,
+    )
+    np.testing.assert_allclose(
+        angular_velocity_derivative_B,
+        expected_angular_velocity_derivative_B,
+        atol=1e-12,
+    )
+
+
+def test_rigid_body_state_derivative_from_rotor_speeds_combines_actuation_and_dynamics() -> None:
+    position_W = np.array([10.0, 20.0, 30.0], dtype=np.float64)
+    velocity_W = np.array([1.0, -2.0, 3.0], dtype=np.float64)
+    q_WB = np.array([1.0, 0.0, 0.0, 0.0], dtype=np.float64)
+    omega_B = np.zeros(3, dtype=np.float64)
+
+    rotor_omega = np.array([2.0, 0.0, 0.0, 0.0], dtype=np.float64)
+    rotor_positions_B = np.array(
+        [
+            [2.0, 0.0, 0.0],
+            [0.0, 0.0, 0.0],
+            [0.0, 0.0, 0.0],
+            [0.0, 0.0, 0.0],
+        ],
+        dtype=np.float64,
+    )
+    rotor_spin_directions = np.array(
+        [1.0, -1.0, 1.0, -1.0],
+        dtype=np.float64,
+    )
+
+    mass = 1.0
+    inertia_B = np.diag(
+        np.array([2.0, 3.0, 4.0], dtype=np.float64),
+    )
+    gravity_acceleration = 9.81
+    thrust_coefficient = 0.75
+    moment_coefficient = 0.5
+
+    (
+        position_derivative_W,
+        velocity_derivative_W,
+        quaternion_derivative_WB,
+        angular_velocity_derivative_B,
+    ) = rigid_body_state_derivative_from_rotor_speeds(
+        position_W,
+        velocity_W,
+        q_WB,
+        omega_B,
+        rotor_omega,
+        rotor_positions_B,
+        rotor_spin_directions,
+        mass,
+        inertia_B,
+        gravity_acceleration,
+        thrust_coefficient,
+        moment_coefficient,
+    )
+
+    expected_position_derivative_W = np.array(
+        [1.0, -2.0, 3.0],
+        dtype=np.float64,
+    )
+    expected_velocity_derivative_W = np.array(
+        [0.0, 0.0, 6.81],
+        dtype=np.float64,
+    )
+    expected_quaternion_derivative_WB = np.zeros(4, dtype=np.float64)
+    expected_angular_velocity_derivative_B = np.array(
+        [0.0, 2.0, -0.5],
         dtype=np.float64,
     )
 
