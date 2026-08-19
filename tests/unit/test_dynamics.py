@@ -4,8 +4,194 @@ from numpy.typing import NDArray
 
 from quadrotor_math.dynamics import (
     angular_acceleration_body_from_moment,
+    rigid_body_state_derivative_from_body_wrench,
     translational_acceleration_world_from_body_force,
 )
+
+
+def test_rigid_body_state_derivative_combines_kinematics_and_dynamics() -> None:
+    position_W = np.array([10.0, 20.0, 30.0], dtype=np.float64)
+    velocity_W = np.array([1.0, -2.0, 3.0], dtype=np.float64)
+    q_WB = np.array([1.0, 0.0, 0.0, 0.0], dtype=np.float64)
+    omega_B = np.array([0.0, 0.0, 2.0], dtype=np.float64)
+
+    force_B = np.array([0.0, 0.0, -19.62], dtype=np.float64)
+    moment_B = np.array([2.0, 0.0, 0.0], dtype=np.float64)
+
+    mass = 2.0
+    inertia_B = np.diag(
+        np.array([2.0, 3.0, 4.0], dtype=np.float64),
+    )
+    gravity_acceleration = 9.81
+
+    (
+        position_derivative_W,
+        velocity_derivative_W,
+        quaternion_derivative_WB,
+        angular_velocity_derivative_B,
+    ) = rigid_body_state_derivative_from_body_wrench(
+        position_W,
+        velocity_W,
+        q_WB,
+        omega_B,
+        force_B,
+        moment_B,
+        mass,
+        inertia_B,
+        gravity_acceleration,
+    )
+
+    expected_position_derivative_W = np.array(
+        [1.0, -2.0, 3.0],
+        dtype=np.float64,
+    )
+    expected_velocity_derivative_W = np.zeros(
+        3,
+        dtype=np.float64,
+    )
+    expected_quaternion_derivative_WB = np.array(
+        [0.0, 0.0, 0.0, 1.0],
+        dtype=np.float64,
+    )
+    expected_angular_velocity_derivative_B = np.array(
+        [1.0, 0.0, 0.0],
+        dtype=np.float64,
+    )
+
+    np.testing.assert_allclose(
+        position_derivative_W,
+        expected_position_derivative_W,
+        atol=1e-12,
+    )
+    np.testing.assert_allclose(
+        velocity_derivative_W,
+        expected_velocity_derivative_W,
+        atol=1e-12,
+    )
+    np.testing.assert_allclose(
+        quaternion_derivative_WB,
+        expected_quaternion_derivative_WB,
+        atol=1e-12,
+    )
+    np.testing.assert_allclose(
+        angular_velocity_derivative_B,
+        expected_angular_velocity_derivative_B,
+        atol=1e-12,
+    )
+
+
+@pytest.mark.parametrize(
+    ("position_W", "velocity_W", "expected_message"),
+    [
+        (
+            np.zeros(2, dtype=np.float64),
+            np.zeros(3, dtype=np.float64),
+            r"position_W must have shape \(3,\)",
+        ),
+        (
+            np.zeros((3, 1), dtype=np.float64),
+            np.zeros(3, dtype=np.float64),
+            r"position_W must have shape \(3,\)",
+        ),
+        (
+            np.zeros(4, dtype=np.float64),
+            np.zeros(3, dtype=np.float64),
+            r"position_W must have shape \(3,\)",
+        ),
+        (
+            np.zeros(3, dtype=np.float64),
+            np.zeros(2, dtype=np.float64),
+            r"velocity_W must have shape \(3,\)",
+        ),
+        (
+            np.zeros(3, dtype=np.float64),
+            np.zeros((3, 1), dtype=np.float64),
+            r"velocity_W must have shape \(3,\)",
+        ),
+        (
+            np.zeros(3, dtype=np.float64),
+            np.zeros(4, dtype=np.float64),
+            r"velocity_W must have shape \(3,\)",
+        ),
+    ],
+)
+def test_rigid_body_state_derivative_rejects_invalid_position_and_velocity_shapes(
+    position_W: NDArray[np.float64],
+    velocity_W: NDArray[np.float64],
+    expected_message: str,
+) -> None:
+    q_WB = np.array([1.0, 0.0, 0.0, 0.0], dtype=np.float64)
+    omega_B = np.zeros(3, dtype=np.float64)
+    force_B = np.zeros(3, dtype=np.float64)
+    moment_B = np.zeros(3, dtype=np.float64)
+    mass = 1.0
+    inertia_B = np.eye(3, dtype=np.float64)
+    gravity_acceleration = 9.81
+
+    with pytest.raises(ValueError, match=expected_message):
+        rigid_body_state_derivative_from_body_wrench(
+            position_W,
+            velocity_W,
+            q_WB,
+            omega_B,
+            force_B,
+            moment_B,
+            mass,
+            inertia_B,
+            gravity_acceleration,
+        )
+
+
+@pytest.mark.parametrize(
+    ("position_W", "velocity_W", "expected_message"),
+    [
+        (
+            np.array([np.nan, 0.0, 0.0], dtype=np.float64),
+            np.zeros(3, dtype=np.float64),
+            "position_W must contain only finite values",
+        ),
+        (
+            np.array([np.inf, 0.0, 0.0], dtype=np.float64),
+            np.zeros(3, dtype=np.float64),
+            "position_W must contain only finite values",
+        ),
+        (
+            np.zeros(3, dtype=np.float64),
+            np.array([np.nan, 0.0, 0.0], dtype=np.float64),
+            "velocity_W must contain only finite values",
+        ),
+        (
+            np.zeros(3, dtype=np.float64),
+            np.array([np.inf, 0.0, 0.0], dtype=np.float64),
+            "velocity_W must contain only finite values",
+        ),
+    ],
+)
+def test_rigid_body_state_derivative_rejects_nonfinite_position_and_velocity(
+    position_W: NDArray[np.float64],
+    velocity_W: NDArray[np.float64],
+    expected_message: str,
+) -> None:
+    q_WB = np.array([1.0, 0.0, 0.0, 0.0], dtype=np.float64)
+    omega_B = np.zeros(3, dtype=np.float64)
+    force_B = np.zeros(3, dtype=np.float64)
+    moment_B = np.zeros(3, dtype=np.float64)
+    mass = 1.0
+    inertia_B = np.eye(3, dtype=np.float64)
+    gravity_acceleration = 9.81
+
+    with pytest.raises(ValueError, match=expected_message):
+        rigid_body_state_derivative_from_body_wrench(
+            position_W,
+            velocity_W,
+            q_WB,
+            omega_B,
+            force_B,
+            moment_B,
+            mass,
+            inertia_B,
+            gravity_acceleration,
+        )
 
 
 def test_angular_acceleration_body_includes_gyroscopic_coupling() -> None:

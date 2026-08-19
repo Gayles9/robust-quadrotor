@@ -1,6 +1,11 @@
 import numpy as np
 from numpy.typing import NDArray
 
+from quadrotor_math.rotations import (
+    quaternion_derivative_body_to_world,
+    rotation_matrix_body_to_world,
+)
+
 
 def angular_acceleration_body_from_moment(
     moment_B: NDArray[np.float64],
@@ -138,3 +143,100 @@ def translational_acceleration_world_from_body_force(
     )
     acceleration_W = gravity_W + (R_WB @ force_B) / mass
     return np.asarray(acceleration_W, dtype=np.float64)
+
+
+def rigid_body_state_derivative_from_body_wrench(
+    position_W: NDArray[np.float64],
+    velocity_W: NDArray[np.float64],
+    q_WB: NDArray[np.float64],
+    omega_B: NDArray[np.float64],
+    force_B: NDArray[np.float64],
+    moment_B: NDArray[np.float64],
+    mass: float,
+    inertia_B: NDArray[np.float64],
+    gravity_acceleration: float,
+) -> tuple[
+    NDArray[np.float64],
+    NDArray[np.float64],
+    NDArray[np.float64],
+    NDArray[np.float64],
+]:
+    """Return the complete rigid-body state derivative from a body-frame wrench.
+
+    Args:
+        position_W: Position with shape ``(3,)``, expressed in the
+            north-east-down (NED) world frame in metres.
+        velocity_W: Translational velocity with shape ``(3,)``, expressed in
+            the NED world frame in m/s.
+        q_WB: Hamilton scalar-first body-to-world quaternion with shape
+            ``(4,)`` and components ``[w, x, y, z]``. The quaternion is
+            dimensionless and maps the forward-right-down (FRD) body frame to
+            the NED world frame.
+        omega_B: Angular velocity with shape ``(3,)``, expressed in the FRD
+            body frame in rad/s.
+        force_B: Force with shape ``(3,)``, expressed in the FRD body frame in
+            newtons.
+        moment_B: Moment with shape ``(3,)``, expressed in the FRD body frame
+            in N·m.
+        mass: Vehicle mass in kilograms.
+        inertia_B: Inertia tensor with shape ``(3, 3)``, expressed about the
+            centre of mass in body coordinates in kg·m².
+        gravity_acceleration: Positive gravity magnitude in m/s².
+
+    Returns:
+        A tuple containing, in order, ``position_derivative_W`` with shape
+        ``(3,)`` in the NED world frame in m/s, ``velocity_derivative_W`` with
+        shape ``(3,)`` in the NED world frame in m/s²,
+        ``quaternion_derivative_WB`` with shape ``(4,)`` in s⁻¹, and
+        ``angular_velocity_derivative_B`` with shape ``(3,)`` in the FRD body
+        frame in rad/s².
+
+    Raises:
+        ValueError: If ``position_W`` does not have shape ``(3,)`` or
+            ``velocity_W`` does not have shape ``(3,)``, or if ``position_W``
+            or ``velocity_W`` contains a non-finite value.
+    """
+    if position_W.shape != (3,):
+        raise ValueError("position_W must have shape (3,)")
+
+    if velocity_W.shape != (3,):
+        raise ValueError("velocity_W must have shape (3,)")
+
+    if not np.all(np.isfinite(position_W)):
+        raise ValueError("position_W must contain only finite values")
+
+    if not np.all(np.isfinite(velocity_W)):
+        raise ValueError("velocity_W must contain only finite values")
+
+    position_derivative_W = np.array(
+        velocity_W,
+        dtype=np.float64,
+        copy=True,
+    )
+
+    R_WB = rotation_matrix_body_to_world(q_WB)
+
+    velocity_derivative_W = translational_acceleration_world_from_body_force(
+        force_B,
+        R_WB,
+        mass,
+        gravity_acceleration,
+    )
+
+    quaternion_derivative_WB = quaternion_derivative_body_to_world(
+        q_WB,
+        omega_B,
+    )
+
+    angular_velocity_derivative_B = angular_acceleration_body_from_moment(
+        moment_B,
+        omega_B,
+        inertia_B,
+    )
+
+    return (
+        position_derivative_W,
+        velocity_derivative_W,
+        quaternion_derivative_WB,
+        angular_velocity_derivative_B,
+    )
