@@ -3,6 +3,7 @@ import pytest
 from numpy.typing import NDArray
 
 from quadrotor_math.actuation import (
+    force_and_moment_body_from_rotor_speeds,
     reaction_moment_body_from_rotor_speeds,
     rotor_thrusts_from_speeds,
     thrust_force_body_from_rotor_thrusts,
@@ -31,6 +32,36 @@ def test_rotor_thrusts_from_speeds_uses_quadratic_law() -> None:
         expected_rotor_thrusts,
         atol=1e-12,
     )
+
+
+def test_force_and_moment_body_from_rotor_speeds_combines_actuation_effects() -> None:
+    rotor_omega = np.array([2.0, 0.0, 0.0, 0.0], dtype=np.float64)
+    rotor_positions_B = np.array(
+        [
+            [2.0, 0.0, 0.0],
+            [0.0, 0.0, 0.0],
+            [0.0, 0.0, 0.0],
+            [0.0, 0.0, 0.0],
+        ],
+        dtype=np.float64,
+    )
+    rotor_spin_directions = np.array(
+        [1.0, -1.0, 1.0, -1.0],
+        dtype=np.float64,
+    )
+
+    force_B, moment_B = force_and_moment_body_from_rotor_speeds(
+        rotor_omega,
+        rotor_positions_B,
+        rotor_spin_directions,
+        thrust_coefficient=0.75,
+        moment_coefficient=0.5,
+    )
+
+    expected_force_B = np.array([0.0, 0.0, -3.0], dtype=np.float64)
+    expected_moment_B = np.array([0.0, 6.0, -2.0], dtype=np.float64)
+    np.testing.assert_allclose(force_B, expected_force_B, atol=1e-12)
+    np.testing.assert_allclose(moment_B, expected_moment_B, atol=1e-12)
 
 
 def test_reaction_moment_body_from_rotor_speeds_produces_yaw() -> None:

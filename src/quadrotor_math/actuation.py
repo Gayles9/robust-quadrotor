@@ -161,3 +161,45 @@ def thrust_moment_body_from_rotor_thrusts(
         np.sum(np.cross(rotor_positions_B, rotor_forces_B), axis=0),
         dtype=np.float64,
     )
+
+
+def force_and_moment_body_from_rotor_speeds(
+    rotor_omega: NDArray[np.float64],
+    rotor_positions_B: NDArray[np.float64],
+    rotor_spin_directions: NDArray[np.float64],
+    thrust_coefficient: float,
+    moment_coefficient: float,
+) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
+    """Return the combined rotor force and moment in the FRD body frame.
+
+    Args:
+        rotor_omega: Rotor angular speeds with shape ``(4,)`` in rad/s.
+        rotor_positions_B: Rotor positions with shape ``(4, 3)``, expressed in
+            the forward-right-down (FRD) body frame in metres.
+        rotor_spin_directions: Rotor spin directions with shape ``(4,)`` that
+            contain only ``-1`` or ``+1``.
+        thrust_coefficient: Thrust coefficient ``k_f`` in N/(rad/s)^2.
+        moment_coefficient: Moment coefficient ``k_m`` in N·m/(rad/s)^2.
+
+    Returns:
+        A tuple ``(force_B, moment_B)``. ``force_B`` has shape ``(3,)`` in
+        newtons, and ``moment_B`` has shape ``(3,)`` in N·m. Both vectors are
+        expressed in the forward-right-down (FRD) body frame.
+
+    Raises:
+        ValueError: If an input is invalid. Input validation is performed by
+            the composed actuation functions.
+    """
+    rotor_thrusts = rotor_thrusts_from_speeds(rotor_omega, thrust_coefficient)
+    force_B = thrust_force_body_from_rotor_thrusts(rotor_thrusts)
+    moment_thrust_B = thrust_moment_body_from_rotor_thrusts(
+        rotor_positions_B,
+        rotor_thrusts,
+    )
+    moment_reaction_B = reaction_moment_body_from_rotor_speeds(
+        rotor_omega,
+        rotor_spin_directions,
+        moment_coefficient,
+    )
+    moment_B = moment_thrust_B + moment_reaction_B
+    return force_B, moment_B
