@@ -2,6 +2,63 @@ import numpy as np
 from numpy.typing import NDArray
 
 
+def euclidean_vector_trajectory_errors(
+    vector_history: NDArray[np.float64],
+    reference_vector_history: NDArray[np.float64],
+) -> NDArray[np.float64]:
+    """Return row-wise Euclidean errors between corresponding vector samples.
+
+    Both histories are expected to have shape ``(N, D)``, with each row
+    containing one vector sample. Corresponding rows are subtracted and their
+    Euclidean norms are returned independently.
+
+    Args:
+        vector_history: Vector samples with shape ``(N, D)``.
+        reference_vector_history: Corresponding reference vector samples with
+            shape ``(N, D)``.
+
+    Returns:
+        A float64 array with shape ``(N,)`` containing one Euclidean error per
+        sample. Each error has the same units as the supplied vector quantity.
+
+    Raises:
+        ValueError: If either history is not two-dimensional, the history
+            shapes do not match, the histories contain no samples or no vector
+            components, or either history contains a non-finite value.
+
+    This metric is intended to be applied independently to position, velocity,
+    or angular-velocity histories. Differently dimensioned physical quantities
+    are not combined because their numerical magnitudes have incompatible
+    units and meanings.
+    """
+    if vector_history.ndim != 2:
+        raise ValueError("vector_history must be two-dimensional")
+
+    if reference_vector_history.ndim != 2:
+        raise ValueError("reference_vector_history must be two-dimensional")
+
+    if vector_history.shape != reference_vector_history.shape:
+        raise ValueError("vector_history and reference_vector_history must have matching shapes")
+
+    if vector_history.shape[0] == 0:
+        raise ValueError("vector histories must contain at least one sample")
+
+    if vector_history.shape[1] == 0:
+        raise ValueError("vector histories must contain at least one component")
+
+    if not np.all(np.isfinite(vector_history)):
+        raise ValueError("vector_history must contain only finite values")
+
+    if not np.all(np.isfinite(reference_vector_history)):
+        raise ValueError("reference_vector_history must contain only finite values")
+
+    trajectory_errors = np.linalg.norm(
+        vector_history - reference_vector_history,
+        axis=1,
+    )
+    return np.asarray(trajectory_errors, dtype=np.float64)
+
+
 def quaternion_attitude_trajectory_errors_body_to_world(
     q_history_WB: NDArray[np.float64],
     reference_q_history_WB: NDArray[np.float64],

@@ -3,8 +3,97 @@ import pytest
 from numpy.typing import NDArray
 
 from quadrotor_math.metrics import (
+    euclidean_vector_trajectory_errors,
     quaternion_attitude_trajectory_errors_body_to_world,
 )
+
+
+def test_euclidean_vector_trajectory_errors_returns_rowwise_norms() -> None:
+    vector_history = np.array(
+        [
+            [1.0, 2.0, 3.0],
+            [4.0, 6.0, 8.0],
+        ],
+        dtype=np.float64,
+    )
+    reference_vector_history = np.array(
+        [
+            [1.0, 2.0, 3.0],
+            [1.0, 2.0, 8.0],
+        ],
+        dtype=np.float64,
+    )
+
+    trajectory_errors = euclidean_vector_trajectory_errors(
+        vector_history,
+        reference_vector_history,
+    )
+
+    expected_trajectory_errors = np.array(
+        [0.0, 5.0],
+        dtype=np.float64,
+    )
+    np.testing.assert_allclose(
+        trajectory_errors,
+        expected_trajectory_errors,
+        atol=1e-12,
+    )
+
+
+@pytest.mark.parametrize(
+    (
+        "vector_history",
+        "reference_vector_history",
+        "expected_message",
+    ),
+    [
+        (
+            np.zeros(3, dtype=np.float64),
+            np.zeros((1, 3), dtype=np.float64),
+            "vector_history must be two-dimensional",
+        ),
+        (
+            np.zeros((1, 3), dtype=np.float64),
+            np.zeros(3, dtype=np.float64),
+            "reference_vector_history must be two-dimensional",
+        ),
+        (
+            np.zeros((1, 3), dtype=np.float64),
+            np.zeros((2, 3), dtype=np.float64),
+            "vector_history and reference_vector_history must have matching shapes",
+        ),
+        (
+            np.zeros((0, 3), dtype=np.float64),
+            np.zeros((0, 3), dtype=np.float64),
+            "vector histories must contain at least one sample",
+        ),
+        (
+            np.zeros((1, 0), dtype=np.float64),
+            np.zeros((1, 0), dtype=np.float64),
+            "vector histories must contain at least one component",
+        ),
+        (
+            np.array([[np.nan, 0.0, 0.0]], dtype=np.float64),
+            np.zeros((1, 3), dtype=np.float64),
+            "vector_history must contain only finite values",
+        ),
+        (
+            np.zeros((1, 3), dtype=np.float64),
+            np.array([[np.inf, 0.0, 0.0]], dtype=np.float64),
+            "reference_vector_history must contain only finite values",
+        ),
+    ],
+)
+def test_euclidean_vector_trajectory_errors_rejects_invalid_inputs(
+    vector_history: NDArray[np.float64],
+    reference_vector_history: NDArray[np.float64],
+    expected_message: str,
+) -> None:
+    with pytest.raises(ValueError, match=expected_message):
+        euclidean_vector_trajectory_errors(
+            vector_history,
+            reference_vector_history,
+        )
 
 
 def test_quaternion_attitude_trajectory_errors_body_to_world_are_sign_invariant() -> None:
