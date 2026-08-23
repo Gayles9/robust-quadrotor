@@ -13,32 +13,31 @@ and validation testable without depending on a flight stack or message transport
 
 ## Current status
 
-At commit `c3d79f1`, the foundational rotor-actuation and six-degree-of-freedom rigid-body
-dynamics pipeline includes explicit-Euler and fixed-step projected RK4 propagation of the
-complete state. The project gate passes 151 tests.
+At commit `81b38f9`, the foundational rotor-actuation and six-degree-of-freedom rigid-body
+dynamics pipeline includes explicit-Euler propagation, fixed-step projected RK4 propagation,
+and deterministic multi-step RK4 state histories. The project gate passes 157 tests.
 
-The repository does not yet contain multi-step simulation experiments, a closed-loop
-controller, a state estimator, adaptive integration, robustness campaigns, or a completed
-ROS 2/PX4 integration layer.
+The repository does not yet contain convergence experiments, invariant-monitoring studies, a
+closed-loop controller, a state estimator, adaptive integration, robustness campaigns, or a
+completed ROS 2/PX4 integration layer.
 
 ## Current end-to-end pipeline
 
 ```mermaid
 flowchart TD
-    A[Four rotor speeds] --> B[Individual rotor thrusts]
-    B --> C[FRD body force and moment]
-    C --> D[NED translational and FRD rotational acceleration]
-    D --> E[Complete rigid-body state derivative]
-    E --> F[Explicit Euler or projected RK4 state update]
-    F --> G[Quaternion normalization]
+    A[Constant rotor speeds] --> B[FRD rotor actuation]
+    B --> C[Complete rigid-body state derivative]
+    C --> D[Projected RK4 state step with quaternion normalization]
+    D --> E[Sequential NED and FRD state history]
 ```
 
 The actuation model converts four nonnegative rotor angular speeds into static thrust
 magnitudes, sums their force along negative body `z`, and combines offset thrust moments with
 the rotor reaction moment about body `z`. The resulting body wrench drives the translational
-and rotational equations, which produce instantaneous state derivatives. Explicit Euler or
-fixed-step projected RK4 then advances the state through one time interval and restores the
-quaternion to unit norm.
+and rotational equations, which produce instantaneous state derivatives. Explicit Euler
+remains a transparent one-step baseline. Fixed-step projected RK4 advances one state while
+normalizing its intermediate and final quaternions, and the deterministic simulator applies
+that RK4 step sequentially to construct a complete state history.
 
 **Practical interpretation.** Rotor speeds determine the force and turning effect on the
 vehicle; the dynamics convert those effects into rates of motion; integration turns those
@@ -154,6 +153,35 @@ method; it is neither exact nor adaptive.
 **Practical interpretation.** Euler samples one slope at the start of the step. RK4 samples
 four slopes across the step and combines them to represent curved motion more accurately.
 
+### Deterministic multi-step RK4 simulation
+
+`simulate_rigid_body_rk4_from_rotor_speeds` applies the RK4 state step for a fixed positive
+`time_step` and a positive, non-Boolean integer `number_of_steps`. Rotor speeds, rotor geometry,
+mass, body-frame inertia, gravity magnitude, thrust coefficient, and moment coefficient remain
+constant throughout the simulation. Each returned RK4 state becomes the input state for the
+next transition, including the quaternion normalization performed by the RK4 stepper.
+
+The function returns five float64 arrays in this exact order:
+
+1. `time_s`, shape `(N + 1,)`, in seconds;
+2. `position_history_W`, shape `(N + 1, 3)`, in the NED world frame in metres;
+3. `velocity_history_W`, shape `(N + 1, 3)`, in the NED world frame in m/s;
+4. `q_history_WB`, shape `(N + 1, 4)`, containing dimensionless Hamilton scalar-first
+   body-to-world unit quaternions; and
+5. `omega_history_B`, shape `(N + 1, 3)`, in the FRD body frame in rad/s.
+
+Here `N = number_of_steps`. The histories have `N + 1` rows because row zero stores the
+supplied initial state; row `i` corresponds to `time_s[i] = i * time_step`.
+
+A state derivative describes the instantaneous rate of change of position, velocity,
+attitude, and angular velocity. One RK4 state step combines four derivative evaluations to
+produce one next state. A multi-step simulation history performs `N` such transitions in
+sequence and records the initial state plus every result.
+
+**Think about it this way.** The derivative says how the vehicle is changing now, one RK4 step
+moves it to the next instant, and the simulator repeatedly feeds each new state into the next
+step to build a time-aligned history.
+
 ## Frame and attitude conventions
 
 - World frame `W` is north-east-down (NED): `+x` north, `+y` east, and `+z` down.
@@ -182,6 +210,8 @@ The full convention, state shapes, signs, and hover sanity check are defined in 
 - Fixed-step RK4 propagation of the complete rigid-body state.
 - Intermediate and final quaternion normalization during RK4 propagation.
 - Finite positive RK4 time-step validation.
+- Deterministic constant-input multi-step RK4 simulation with time-aligned state histories.
+- Positive non-Boolean integer validation for the requested number of RK4 transitions.
 - Typed interfaces, explicit shape/value/physical-parameter validation, and unit tests for
   the implemented boundaries.
 
@@ -208,12 +238,12 @@ uv run mypy src
 uv run pytest
 ```
 
-At commit `c3d79f1`, this complete gate passes 151 tests.
+At commit `81b38f9`, this complete gate passes 157 tests.
 
 ## Repository structure
 
 - `src/quadrotor_math/`: ROS/PX4-independent vector, randomness, rotation, actuation,
-  dynamics, and integration algorithms.
+  dynamics, integration, and deterministic simulation algorithms.
 - `tests/unit/`: focused unit and composition tests for the mathematical core.
 - `docs/architecture/`: architectural contracts, including frames and state conventions.
 - `docs/decisions/`: accepted workflow and frame-convention decisions.
@@ -222,10 +252,10 @@ At commit `c3d79f1`, this complete gate passes 151 tests.
 
 ## Current limitations
 
-- Explicit Euler and fixed-step projected RK4 are implemented, but no multi-step convergence
-  or accuracy study exists yet.
-- No adaptive integrator or deterministic scenario runner exists yet.
-- No controller or estimator exists yet.
+- The simulator supports constant rotor input and a fixed positive time step only.
+- No quantitative Euler-versus-RK4 convergence or physical-invariant study exists yet.
+- No controller, scheduled input, callback, event handling, or adaptive step size exists.
+- No state estimator exists yet.
 - No Monte Carlo campaign exists yet.
 - No completed ROS 2/PX4 adapter exists yet.
 - The current mathematical model represents only the effects present in the source: static
@@ -239,10 +269,9 @@ the final high-accuracy simulation method, especially for larger time steps or l
 
 ## Near-term roadmap
 
-1. Build deterministic multi-step simulation scenarios.
-2. Compare Euler and RK4 convergence across decreasing time steps.
-3. Monitor state validity and physical invariants during propagation.
-4. Establish hover and controlled-perturbation reference scenarios.
-5. Begin feedback-controller implementation after the numerical model is characterized.
-6. Continue later with sensors, estimation, uncertainty, Monte Carlo validation, and ROS 2/PX4
+1. Quantify Euler-versus-RK4 convergence across decreasing time steps.
+2. Monitor state validity and physical invariants during propagation.
+3. Establish hover and controlled-perturbation reference scenarios.
+4. Begin feedback-controller implementation after the numerical model is characterized.
+5. Continue later with sensors, estimation, uncertainty, Monte Carlo validation, and ROS 2/PX4
    adapters.
