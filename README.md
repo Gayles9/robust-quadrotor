@@ -13,13 +13,15 @@ and validation testable without depending on a flight stack or message transport
 
 ## Current status
 
-At commit `5870663`, the foundational rotor-actuation and six-degree-of-freedom rigid-body
+At commit `8191c55`, the foundational rotor-actuation and six-degree-of-freedom rigid-body
 dynamics pipeline includes explicit-Euler propagation, fixed-step projected RK4 propagation,
-and deterministic multi-step Euler and RK4 state histories. The project gate passes 163 tests.
+deterministic multi-step Euler and RK4 state histories, reusable physical trajectory-error
+metrics, and a completed deterministic Euler-versus-RK4 convergence study. The project gate
+passes 199 tests.
 
-The repository does not yet contain convergence experiments, invariant-monitoring studies, a
-closed-loop controller, a state estimator, adaptive integration, robustness campaigns, or a
-completed ROS 2/PX4 integration layer.
+The repository does not yet contain state-validity or physically conditional invariant
+monitoring, a closed-loop controller, a state estimator, adaptive integration, robustness
+campaigns, or a completed ROS 2/PX4 integration layer.
 
 ## Current end-to-end pipeline
 
@@ -29,6 +31,9 @@ flowchart TD
     B --> C[Complete rigid-body state derivative]
     C --> D[Explicit Euler or projected RK4 state step]
     D --> E[Sequential NED and FRD state histories]
+    E --> F[Physically meaningful trajectory errors]
+    F --> G[Observed convergence orders]
+    G --> H[Reviewed numerical evidence]
 ```
 
 The actuation model converts four nonnegative rotor angular speeds into static thrust
@@ -37,7 +42,9 @@ the rotor reaction moment about body `z`. The resulting body wrench drives the t
 and rotational equations, which produce instantaneous state derivatives. Explicit Euler
 remains a transparent one-step baseline. Fixed-step projected RK4 advances one state while
 normalizing its intermediate and final quaternions. Matching deterministic simulators apply
-either stepper sequentially to construct complete state histories.
+either stepper sequentially to construct complete state histories. Reusable metrics then
+compare corresponding trajectory samples in their own physical units, and the convergence
+experiment measures how those errors change as the fixed time step is refined.
 
 **Practical interpretation.** Rotor speeds determine the force and turning effect on the
 vehicle; the dynamics convert those effects into rates of motion; integration turns those
@@ -186,13 +193,60 @@ records the initial state plus every result.
 
 Euler uses one derivative evaluation per step and is a first-order method. RK4 uses four
 derivative stages per step and is expected to provide much better accuracy for a given step
-size. Accuracy and observed convergence have not yet been measured in this repository.
-Because the RK4 stepper projects intermediate and final quaternions to unit norm, the observed
-order of the complete state update must be measured rather than simply assumed.
+size. Because the RK4 stepper projects intermediate and final quaternions to unit norm, the
+observed order of the complete state update is measured rather than assumed.
 
 **Think about it this way.** The derivative says how the vehicle is changing now, a stepper
 chooses how carefully to advance one interval, and a simulator repeatedly feeds each new state
 into the next step to build a time-aligned history.
+
+### Trajectory-error and convergence metrics
+
+Three reusable metrics support quantitative comparisons:
+
+- `euclidean_vector_trajectory_errors` returns one row-wise Euclidean error per sample for a
+  generic `(N, D)` history. It is used independently for NED position in metres, NED velocity
+  in m/s, and FRD angular velocity in rad/s. These quantities are not combined into a single
+  mixed-unit norm.
+- `quaternion_attitude_trajectory_errors_body_to_world` returns sign-invariant geodesic
+  attitude errors in radians for Hamilton scalar-first body-to-world quaternion histories.
+  It sign-aligns each pair before applying the chord-based physical angle, so `q_WB` and
+  `-q_WB` correctly have zero attitude error.
+- `observed_convergence_orders` reports one order for each adjacent pair of decreasing time
+  steps. Pairs touching the numerical error floor return `NaN`; negative measured orders are
+  retained. Differences of logarithms avoid overflow and underflow from extreme direct
+  ratios, and targeted `log1p` fallbacks preserve distinguishable values when separately
+  rounded logarithms cancel.
+
+### Deterministic Euler-versus-RK4 convergence study
+
+The reproducible study runs the established asymmetric one-active-rotor scenario for 1 second
+at fixed time steps `0.1`, `0.05`, `0.025`, and `0.0125` seconds. A 2560-step projected-RK4
+trajectory supplies a fine numerical reference sampled at the coarse output times by exact
+integer strides. Errors are measured separately for NED position, NED velocity,
+sign-invariant body-to-world attitude, and FRD angular velocity at final time and over the
+matching trajectory samples.
+
+Euler's measured orders approach one across all four state quantities. Projected RK4 shows
+measured approximately fourth-order convergence, with observed orders ranging from about
+`3.97` to `4.01`. This supports the expected RK4 behavior over the tested range. All values
+are measured relative to a fine numerical reference, not an exact solution, so the experiment
+is empirical evidence rather than a proof of formal order or absolute accuracy.
+
+For position at final time, the Euler error decreases from `3.7898843195e-01 m` on the
+coarsest grid to `4.8673997501e-02 m` on the finest grid. The corresponding RK4 error decreases
+from `8.0402004144e-06 m` to `2.0267431351e-09 m`. The reported final-time and
+maximum-trajectory order tables contain no `NaN`, negative, or nonmonotonic measured orders
+for this scenario.
+
+**Think about it this way.** In this experiment, halving the time step reduces Euler error by
+roughly a factor of two and RK4 error by roughly a factor of sixteen.
+
+Run the study with:
+
+```sh
+uv run python experiments/euler_rk4_convergence.py
+```
 
 ## Frame and attitude conventions
 
@@ -226,6 +280,11 @@ The full convention, state shapes, signs, and hover sanity check are defined in 
 - Deterministic constant-input multi-step RK4 simulation with time-aligned state histories.
 - Positive non-Boolean integer validation for the requested number of Euler or RK4
   transitions.
+- Row-wise Euclidean trajectory errors for independently measured vector quantities.
+- Sign-invariant geodesic quaternion attitude trajectory errors.
+- Numerically guarded observed convergence orders across adjacent time-step resolutions.
+- A reproducible deterministic Euler-versus-RK4 convergence experiment with final-time and
+  maximum-trajectory error tables.
 - Typed interfaces, explicit shape/value/physical-parameter validation, and unit tests for
   the implemented boundaries.
 
@@ -248,16 +307,17 @@ make check
 ```sh
 uv run ruff check .
 uv run ruff format --check .
-uv run mypy src
+uv run mypy src experiments
 uv run pytest
 ```
 
-At commit `5870663`, this complete gate passes 163 tests.
+At commit `8191c55`, this complete gate passes 199 tests.
 
 ## Repository structure
 
 - `src/quadrotor_math/`: ROS/PX4-independent vector, randomness, rotation, actuation,
-  dynamics, integration, and deterministic simulation algorithms.
+  dynamics, integration, deterministic simulation, and trajectory-error algorithms.
+- `experiments/`: reproducible numerical studies built from the public mathematical core.
 - `tests/unit/`: focused unit and composition tests for the mathematical core.
 - `docs/architecture/`: architectural contracts, including frames and state conventions.
 - `docs/decisions/`: accepted workflow and frame-convention decisions.
@@ -267,8 +327,9 @@ At commit `5870663`, this complete gate passes 163 tests.
 ## Current limitations
 
 - Both simulators support constant rotor input and a fixed positive time step only.
-- No quantitative Euler-versus-RK4 convergence results exist yet.
-- No invariant-monitoring framework exists yet.
+- The convergence study covers one deterministic asymmetric scenario over 1 second and uses a
+  fine numerical reference rather than an exact solution.
+- State validity and physically conditional invariants are not yet monitored over trajectories.
 - No controller, scheduled input, callback, event handling, or adaptive step size exists.
 - No state estimator exists yet.
 - No Monte Carlo campaign exists yet.
@@ -284,10 +345,8 @@ the final high-accuracy simulation method, especially for larger time steps or l
 
 ## Near-term roadmap
 
-1. Run a deterministic Euler-versus-RK4 convergence study across decreasing time steps using
-   physically meaningful position, velocity, attitude, and angular-velocity error metrics.
-2. Add state-validity and physical-invariant monitoring during propagation.
-3. Establish hover and controlled-perturbation reference scenarios.
-4. Begin feedback-controller implementation after the numerical model is characterized.
-5. Continue later with sensors, estimation, uncertainty, Monte Carlo validation, and ROS 2/PX4
+1. Add state-validity and physically conditional invariant monitoring during propagation.
+2. Establish hover and controlled-perturbation reference scenarios.
+3. Begin feedback-controller implementation after the numerical model is characterized.
+4. Continue later with sensors, estimation, uncertainty, Monte Carlo validation, and ROS 2/PX4
    adapters.
