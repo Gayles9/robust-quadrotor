@@ -13,10 +13,10 @@ format:
 	uv run ruff format .
 
 typecheck:
-	uv run mypy src
+	uv run mypy src experiments
 
 check:
 	uv run ruff check .
 	uv run ruff format --check .
-	uv run mypy src
+	uv run mypy src experiments
 	uv run pytest
