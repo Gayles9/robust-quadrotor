@@ -59,6 +59,102 @@ def euclidean_vector_trajectory_errors(
     return np.asarray(trajectory_errors, dtype=np.float64)
 
 
+def observed_convergence_orders(
+    time_steps: NDArray[np.float64],
+    errors: NDArray[np.float64],
+    *,
+    error_floor: float,
+) -> NDArray[np.float64]:
+    """Return observed convergence orders for adjacent resolution pairs.
+
+    ``time_steps`` is expected to be a one-dimensional array of decreasing
+    time steps, and ``errors`` is expected to contain the corresponding
+    nonnegative errors. Each adjacent-pair order uses the pair's actual
+    refinement ratio, so refinement ratios need not be two. ``error_floor`` is
+    keyword-only and identifies errors too small for a meaningful order
+    estimate. Differences of logarithms avoid overflow or underflow from
+    directly forming extreme finite ratios. A ``log1p`` fallback preserves
+    distinguishable adjacent values when separately rounded logarithms cancel.
+
+    Args:
+        time_steps: Decreasing time steps with shape ``(M,)``.
+        errors: Corresponding nonnegative errors with shape ``(M,)``.
+        error_floor: Numerical error floor. An adjacent-pair order is computed
+            only when both errors are strictly above this value.
+
+    Returns:
+        A float64 array with shape ``(M - 1,)`` containing adjacent-pair order
+        estimates. Entries are ``np.nan`` when either adjacent error is at or
+        below ``error_floor``. Negative orders remain valid measurements and
+        are not clipped.
+
+    Raises:
+        ValueError: If either input array is not one-dimensional, their shapes
+            do not match, fewer than two resolutions are supplied, time steps
+            are non-finite, non-positive, or not strictly decreasing, errors
+            are non-finite or negative, or ``error_floor`` is non-finite or
+            negative.
+    """
+    if time_steps.ndim != 1:
+        raise ValueError("time_steps must be one-dimensional")
+
+    if errors.ndim != 1:
+        raise ValueError("errors must be one-dimensional")
+
+    if time_steps.shape != errors.shape:
+        raise ValueError("time_steps and errors must have matching shapes")
+
+    if time_steps.size < 2:
+        raise ValueError("at least two time steps and errors are required")
+
+    if not np.all(np.isfinite(time_steps)):
+        raise ValueError("time_steps must contain only finite values")
+
+    if not np.all(time_steps > 0.0):
+        raise ValueError("time_steps must be positive")
+
+    if not np.all(np.diff(time_steps) < 0.0):
+        raise ValueError("time_steps must be strictly decreasing")
+
+    if not np.all(np.isfinite(errors)):
+        raise ValueError("errors must contain only finite values")
+
+    if not np.all(errors >= 0.0):
+        raise ValueError("errors must be nonnegative")
+
+    if not np.isfinite(error_floor):
+        raise ValueError("error_floor must be finite")
+
+    if error_floor < 0.0:
+        raise ValueError("error_floor must be nonnegative")
+
+    orders = np.full(time_steps.shape[0] - 1, np.nan, dtype=np.float64)
+    valid_pairs = (errors[:-1] > error_floor) & (errors[1:] > error_floor)
+    current_errors = errors[:-1][valid_pairs]
+    next_errors = errors[1:][valid_pairs]
+    current_time_steps = time_steps[:-1][valid_pairs]
+    next_time_steps = time_steps[1:][valid_pairs]
+    log_error_change = np.log(current_errors) - np.log(next_errors)
+    cancelled_error_changes = (log_error_change == 0.0) & (current_errors != next_errors)
+    log_error_change[cancelled_error_changes] = np.log1p(
+        (current_errors[cancelled_error_changes] - next_errors[cancelled_error_changes])
+        / next_errors[cancelled_error_changes]
+    )
+    log_time_step_change = np.log(current_time_steps) - np.log(next_time_steps)
+    cancelled_time_step_changes = (log_time_step_change == 0.0) & (
+        current_time_steps != next_time_steps
+    )
+    log_time_step_change[cancelled_time_step_changes] = np.log1p(
+        (
+            current_time_steps[cancelled_time_step_changes]
+            - next_time_steps[cancelled_time_step_changes]
+        )
+        / next_time_steps[cancelled_time_step_changes]
+    )
+    orders[valid_pairs] = log_error_change / log_time_step_change
+    return orders
+
+
 def quaternion_attitude_trajectory_errors_body_to_world(
     q_history_WB: NDArray[np.float64],
     reference_q_history_WB: NDArray[np.float64],
