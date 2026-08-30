@@ -162,6 +162,118 @@ def test_simulate_rigid_body_rk4_from_rotor_speeds_returns_complete_history() ->
     )
 
 
+def test_simulate_rigid_body_rk4_from_rotor_speeds_matches_gravity_only_ballistic_trajectory() -> (
+    None
+):
+    position_W = np.array([10.0, 20.0, 30.0], dtype=np.float64)
+    velocity_W = np.array([1.0, -2.0, -3.0], dtype=np.float64)
+    q_WB = np.array([1.0, 0.0, 0.0, 0.0], dtype=np.float64)
+    omega_B = np.zeros(3, dtype=np.float64)
+
+    rotor_omega = np.zeros(4, dtype=np.float64)
+    rotor_positions_B = np.array(
+        [
+            [0.5, 0.0, 0.0],
+            [0.0, 0.5, 0.0],
+            [-0.5, 0.0, 0.0],
+            [0.0, -0.5, 0.0],
+        ],
+        dtype=np.float64,
+    )
+    rotor_spin_directions = np.array(
+        [1.0, -1.0, 1.0, -1.0],
+        dtype=np.float64,
+    )
+
+    mass = 2.0
+    inertia_B = np.diag(np.array([2.0, 3.0, 4.0], dtype=np.float64))
+    gravity_acceleration = 9.81
+    thrust_coefficient = 0.75
+    moment_coefficient = 0.5
+    time_step = 0.25
+    number_of_steps = 4
+
+    (
+        time_s,
+        position_history_W,
+        velocity_history_W,
+        q_history_WB,
+        omega_history_B,
+    ) = simulate_rigid_body_rk4_from_rotor_speeds(
+        position_W,
+        velocity_W,
+        q_WB,
+        omega_B,
+        rotor_omega,
+        rotor_positions_B,
+        rotor_spin_directions,
+        mass,
+        inertia_B,
+        gravity_acceleration,
+        thrust_coefficient,
+        moment_coefficient,
+        time_step,
+        number_of_steps,
+    )
+
+    expected_time_s = (
+        np.arange(
+            number_of_steps + 1,
+            dtype=np.float64,
+        )
+        * time_step
+    )
+    gravity_W = np.array(
+        [0.0, 0.0, gravity_acceleration],
+        dtype=np.float64,
+    )
+    expected_position_history_W = (
+        position_W
+        + expected_time_s[:, None] * velocity_W
+        + 0.5 * expected_time_s[:, None] ** 2 * gravity_W
+    )
+    expected_velocity_history_W = velocity_W + expected_time_s[:, None] * gravity_W
+    expected_q_history_WB = np.tile(
+        q_WB,
+        (number_of_steps + 1, 1),
+    )
+    expected_omega_history_B = np.zeros(
+        (number_of_steps + 1, 3),
+        dtype=np.float64,
+    )
+
+    np.testing.assert_allclose(
+        time_s,
+        expected_time_s,
+        rtol=0.0,
+        atol=1e-12,
+    )
+    np.testing.assert_allclose(
+        position_history_W,
+        expected_position_history_W,
+        rtol=0.0,
+        atol=1e-12,
+    )
+    np.testing.assert_allclose(
+        velocity_history_W,
+        expected_velocity_history_W,
+        rtol=0.0,
+        atol=1e-12,
+    )
+    np.testing.assert_allclose(
+        q_history_WB,
+        expected_q_history_WB,
+        rtol=0.0,
+        atol=1e-12,
+    )
+    np.testing.assert_allclose(
+        omega_history_B,
+        expected_omega_history_B,
+        rtol=0.0,
+        atol=1e-12,
+    )
+
+
 def test_simulate_rigid_body_euler_from_rotor_speeds_returns_complete_history() -> None:
     position_W = np.array([10.0, 20.0, 30.0], dtype=np.float64)
     velocity_W = np.array([1.0, -2.0, 3.0], dtype=np.float64)
@@ -286,6 +398,118 @@ def test_simulate_rigid_body_euler_from_rotor_speeds_returns_complete_history() 
     np.testing.assert_allclose(
         omega_history_B,
         expected_omega_history_B,
+        atol=1e-12,
+    )
+
+
+def test_simulate_rigid_body_euler_from_rotor_speeds_matches_discrete_gravity_only_trajectory() -> (
+    None
+):
+    position_W = np.array([10.0, 20.0, 30.0], dtype=np.float64)
+    velocity_W = np.array([1.0, -2.0, -3.0], dtype=np.float64)
+    q_WB = np.array([1.0, 0.0, 0.0, 0.0], dtype=np.float64)
+    omega_B = np.zeros(3, dtype=np.float64)
+    rotor_omega = np.zeros(4, dtype=np.float64)
+
+    rotor_positions_B = np.array(
+        [
+            [0.5, 0.0, 0.0],
+            [0.0, 0.5, 0.0],
+            [-0.5, 0.0, 0.0],
+            [0.0, -0.5, 0.0],
+        ],
+        dtype=np.float64,
+    )
+    rotor_spin_directions = np.array(
+        [1.0, -1.0, 1.0, -1.0],
+        dtype=np.float64,
+    )
+
+    mass = 2.0
+    inertia_B = np.diag(np.array([2.0, 3.0, 4.0], dtype=np.float64))
+    gravity_acceleration = 9.81
+    thrust_coefficient = 0.75
+    moment_coefficient = 0.5
+    time_step = 0.25
+    number_of_steps = 4
+
+    (
+        time_s,
+        position_history_W,
+        velocity_history_W,
+        q_history_WB,
+        omega_history_B,
+    ) = simulate_rigid_body_euler_from_rotor_speeds(
+        position_W,
+        velocity_W,
+        q_WB,
+        omega_B,
+        rotor_omega,
+        rotor_positions_B,
+        rotor_spin_directions,
+        mass,
+        inertia_B,
+        gravity_acceleration,
+        thrust_coefficient,
+        moment_coefficient,
+        time_step,
+        number_of_steps,
+    )
+
+    expected_time_s = (
+        np.arange(
+            number_of_steps + 1,
+            dtype=np.float64,
+        )
+        * time_step
+    )
+    gravity_W = np.array(
+        [0.0, 0.0, gravity_acceleration],
+        dtype=np.float64,
+    )
+    expected_velocity_history_W = velocity_W + expected_time_s[:, None] * gravity_W
+    expected_position_history_W = (
+        position_W
+        + expected_time_s[:, None] * velocity_W
+        + 0.5 * (expected_time_s[:, None] ** 2 - expected_time_s[:, None] * time_step) * gravity_W
+    )
+    expected_q_history_WB = np.tile(
+        q_WB,
+        (number_of_steps + 1, 1),
+    )
+    expected_omega_history_B = np.zeros(
+        (number_of_steps + 1, 3),
+        dtype=np.float64,
+    )
+
+    np.testing.assert_allclose(
+        time_s,
+        expected_time_s,
+        rtol=0.0,
+        atol=1e-12,
+    )
+    np.testing.assert_allclose(
+        position_history_W,
+        expected_position_history_W,
+        rtol=0.0,
+        atol=1e-12,
+    )
+    np.testing.assert_allclose(
+        velocity_history_W,
+        expected_velocity_history_W,
+        rtol=0.0,
+        atol=1e-12,
+    )
+    np.testing.assert_allclose(
+        q_history_WB,
+        expected_q_history_WB,
+        rtol=0.0,
+        atol=1e-12,
+    )
+    np.testing.assert_allclose(
+        omega_history_B,
+        expected_omega_history_B,
+        rtol=0.0,
         atol=1e-12,
     )
 

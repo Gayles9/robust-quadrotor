@@ -19,7 +19,9 @@ propagation, deterministic multi-step Euler and RK4 state histories, reusable ri
 state-history structural validation, physical trajectory-error metrics, and a completed
 deterministic Euler-versus-RK4 convergence study. Focused characterization now also shows that
 the derivative model and both simulators recognize and preserve one exact balanced-thrust,
-zero-moment hover equilibrium. The current project gate passes 224 tests.
+zero-moment hover equilibrium. A gravity-only ballistic reference additionally verifies RK4
+against the analytical constant-gravity trajectory and Euler against its derived discrete
+trajectory. The current project gate passes 226 tests.
 
 The repository does not yet contain physically conditional invariant monitoring, a closed-loop
 controller, a state estimator, adaptive integration, robustness campaigns, or a completed
@@ -272,6 +274,33 @@ not validated by this scenario. Gate G1 remains open. The scenario remains test-
 there is not yet a second production consumer that would justify a reusable helper,
 configuration dataclass, or standalone experiment.
 
+### Gravity-only ballistic trajectory characterization
+
+A second test-local physical scenario uses zero rotor speeds, zero angular velocity, and
+identity attitude in the NED world frame. Zero rotor speeds produce zero body force and moment,
+so translation is driven only by `gravity_W = [0, 0, +g]`, while attitude remains identity and
+body angular velocity remains zero. The scenario starts at `[10, 20, 30] m` with velocity
+`[1, -2, -3] m/s`, uses mass `2.0 kg`, gravity `9.81 m/s²`, a `0.25 s` time step, and four
+steps for a total duration of `1.0 s`.
+
+Projected RK4 matches the analytical constant-gravity position and velocity histories, the
+constant identity attitude, and zero angular velocity using `rtol=0.0` and `atol=1e-12`. At
+`t = 1.0 s`, the analytical position is `[11, 18, 31.905] m` and velocity is
+`[1, -2, 6.81] m/s`. Quaternion projection has no physical effect in this scenario because the
+attitude remains constant and unit length.
+
+Explicit Euler matches its separately derived discrete trajectory. Its velocity is analytical
+at the grid times because acceleration is constant, while its position uses the velocity at
+the beginning of each step. At `t = 1.0 s`, Euler position is `[11, 18, 30.67875] m`, giving
+Euler-minus-analytical position error `[0, 0, -1.22625] m`. This is expected first-order
+integration behavior, not a dynamics defect.
+
+These tests establish trajectory behavior before separate conservation claims. They do not
+yet establish mechanical-energy conservation, momentum monitoring, aerodynamic realism,
+stability, control, estimation, or robustness. Gate G1 remains open. The scenario remains
+test-local; no helper, invariant module, energy metric, or standalone experiment has been
+added.
+
 ### Trajectory-error and convergence metrics
 
 Three reusable metrics support quantitative comparisons:
@@ -356,6 +385,8 @@ The full convention, state shapes, signs, and hover sanity check are defined in 
   finiteness, fixed increasing time grids, and unit quaternion norms.
 - Derivative-level and multi-step characterization of one exact balanced-thrust, zero-moment
   hover equilibrium for explicit Euler and projected RK4.
+- Gravity-only ballistic characterization against the analytical RK4 trajectory and the
+  derived discrete-Euler trajectory.
 - Row-wise Euclidean trajectory errors for independently measured vector quantities.
 - Sign-invariant geodesic quaternion attitude trajectory errors.
 - Numerically guarded observed convergence orders across adjacent time-step resolutions.
@@ -387,7 +418,7 @@ uv run mypy src experiments
 uv run pytest
 ```
 
-For the current working tree, this complete gate passes 224 tests with no warnings. Ruff lint,
+For the current working tree, this complete gate passes 226 tests with no warnings. Ruff lint,
 Ruff formatting verification, and strict mypy over `src` and `experiments` pass, and
 `git diff --check` reports no errors.
 
@@ -412,6 +443,8 @@ Ruff formatting verification, and strict mypy over `src` and `experiments` pass,
   conservation, equilibrium, hover, energy, or momentum behavior.
 - The balanced-hover characterization covers one exact identity-attitude equilibrium; it does
   not establish stability or behavior after perturbations.
+- The gravity-only ballistic characterization establishes method-specific trajectories on one
+  fixed grid; it does not yet establish momentum or mechanical-energy conservation checks.
 - Physically conditional invariants are not yet monitored over trajectories.
 - No controller, scheduled input, callback, event handling, or adaptive step size exists.
 - No state estimator exists yet.
@@ -428,10 +461,10 @@ the final high-accuracy simulation method, especially for larger time steps or l
 
 ## Near-term roadmap
 
-1. A read-only design review for a gravity-only ballistic reference scenario, separating
-   analytical constant-gravity trajectory behavior, horizontal-momentum conservation,
-   mechanical-energy conservation, Euler-versus-RK4 numerical behavior, and deciding the
-   smallest first test without mixing these distinct claims.
+1. A read-only design review for gravity-only conservation characterization, separating
+   horizontal momentum conservation, RK4 mechanical-energy conservation, Euler's analytically
+   predicted energy drift, test-local calculations versus a reusable invariant API, and
+   choosing the smallest first conservation behavior.
 2. Add only the resulting explicitly scoped physical reference-scenario behavior.
 3. Begin feedback-controller implementation after the numerical model is characterized.
 4. Continue later with sensors, estimation, uncertainty, Monte Carlo validation, and ROS 2/PX4
