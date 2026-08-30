@@ -13,15 +13,16 @@ and validation testable without depending on a flight stack or message transport
 
 ## Current status
 
-At commit `8191c55`, the foundational rotor-actuation and six-degree-of-freedom rigid-body
-dynamics pipeline includes explicit-Euler propagation, fixed-step projected RK4 propagation,
-deterministic multi-step Euler and RK4 state histories, reusable physical trajectory-error
-metrics, and a completed deterministic Euler-versus-RK4 convergence study. The project gate
-passes 199 tests.
+The current working tree extends the foundational rotor-actuation and six-degree-of-freedom
+rigid-body dynamics pipeline with explicit-Euler propagation, fixed-step projected RK4
+propagation, deterministic multi-step Euler and RK4 state histories, reusable rigid-body
+state-history structural validation, physical trajectory-error metrics, and a completed
+deterministic Euler-versus-RK4 convergence study. The current project gate passes 221 tests.
 
-The repository does not yet contain state-validity or physically conditional invariant
-monitoring, a closed-loop controller, a state estimator, adaptive integration, robustness
-campaigns, or a completed ROS 2/PX4 integration layer.
+The repository does not yet contain physically conditional invariant monitoring, a closed-loop
+controller, a state estimator, adaptive integration, robustness campaigns, or a completed
+ROS 2/PX4 integration layer. Structural validation is one foundation for later reference
+scenarios, but this milestone does not complete Gate G1.
 
 ## Current end-to-end pipeline
 
@@ -31,9 +32,11 @@ flowchart TD
     B --> C[Complete rigid-body state derivative]
     C --> D[Explicit Euler or projected RK4 state step]
     D --> E[Sequential NED and FRD state histories]
-    E --> F[Physically meaningful trajectory errors]
-    F --> G[Observed convergence orders]
-    G --> H[Reviewed numerical evidence]
+    E --> F[Reusable structural validation]
+    E --> G[Physically meaningful trajectory errors]
+    G --> H[Observed convergence orders]
+    F --> I[Validated history contract]
+    H --> J[Reviewed numerical evidence]
 ```
 
 The actuation model converts four nonnegative rotor angular speeds into static thrust
@@ -45,6 +48,10 @@ normalizing its intermediate and final quaternions. Matching deterministic simul
 either stepper sequentially to construct complete state histories. Reusable metrics then
 compare corresponding trajectory samples in their own physical units, and the convergence
 experiment measures how those errors change as the fixed time step is refined.
+
+The reusable history validator independently rejects malformed or numerically invalid state
+histories. The existing Euler and projected-RK4 simulators both produce histories accepted by
+that validator without modification.
 
 **Practical interpretation.** Rotor speeds determine the force and turning effect on the
 vehicle; the dynamics convert those effects into rates of motion; integration turns those
@@ -200,6 +207,36 @@ observed order of the complete state update is measured rather than assumed.
 chooses how carefully to advance one interval, and a simulator repeatedly feeds each new state
 into the next step to build a time-aligned history.
 
+### Rigid-body state-history validation
+
+The public module `src/quadrotor_math/validation.py` provides
+`validate_rigid_body_state_history(...)` for reusable unconditional validation of complete
+rigid-body histories. It checks:
+
+- `time_s` has shape `(N,)` and contains at least two samples;
+- `position_history_W` and `velocity_history_W` have shape `(N, 3)` in the NED world frame;
+- `q_history_WB` has shape `(N, 4)` as Hamilton scalar-first body-to-world quaternions;
+- `omega_history_B` has shape `(N, 3)` in the FRD body frame;
+- all state histories contain the same number of samples as `time_s`;
+- time and state entries are finite;
+- time is strictly increasing and uniformly spaced; and
+- every quaternion row has unit Euclidean norm.
+
+Uniform time spacing uses internal `rtol=1e-12` and `atol=0.0`. Quaternion unit norms use
+internal `rtol=1e-12` and `atol=1e-12`. Invalid histories raise `ValueError`; the validator
+does not normalize or otherwise repair corrupted inputs. Focused integration-style tests pass
+the Euler and projected-RK4 simulator outputs directly into the validator, and both are
+accepted without preprocessing.
+
+This boundary establishes structural and numerical validity only. It does not prove that a
+trajectory is dynamically accurate, conserves energy or momentum, represents hover, or
+satisfies any scenario-specific physical invariant. Conditional conservation and equilibrium
+checks remain deferred to explicitly named reference-scenario and invariant work.
+
+Rotation-matrix orthogonality and determinant checks are not duplicated here because
+`R_WB` is not stored in the state history. Unit quaternion validity is checked at this
+boundary, while quaternion-to-matrix correctness remains owned and tested by `rotations.py`.
+
 ### Trajectory-error and convergence metrics
 
 Three reusable metrics support quantitative comparisons:
@@ -280,6 +317,8 @@ The full convention, state shapes, signs, and hover sanity check are defined in 
 - Deterministic constant-input multi-step RK4 simulation with time-aligned state histories.
 - Positive non-Boolean integer validation for the requested number of Euler or RK4
   transitions.
+- Reusable rigid-body state-history structural validation for shapes, sample alignment,
+  finiteness, fixed increasing time grids, and unit quaternion norms.
 - Row-wise Euclidean trajectory errors for independently measured vector quantities.
 - Sign-invariant geodesic quaternion attitude trajectory errors.
 - Numerically guarded observed convergence orders across adjacent time-step resolutions.
@@ -311,12 +350,15 @@ uv run mypy src experiments
 uv run pytest
 ```
 
-At commit `8191c55`, this complete gate passes 199 tests.
+For the current working tree, this complete gate passes 221 tests with no warnings. Ruff lint,
+Ruff formatting verification, and strict mypy over `src` and `experiments` pass, and
+`git diff --check` reports no errors.
 
 ## Repository structure
 
 - `src/quadrotor_math/`: ROS/PX4-independent vector, randomness, rotation, actuation,
-  dynamics, integration, deterministic simulation, and trajectory-error algorithms.
+  dynamics, integration, deterministic simulation, state-history validation, and
+  trajectory-error algorithms.
 - `experiments/`: reproducible numerical studies built from the public mathematical core.
 - `tests/unit/`: focused unit and composition tests for the mathematical core.
 - `docs/architecture/`: architectural contracts, including frames and state conventions.
@@ -329,7 +371,9 @@ At commit `8191c55`, this complete gate passes 199 tests.
 - Both simulators support constant rotor input and a fixed positive time step only.
 - The convergence study covers one deterministic asymmetric scenario over 1 second and uses a
   fine numerical reference rather than an exact solution.
-- State validity and physically conditional invariants are not yet monitored over trajectories.
+- Structural history validation does not establish dynamic accuracy or scenario-specific
+  conservation, equilibrium, hover, energy, or momentum behavior.
+- Physically conditional invariants are not yet monitored over trajectories.
 - No controller, scheduled input, callback, event handling, or adaptive step size exists.
 - No state estimator exists yet.
 - No Monte Carlo campaign exists yet.
@@ -345,8 +389,10 @@ the final high-accuracy simulation method, especially for larger time steps or l
 
 ## Near-term roadmap
 
-1. Add state-validity and physically conditional invariant monitoring during propagation.
-2. Establish hover and controlled-perturbation reference scenarios.
+1. Conduct a read-only design review for the first deterministic physical reference scenario,
+   beginning with balanced-thrust, zero-moment hover equilibrium and defining its assumptions,
+   expected state behavior, tolerances, and smallest TDD test.
+2. Add only the resulting explicitly scoped physical reference-scenario behavior.
 3. Begin feedback-controller implementation after the numerical model is characterized.
 4. Continue later with sensors, estimation, uncertainty, Monte Carlo validation, and ROS 2/PX4
    adapters.
