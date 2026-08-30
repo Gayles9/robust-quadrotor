@@ -274,6 +274,79 @@ def test_simulate_rigid_body_rk4_from_rotor_speeds_matches_gravity_only_ballisti
     )
 
 
+def test_simulate_rigid_body_rk4_from_rotor_speeds_conserves_gravity_only_mechanical_energy() -> (
+    None
+):
+    position_W = np.array([10.0, 20.0, 30.0], dtype=np.float64)
+    velocity_W = np.array([1.0, -2.0, -3.0], dtype=np.float64)
+    q_WB = np.array([1.0, 0.0, 0.0, 0.0], dtype=np.float64)
+    omega_B = np.zeros(3, dtype=np.float64)
+    rotor_omega = np.zeros(4, dtype=np.float64)
+
+    rotor_positions_B = np.array(
+        [
+            [0.5, 0.0, 0.0],
+            [0.0, 0.5, 0.0],
+            [-0.5, 0.0, 0.0],
+            [0.0, -0.5, 0.0],
+        ],
+        dtype=np.float64,
+    )
+    rotor_spin_directions = np.array(
+        [1.0, -1.0, 1.0, -1.0],
+        dtype=np.float64,
+    )
+
+    mass = 2.0
+    inertia_B = np.diag(np.array([2.0, 3.0, 4.0], dtype=np.float64))
+    gravity_acceleration = 9.81
+    thrust_coefficient = 0.75
+    moment_coefficient = 0.5
+    time_step = 0.25
+    number_of_steps = 4
+
+    (
+        _time_s,
+        position_history_W,
+        velocity_history_W,
+        _q_history_WB,
+        _omega_history_B,
+    ) = simulate_rigid_body_rk4_from_rotor_speeds(
+        position_W,
+        velocity_W,
+        q_WB,
+        omega_B,
+        rotor_omega,
+        rotor_positions_B,
+        rotor_spin_directions,
+        mass,
+        inertia_B,
+        gravity_acceleration,
+        thrust_coefficient,
+        moment_coefficient,
+        time_step,
+        number_of_steps,
+    )
+
+    kinetic_energy = 0.5 * mass * np.sum(velocity_history_W**2, axis=1)
+    potential_energy = -mass * gravity_acceleration * position_history_W[:, 2]
+    mechanical_energy = kinetic_energy + potential_energy
+
+    initial_mechanical_energy = -574.6
+    expected_mechanical_energy = np.full(
+        number_of_steps + 1,
+        initial_mechanical_energy,
+        dtype=np.float64,
+    )
+
+    np.testing.assert_allclose(
+        mechanical_energy,
+        expected_mechanical_energy,
+        rtol=0.0,
+        atol=1e-12,
+    )
+
+
 def test_simulate_rigid_body_euler_from_rotor_speeds_returns_complete_history() -> None:
     position_W = np.array([10.0, 20.0, 30.0], dtype=np.float64)
     velocity_W = np.array([1.0, -2.0, 3.0], dtype=np.float64)
@@ -509,6 +582,77 @@ def test_simulate_rigid_body_euler_from_rotor_speeds_matches_discrete_gravity_on
     np.testing.assert_allclose(
         omega_history_B,
         expected_omega_history_B,
+        rtol=0.0,
+        atol=1e-12,
+    )
+
+
+def test_simulate_rigid_body_euler_from_rotor_speeds_has_predicted_gravity_only_energy_drift() -> (
+    None
+):
+    position_W = np.array([10.0, 20.0, 30.0], dtype=np.float64)
+    velocity_W = np.array([1.0, -2.0, -3.0], dtype=np.float64)
+    q_WB = np.array([1.0, 0.0, 0.0, 0.0], dtype=np.float64)
+    omega_B = np.zeros(3, dtype=np.float64)
+    rotor_omega = np.zeros(4, dtype=np.float64)
+
+    rotor_positions_B = np.array(
+        [
+            [0.5, 0.0, 0.0],
+            [0.0, 0.5, 0.0],
+            [-0.5, 0.0, 0.0],
+            [0.0, -0.5, 0.0],
+        ],
+        dtype=np.float64,
+    )
+    rotor_spin_directions = np.array(
+        [1.0, -1.0, 1.0, -1.0],
+        dtype=np.float64,
+    )
+
+    mass = 2.0
+    inertia_B = np.diag(np.array([2.0, 3.0, 4.0], dtype=np.float64))
+    gravity_acceleration = 9.81
+    thrust_coefficient = 0.75
+    moment_coefficient = 0.5
+    time_step = 0.25
+    number_of_steps = 4
+
+    (
+        time_s,
+        position_history_W,
+        velocity_history_W,
+        _q_history_WB,
+        _omega_history_B,
+    ) = simulate_rigid_body_euler_from_rotor_speeds(
+        position_W,
+        velocity_W,
+        q_WB,
+        omega_B,
+        rotor_omega,
+        rotor_positions_B,
+        rotor_spin_directions,
+        mass,
+        inertia_B,
+        gravity_acceleration,
+        thrust_coefficient,
+        moment_coefficient,
+        time_step,
+        number_of_steps,
+    )
+
+    kinetic_energy = 0.5 * mass * np.sum(velocity_history_W**2, axis=1)
+    potential_energy = -mass * gravity_acceleration * position_history_W[:, 2]
+    mechanical_energy = kinetic_energy + potential_energy
+
+    initial_mechanical_energy = -574.6
+    expected_mechanical_energy = (
+        initial_mechanical_energy + 0.5 * mass * gravity_acceleration**2 * time_s * time_step
+    )
+
+    np.testing.assert_allclose(
+        mechanical_energy,
+        expected_mechanical_energy,
         rtol=0.0,
         atol=1e-12,
     )

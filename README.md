@@ -21,12 +21,15 @@ deterministic Euler-versus-RK4 convergence study. Focused characterization now a
 the derivative model and both simulators recognize and preserve one exact balanced-thrust,
 zero-moment hover equilibrium. A gravity-only ballistic reference additionally verifies RK4
 against the analytical constant-gravity trajectory and Euler against its derived discrete
-trajectory. The current project gate passes 226 tests.
+trajectory. Scenario-specific energy characterization now verifies RK4 mechanical-energy
+conservation and Euler's analytically predicted positive energy drift for that gravity-only
+case. The current project gate passes 228 tests.
 
-The repository does not yet contain physically conditional invariant monitoring, a closed-loop
-controller, a state estimator, adaptive integration, robustness campaigns, or a completed
-ROS 2/PX4 integration layer. Structural validation is one foundation for later reference
-scenarios, but this milestone does not complete Gate G1.
+The repository does not yet contain a reusable physically conditional invariant-monitoring
+API, a closed-loop controller, a state estimator, adaptive integration, robustness campaigns,
+or a completed ROS 2/PX4 integration layer. Structural validation and test-local physical
+characterization are foundations for later reference scenarios, but this milestone does not
+complete Gate G1.
 
 ## Current end-to-end pipeline
 
@@ -295,11 +298,52 @@ the beginning of each step. At `t = 1.0 s`, Euler position is `[11, 18, 30.67875
 Euler-minus-analytical position error `[0, 0, -1.22625] m`. This is expected first-order
 integration behavior, not a dynamics defect.
 
-These tests establish trajectory behavior before separate conservation claims. They do not
-yet establish mechanical-energy conservation, momentum monitoring, aerodynamic realism,
-stability, control, estimation, or robustness. Gate G1 remains open. The scenario remains
-test-local; no helper, invariant module, energy metric, or standalone experiment has been
-added.
+These trajectory tests establish method-specific behavior independently of the separate
+conservation characterization below. They do not establish aerodynamic realism, stability,
+control, estimation, or robustness. Gate G1 remains open. The scenario remains test-local;
+no helper, invariant module, energy metric, or standalone experiment has been added.
+
+### Gravity-only mechanical-energy characterization
+
+Under the explicit assumptions of zero rotor speeds, no thrust or applied body moment,
+constant uniform NED gravity, constant mass, and no other conservative or nonconservative
+effects, the test-local mechanical energy is
+
+```text
+kinetic_energy = 0.5 * mass * sum(velocity_history_W**2, axis=1)
+potential_energy = -mass * gravity_acceleration * position_history_W[:, 2]
+mechanical_energy = kinetic_energy + potential_energy
+```
+
+The negative potential-energy sign follows from positive NED world `z` pointing downward.
+For the established `2.0 kg` ballistic scenario, the initial kinetic energy is `14.0 J`, the
+initial potential energy is `-588.6 J`, and total mechanical energy is `-574.6 J`.
+
+Projected RK4 maintains `-574.6 J` across all five stored samples within `rtol=0.0` and
+`atol=1e-12 J`. This tight result is specific to the short polynomial constant-gravity case;
+it does not mean RK4 exactly conserves energy for arbitrary nonlinear systems.
+
+Explicit Euler instead follows the analytically derived drift law
+
+```text
+energy_n - energy_0 = (
+    0.5
+    * mass
+    * gravity_acceleration**2
+    * time_n
+    * time_step
+)
+```
+
+At `t = 1.0 s` with a `0.25 s` step, the drift is `+24.059025 J` and final energy is
+`-550.540975 J`. This is predictable numerical drift from Euler's position discretization,
+not physical energy entering the vehicle or a dynamics-model defect. The existing analytical
+and discrete trajectory tests already establish constant horizontal velocity, so for the
+fixed `2.0 kg` mass they implicitly verify constant horizontal momentum
+`[2.0, -4.0] kg·m/s`; a duplicate momentum-only test was not added.
+
+Energy remains calculated locally in the tests. No public energy function, metrics extension,
+`invariants.py` module, generic monitor, report object, or tolerance policy has been added.
 
 ### Trajectory-error and convergence metrics
 
@@ -387,6 +431,8 @@ The full convention, state shapes, signs, and hover sanity check are defined in 
   hover equilibrium for explicit Euler and projected RK4.
 - Gravity-only ballistic characterization against the analytical RK4 trajectory and the
   derived discrete-Euler trajectory.
+- Gravity-only mechanical-energy characterization of RK4 conservation and Euler's predicted
+  positive numerical drift under explicit scenario assumptions.
 - Row-wise Euclidean trajectory errors for independently measured vector quantities.
 - Sign-invariant geodesic quaternion attitude trajectory errors.
 - Numerically guarded observed convergence orders across adjacent time-step resolutions.
@@ -418,7 +464,7 @@ uv run mypy src experiments
 uv run pytest
 ```
 
-For the current working tree, this complete gate passes 226 tests with no warnings. Ruff lint,
+For the current working tree, this complete gate passes 228 tests with no warnings. Ruff lint,
 Ruff formatting verification, and strict mypy over `src` and `experiments` pass, and
 `git diff --check` reports no errors.
 
@@ -444,8 +490,12 @@ Ruff formatting verification, and strict mypy over `src` and `experiments` pass,
 - The balanced-hover characterization covers one exact identity-attitude equilibrium; it does
   not establish stability or behavior after perturbations.
 - The gravity-only ballistic characterization establishes method-specific trajectories on one
-  fixed grid; it does not yet establish momentum or mechanical-energy conservation checks.
-- Physically conditional invariants are not yet monitored over trajectories.
+  fixed grid. Its energy checks are scenario-specific and do not apply under rotor thrust,
+  drag, wind, motor losses, contact, or other external work.
+- Horizontal momentum is implicit in the existing fixed-mass trajectory assertions rather
+  than exposed through a reusable momentum diagnostic.
+- Physically conditional invariants are not yet owned by a reusable monitoring API, and RK4
+  is not claimed to preserve energy for arbitrary nonlinear systems.
 - No controller, scheduled input, callback, event handling, or adaptive step size exists.
 - No state estimator exists yet.
 - No Monte Carlo campaign exists yet.
@@ -461,10 +511,11 @@ the final high-accuracy simulation method, especially for larger time steps or l
 
 ## Near-term roadmap
 
-1. A read-only design review for gravity-only conservation characterization, separating
-   horizontal momentum conservation, RK4 mechanical-energy conservation, Euler's analytically
-   predicted energy drift, test-local calculations versus a reusable invariant API, and
-   choosing the smallest first conservation behavior.
+1. A read-only design review for torque-free rigid-body rotation, separating rotational
+   kinetic-energy conservation, body-frame angular-velocity evolution, inertial-frame
+   angular-momentum conservation, quaternion attitude evolution, Euler versus projected-RK4
+   behavior, and whether test-local calculations or a reusable physical-diagnostics API are
+   justified.
 2. Add only the resulting explicitly scoped physical reference-scenario behavior.
 3. Begin feedback-controller implementation after the numerical model is characterized.
 4. Continue later with sensors, estimation, uncertainty, Monte Carlo validation, and ROS 2/PX4
