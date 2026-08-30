@@ -291,6 +291,109 @@ def test_simulate_rigid_body_euler_from_rotor_speeds_returns_complete_history() 
 
 
 @pytest.mark.parametrize(
+    "simulate_rigid_body_from_rotor_speeds",
+    [
+        simulate_rigid_body_euler_from_rotor_speeds,
+        simulate_rigid_body_rk4_from_rotor_speeds,
+    ],
+)
+def test_simulators_preserve_balanced_hover_equilibrium(
+    simulate_rigid_body_from_rotor_speeds,
+) -> None:
+    position_W = np.array([10.0, 20.0, 30.0], dtype=np.float64)
+    velocity_W = np.zeros(3, dtype=np.float64)
+    q_WB = np.array([1.0, 0.0, 0.0, 0.0], dtype=np.float64)
+    omega_B = np.zeros(3, dtype=np.float64)
+
+    mass = 1.0
+    inertia_B = np.diag(np.array([2.0, 3.0, 4.0], dtype=np.float64))
+    gravity_acceleration = 9.81
+    thrust_coefficient = 0.75
+    moment_coefficient = 0.5
+
+    rotor_positions_B = np.array(
+        [
+            [0.5, 0.0, 0.0],
+            [0.0, 0.5, 0.0],
+            [-0.5, 0.0, 0.0],
+            [0.0, -0.5, 0.0],
+        ],
+        dtype=np.float64,
+    )
+    rotor_spin_directions = np.array(
+        [1.0, -1.0, 1.0, -1.0],
+        dtype=np.float64,
+    )
+
+    hover_rotor_speed = np.sqrt(mass * gravity_acceleration / (4.0 * thrust_coefficient))
+    rotor_omega = np.full(4, hover_rotor_speed, dtype=np.float64)
+
+    time_step = 0.05
+    number_of_steps = 20
+
+    (
+        time_s,
+        position_history_W,
+        velocity_history_W,
+        q_history_WB,
+        omega_history_B,
+    ) = simulate_rigid_body_from_rotor_speeds(
+        position_W,
+        velocity_W,
+        q_WB,
+        omega_B,
+        rotor_omega,
+        rotor_positions_B,
+        rotor_spin_directions,
+        mass,
+        inertia_B,
+        gravity_acceleration,
+        thrust_coefficient,
+        moment_coefficient,
+        time_step,
+        number_of_steps,
+    )
+
+    number_of_samples = number_of_steps + 1
+    expected_time_s = np.arange(number_of_samples, dtype=np.float64) * time_step
+    expected_position_history_W = np.tile(position_W, (number_of_samples, 1))
+    expected_velocity_history_W = np.zeros((number_of_samples, 3), dtype=np.float64)
+    expected_q_history_WB = np.tile(q_WB, (number_of_samples, 1))
+    expected_omega_history_B = np.zeros((number_of_samples, 3), dtype=np.float64)
+
+    np.testing.assert_allclose(
+        time_s,
+        expected_time_s,
+        rtol=0.0,
+        atol=1e-12,
+    )
+    np.testing.assert_allclose(
+        position_history_W,
+        expected_position_history_W,
+        rtol=0.0,
+        atol=1e-12,
+    )
+    np.testing.assert_allclose(
+        velocity_history_W,
+        expected_velocity_history_W,
+        rtol=0.0,
+        atol=1e-12,
+    )
+    np.testing.assert_allclose(
+        q_history_WB,
+        expected_q_history_WB,
+        rtol=0.0,
+        atol=1e-12,
+    )
+    np.testing.assert_allclose(
+        omega_history_B,
+        expected_omega_history_B,
+        rtol=0.0,
+        atol=1e-12,
+    )
+
+
+@pytest.mark.parametrize(
     ("number_of_steps", "expected_message"),
     [
         (2.0, "number_of_steps must be an integer"),

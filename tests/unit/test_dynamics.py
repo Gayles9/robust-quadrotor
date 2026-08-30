@@ -166,6 +166,81 @@ def test_rigid_body_state_derivative_from_rotor_speeds_combines_actuation_and_dy
     )
 
 
+def test_rigid_body_state_derivative_from_rotor_speeds_is_zero_at_balanced_hover() -> None:
+    position_W = np.array([10.0, 20.0, 30.0], dtype=np.float64)
+    velocity_W = np.zeros(3, dtype=np.float64)
+    q_WB = np.array([1.0, 0.0, 0.0, 0.0], dtype=np.float64)
+    omega_B = np.zeros(3, dtype=np.float64)
+
+    mass = 1.0
+    inertia_B = np.diag(np.array([2.0, 3.0, 4.0], dtype=np.float64))
+    gravity_acceleration = 9.81
+    thrust_coefficient = 0.75
+    moment_coefficient = 0.5
+
+    rotor_positions_B = np.array(
+        [
+            [0.5, 0.0, 0.0],
+            [0.0, 0.5, 0.0],
+            [-0.5, 0.0, 0.0],
+            [0.0, -0.5, 0.0],
+        ],
+        dtype=np.float64,
+    )
+    rotor_spin_directions = np.array(
+        [1.0, -1.0, 1.0, -1.0],
+        dtype=np.float64,
+    )
+
+    hover_rotor_speed = np.sqrt(mass * gravity_acceleration / (4.0 * thrust_coefficient))
+    rotor_omega = np.full(4, hover_rotor_speed, dtype=np.float64)
+
+    (
+        position_derivative_W,
+        velocity_derivative_W,
+        quaternion_derivative_WB,
+        angular_velocity_derivative_B,
+    ) = rigid_body_state_derivative_from_rotor_speeds(
+        position_W,
+        velocity_W,
+        q_WB,
+        omega_B,
+        rotor_omega,
+        rotor_positions_B,
+        rotor_spin_directions,
+        mass,
+        inertia_B,
+        gravity_acceleration,
+        thrust_coefficient,
+        moment_coefficient,
+    )
+
+    np.testing.assert_allclose(
+        position_derivative_W,
+        np.zeros(3, dtype=np.float64),
+        rtol=0.0,
+        atol=1e-12,
+    )
+    np.testing.assert_allclose(
+        velocity_derivative_W,
+        np.zeros(3, dtype=np.float64),
+        rtol=0.0,
+        atol=1e-12,
+    )
+    np.testing.assert_allclose(
+        quaternion_derivative_WB,
+        np.zeros(4, dtype=np.float64),
+        rtol=0.0,
+        atol=1e-12,
+    )
+    np.testing.assert_allclose(
+        angular_velocity_derivative_B,
+        np.zeros(3, dtype=np.float64),
+        rtol=0.0,
+        atol=1e-12,
+    )
+
+
 @pytest.mark.parametrize(
     ("position_W", "velocity_W", "expected_message"),
     [

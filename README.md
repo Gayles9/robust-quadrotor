@@ -17,7 +17,9 @@ The current working tree extends the foundational rotor-actuation and six-degree
 rigid-body dynamics pipeline with explicit-Euler propagation, fixed-step projected RK4
 propagation, deterministic multi-step Euler and RK4 state histories, reusable rigid-body
 state-history structural validation, physical trajectory-error metrics, and a completed
-deterministic Euler-versus-RK4 convergence study. The current project gate passes 221 tests.
+deterministic Euler-versus-RK4 convergence study. Focused characterization now also shows that
+the derivative model and both simulators recognize and preserve one exact balanced-thrust,
+zero-moment hover equilibrium. The current project gate passes 224 tests.
 
 The repository does not yet contain physically conditional invariant monitoring, a closed-loop
 controller, a state estimator, adaptive integration, robustness campaigns, or a completed
@@ -237,6 +239,39 @@ Rotation-matrix orthogonality and determinant checks are not duplicated here bec
 `R_WB` is not stored in the state history. Unit quaternion validity is checked at this
 boundary, while quaternion-to-matrix correctness remains owned and tested by `rotations.py`.
 
+### Balanced-hover equilibrium characterization
+
+A test-local balanced-hover scenario exercises the physical model at identity attitude with
+zero world-frame velocity and zero body-frame angular velocity. In NED, gravity acts along
+positive world `z`; in FRD, upward rotor thrust acts along negative body `z`. Four equal rotor
+speeds are selected from
+
+```text
+hover_rotor_speed = sqrt(
+    mass * gravity_acceleration / (4 * thrust_coefficient)
+)
+```
+
+The test geometry places the rotors at front `[+L, 0, 0]`, right `[0, +L, 0]`, rear
+`[-L, 0, 0]`, and left `[0, -L, 0]`, with spin directions `[+1, -1, +1, -1]`. This ordering is
+local to the tests and does not establish a package-wide rotor numbering convention. For the
+tested parameters, each rotor produces `2.4525 N`, total body thrust is `[0, 0, -9.81] N`,
+symmetric offset-thrust moments cancel roll and pitch, and the balanced spin directions cancel
+the yaw reaction moment.
+
+The derivative-level test independently verifies zero position, velocity, quaternion, and
+angular-velocity derivatives. A parameterized simulation test verifies that explicit Euler
+and projected RK4 preserve constant position, zero velocity, identity attitude, and zero
+angular velocity over 20 steps of `0.05 s`, using `rtol=0.0` and `atol=1e-12`.
+
+This proves that the implemented model recognizes and numerically preserves this specified
+exact hover equilibrium. It does not prove hover stability: without a feedback controller, a
+perturbed vehicle will not automatically return to equilibrium. Arbitrary yaw, tilted hover,
+motor dynamics, aerodynamic effects, disturbances, sensors, estimation, and uncertainty are
+not validated by this scenario. Gate G1 remains open. The scenario remains test-local because
+there is not yet a second production consumer that would justify a reusable helper,
+configuration dataclass, or standalone experiment.
+
 ### Trajectory-error and convergence metrics
 
 Three reusable metrics support quantitative comparisons:
@@ -319,6 +354,8 @@ The full convention, state shapes, signs, and hover sanity check are defined in 
   transitions.
 - Reusable rigid-body state-history structural validation for shapes, sample alignment,
   finiteness, fixed increasing time grids, and unit quaternion norms.
+- Derivative-level and multi-step characterization of one exact balanced-thrust, zero-moment
+  hover equilibrium for explicit Euler and projected RK4.
 - Row-wise Euclidean trajectory errors for independently measured vector quantities.
 - Sign-invariant geodesic quaternion attitude trajectory errors.
 - Numerically guarded observed convergence orders across adjacent time-step resolutions.
@@ -350,7 +387,7 @@ uv run mypy src experiments
 uv run pytest
 ```
 
-For the current working tree, this complete gate passes 221 tests with no warnings. Ruff lint,
+For the current working tree, this complete gate passes 224 tests with no warnings. Ruff lint,
 Ruff formatting verification, and strict mypy over `src` and `experiments` pass, and
 `git diff --check` reports no errors.
 
@@ -373,6 +410,8 @@ Ruff formatting verification, and strict mypy over `src` and `experiments` pass,
   fine numerical reference rather than an exact solution.
 - Structural history validation does not establish dynamic accuracy or scenario-specific
   conservation, equilibrium, hover, energy, or momentum behavior.
+- The balanced-hover characterization covers one exact identity-attitude equilibrium; it does
+  not establish stability or behavior after perturbations.
 - Physically conditional invariants are not yet monitored over trajectories.
 - No controller, scheduled input, callback, event handling, or adaptive step size exists.
 - No state estimator exists yet.
@@ -389,9 +428,10 @@ the final high-accuracy simulation method, especially for larger time steps or l
 
 ## Near-term roadmap
 
-1. Conduct a read-only design review for the first deterministic physical reference scenario,
-   beginning with balanced-thrust, zero-moment hover equilibrium and defining its assumptions,
-   expected state behavior, tolerances, and smallest TDD test.
+1. A read-only design review for a gravity-only ballistic reference scenario, separating
+   analytical constant-gravity trajectory behavior, horizontal-momentum conservation,
+   mechanical-energy conservation, Euler-versus-RK4 numerical behavior, and deciding the
+   smallest first test without mixing these distinct claims.
 2. Add only the resulting explicitly scoped physical reference-scenario behavior.
 3. Begin feedback-controller implementation after the numerical model is characterized.
 4. Continue later with sensors, estimation, uncertainty, Monte Carlo validation, and ROS 2/PX4
