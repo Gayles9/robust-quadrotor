@@ -1,6 +1,7 @@
 import numpy as np
 import pytest
 
+from quadrotor_math.rotations import rotation_matrix_body_to_world
 from quadrotor_math.simulation import (
     simulate_rigid_body_euler_from_rotor_speeds,
     simulate_rigid_body_rk4_from_rotor_speeds,
@@ -344,6 +345,89 @@ def test_simulate_rigid_body_rk4_from_rotor_speeds_conserves_gravity_only_mechan
         expected_mechanical_energy,
         rtol=0.0,
         atol=1e-12,
+    )
+
+
+def test_rk4_torque_free_rotation_nearly_conserves_inertial_angular_momentum() -> None:
+    position_W = np.zeros(3, dtype=np.float64)
+    velocity_W = np.zeros(3, dtype=np.float64)
+    q_WB = np.array([1.0, 0.0, 0.0, 0.0], dtype=np.float64)
+    omega_B = np.array([0.7, -0.4, 1.1], dtype=np.float64)
+    rotor_omega = np.zeros(4, dtype=np.float64)
+
+    rotor_positions_B = np.array(
+        [
+            [0.5, 0.0, 0.0],
+            [0.0, 0.5, 0.0],
+            [-0.5, 0.0, 0.0],
+            [0.0, -0.5, 0.0],
+        ],
+        dtype=np.float64,
+    )
+    rotor_spin_directions = np.array(
+        [1.0, -1.0, 1.0, -1.0],
+        dtype=np.float64,
+    )
+
+    mass = 2.0
+    inertia_B = np.diag(
+        np.array([2.0, 3.0, 4.0], dtype=np.float64),
+    )
+    gravity_acceleration = 9.81
+    thrust_coefficient = 0.75
+    moment_coefficient = 0.5
+    time_step = 0.05
+    number_of_steps = 200
+
+    (
+        _time_s,
+        _position_history_W,
+        _velocity_history_W,
+        q_history_WB,
+        omega_history_B,
+    ) = simulate_rigid_body_rk4_from_rotor_speeds(
+        position_W,
+        velocity_W,
+        q_WB,
+        omega_B,
+        rotor_omega,
+        rotor_positions_B,
+        rotor_spin_directions,
+        mass,
+        inertia_B,
+        gravity_acceleration,
+        thrust_coefficient,
+        moment_coefficient,
+        time_step,
+        number_of_steps,
+    )
+
+    angular_momentum_history_B = (inertia_B @ omega_history_B.T).T
+    angular_momentum_history_W = np.asarray(
+        [
+            rotation_matrix_body_to_world(q_sample_WB) @ angular_momentum_sample_B
+            for q_sample_WB, angular_momentum_sample_B in zip(
+                q_history_WB,
+                angular_momentum_history_B,
+                strict=True,
+            )
+        ],
+        dtype=np.float64,
+    )
+
+    expected_angular_momentum_W = np.array(
+        [1.4, -1.2, 4.4],
+        dtype=np.float64,
+    )
+    expected_angular_momentum_history_W = np.tile(
+        expected_angular_momentum_W,
+        (number_of_steps + 1, 1),
+    )
+    np.testing.assert_allclose(
+        angular_momentum_history_W,
+        expected_angular_momentum_history_W,
+        rtol=0.0,
+        atol=5e-7,
     )
 
 

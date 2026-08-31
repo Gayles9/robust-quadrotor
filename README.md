@@ -23,7 +23,9 @@ zero-moment hover equilibrium. A gravity-only ballistic reference additionally v
 against the analytical constant-gravity trajectory and Euler against its derived discrete
 trajectory. Scenario-specific energy characterization now verifies RK4 mechanical-energy
 conservation and Euler's analytically predicted positive energy drift for that gravity-only
-case. The current project gate passes 228 tests.
+case. Torque-free asymmetric rotation characterization additionally verifies instantaneous
+rotational-energy conservation and projected-RK4 near-conservation of inertial-frame angular
+momentum. The current project gate passes 230 tests.
 
 The repository does not yet contain a reusable physically conditional invariant-monitoring
 API, a closed-loop controller, a state estimator, adaptive integration, robustness campaigns,
@@ -345,6 +347,22 @@ fixed `2.0 kg` mass they implicitly verify constant horizontal momentum
 Energy remains calculated locally in the tests. No public energy function, metrics extension,
 `invariants.py` module, generic monitor, report object, or tolerance policy has been added.
 
+### Torque-free rotation invariants
+
+A test-local asymmetric rigid-body scenario uses `inertia_B = diag(2, 3, 4) kg·m²`, initial
+`omega_B = [0.7, -0.4, 1.1] rad/s`, identity `q_WB`, and zero applied moment. A focused
+dynamics test verifies the nonzero gyroscopically coupled angular acceleration and zero
+instantaneous rotational-energy rate within `1e-12 W`.
+
+Over a separate 10-second projected-RK4 simulation with a `0.05 s` step, the complete
+inertial-frame angular-momentum history remains within an absolute componentwise bound of
+`5e-7 kg·m²/s` from its initial value. This characterizes small numerical drift for the exact
+scenario and grid; it does not claim exact discrete conservation or make RK4 an
+invariant-preserving integrator. The detailed derivations, measured drift, ownership decision,
+and limitations are recorded in the
+[torque-free rotation invariants progress record](docs/progress/2026-08-31-torque-free-rotation-invariants.md).
+Gate G1 remains open.
+
 ### Trajectory-error and convergence metrics
 
 Three reusable metrics support quantitative comparisons:
@@ -433,6 +451,8 @@ The full convention, state shapes, signs, and hover sanity check are defined in 
   derived discrete-Euler trajectory.
 - Gravity-only mechanical-energy characterization of RK4 conservation and Euler's predicted
   positive numerical drift under explicit scenario assumptions.
+- Torque-free asymmetric rotation characterization of instantaneous rotational-energy
+  conservation and projected-RK4 near-conservation of inertial-frame angular momentum.
 - Row-wise Euclidean trajectory errors for independently measured vector quantities.
 - Sign-invariant geodesic quaternion attitude trajectory errors.
 - Numerically guarded observed convergence orders across adjacent time-step resolutions.
@@ -464,7 +484,7 @@ uv run mypy src experiments
 uv run pytest
 ```
 
-For the current working tree, this complete gate passes 228 tests with no warnings. Ruff lint,
+For the current working tree, this complete gate passes 230 tests with no warnings. Ruff lint,
 Ruff formatting verification, and strict mypy over `src` and `experiments` pass, and
 `git diff --check` reports no errors.
 
@@ -496,6 +516,9 @@ Ruff formatting verification, and strict mypy over `src` and `experiments` pass,
   than exposed through a reusable momentum diagnostic.
 - Physically conditional invariants are not yet owned by a reusable monitoring API, and RK4
   is not claimed to preserve energy for arbitrary nonlinear systems.
+- The torque-free rotation evidence covers one identity-attitude, diagonal-inertia scenario
+  and one 10-second RK4 grid. It does not establish exact discrete conservation, arbitrary
+  inertia behavior, Euler drift, or long-duration stability.
 - No controller, scheduled input, callback, event handling, or adaptive step size exists.
 - No state estimator exists yet.
 - No Monte Carlo campaign exists yet.
@@ -511,11 +534,10 @@ the final high-accuracy simulation method, especially for larger time steps or l
 
 ## Near-term roadmap
 
-1. A read-only design review for torque-free rigid-body rotation, separating rotational
-   kinetic-energy conservation, body-frame angular-velocity evolution, inertial-frame
-   angular-momentum conservation, quaternion attitude evolution, Euler versus projected-RK4
-   behavior, and whether test-local calculations or a reusable physical-diagnostics API are
-   justified.
+1. Perform a read-only remaining-Gate-G1 evidence review to determine which deterministic
+   physical characterization is still necessary before closing the plant-model and
+   numerical-foundation gate, including whether multi-step rotational-energy drift needs its
+   own test.
 2. Add only the resulting explicitly scoped physical reference-scenario behavior.
 3. Begin feedback-controller implementation after the numerical model is characterized.
 4. Continue later with sensors, estimation, uncertainty, Monte Carlo validation, and ROS 2/PX4

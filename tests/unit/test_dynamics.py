@@ -379,6 +379,44 @@ def test_angular_acceleration_body_includes_gyroscopic_coupling() -> None:
     )
 
 
+def test_angular_acceleration_body_from_moment_has_zero_rotational_energy_rate_when_torque_free() -> (  # noqa: E501
+    None
+):
+    moment_B = np.zeros(3, dtype=np.float64)
+    omega_B = np.array(
+        [0.7, -0.4, 1.1],
+        dtype=np.float64,
+    )
+    inertia_B = np.diag(
+        np.array([2.0, 3.0, 4.0], dtype=np.float64),
+    )
+
+    omega_dot_B = angular_acceleration_body_from_moment(
+        moment_B,
+        omega_B,
+        inertia_B,
+    )
+
+    expected_omega_dot_B = np.array(
+        [0.22, 1.54 / 3.0, 0.07],
+        dtype=np.float64,
+    )
+    np.testing.assert_allclose(
+        omega_dot_B,
+        expected_omega_dot_B,
+        rtol=0.0,
+        atol=1e-12,
+    )
+
+    rotational_energy_rate = omega_B @ inertia_B @ omega_dot_B
+    np.testing.assert_allclose(
+        rotational_energy_rate,
+        0.0,
+        rtol=0.0,
+        atol=1e-12,
+    )
+
+
 @pytest.mark.parametrize(
     ("moment_B", "omega_B", "inertia_B", "expected_message"),
     [
