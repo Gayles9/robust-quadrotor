@@ -25,7 +25,13 @@ trajectory. Scenario-specific energy characterization now verifies RK4 mechanica
 conservation and Euler's analytically predicted positive energy drift for that gravity-only
 case. Torque-free asymmetric rotation characterization additionally verifies instantaneous
 rotational-energy conservation and projected-RK4 near-conservation of inertial-frame angular
-momentum. The current project gate passes 230 tests.
+momentum.
+
+The mathematical core now also exposes the ideal-accelerometer specific-force boundary
+`ideal_accelerometer_specific_force_body(...)` in `src/quadrotor_math/imu.py`. It applies the
+repository's NED/FRD frame contract, accepts zero gravity, and rejects malformed or non-finite
+array inputs and invalid gravity magnitudes. The verified current project gate passes 242
+tests with no warnings.
 
 The repository does not yet contain a reusable physically conditional invariant-monitoring
 API, a closed-loop controller, a state estimator, adaptive integration, robustness campaigns,
@@ -114,6 +120,35 @@ The symbol `⊗` denotes the Hamilton quaternion product. `q_WB` uses scalar-fir
 
 **Practical interpretation.** Body angular velocity determines the instantaneous rate of
 change of the vehicle's body-to-world attitude.
+
+### Ideal accelerometer specific force
+
+The public module `src/quadrotor_math/imu.py` provides
+`ideal_accelerometer_specific_force_body(...)`. For supplied world-frame inertial
+translational acceleration `a_W`, the function calculates
+
+```text
+g_W = [0, 0, g]
+f_B = R_WB.T @ (a_W - g_W)
+```
+
+The world frame is north-east-down (NED), the body frame is forward-right-down (FRD), and
+positive world `z` points down. `R_WB` maps body-coordinate vectors into world coordinates,
+so `R_WB.T` maps world-coordinate vectors into body coordinates. An ideal accelerometer
+reports specific force rather than gravity-inclusive inertial acceleration, which is why
+`g_W` is subtracted before the result is rotated into the body frame.
+
+Three physical anchors fix the signs and frames: tilted thrust maps to body negative `z`,
+level rest or hover returns `[0, 0, -g]`, and gravity-only free fall returns `[0, 0, 0]`.
+Zero gravity is valid; with identity `R_WB`, the returned specific force then equals the
+supplied inertial acceleration.
+
+The function validates that `translational_acceleration_W` has shape `(3,)`, `R_WB` has shape
+`(3, 3)`, both arrays contain only finite entries, and the gravity magnitude is finite and
+nonnegative. Proper-rotation construction and correctness remain owned by the existing
+rotations layer. This function does not independently test `R_WB` orthogonality or
+determinant. The detailed derivation, evidence, ownership, and limitations are recorded in
+the [ideal-accelerometer specific-force progress record](docs/progress/2026-09-01-ideal-accelerometer-specific-force.md).
 
 ### Explicit-Euler propagation
 
@@ -460,6 +495,9 @@ The full convention, state shapes, signs, and hover sanity check are defined in 
   maximum-trajectory error tables.
 - Typed interfaces, explicit shape/value/physical-parameter validation, and unit tests for
   the implemented boundaries.
+- Ideal accelerometer specific force in the FRD body frame from supplied NED inertial
+  acceleration and body-to-world attitude, including shape, finiteness, and nonnegative
+  gravity-magnitude validation.
 
 ## Verification and development workflow
 
@@ -484,15 +522,15 @@ uv run mypy src experiments
 uv run pytest
 ```
 
-For the current working tree, this complete gate passes 230 tests with no warnings. Ruff lint,
+For the current working tree, this complete gate passes 242 tests with no warnings. Ruff lint,
 Ruff formatting verification, and strict mypy over `src` and `experiments` pass, and
 `git diff --check` reports no errors.
 
 ## Repository structure
 
 - `src/quadrotor_math/`: ROS/PX4-independent vector, randomness, rotation, actuation,
-  dynamics, integration, deterministic simulation, state-history validation, and
-  trajectory-error algorithms.
+  dynamics, integration, deterministic simulation, ideal IMU mathematics, state-history
+  validation, and trajectory-error algorithms.
 - `experiments/`: reproducible numerical studies built from the public mathematical core.
 - `tests/unit/`: focused unit and composition tests for the mathematical core.
 - `docs/architecture/`: architectural contracts, including frames and state conventions.
@@ -521,6 +559,9 @@ Ruff formatting verification, and strict mypy over `src` and `experiments` pass,
   inertia behavior, Euler drift, or long-duration stability.
 - No controller, scheduled input, callback, event handling, or adaptive step size exists.
 - No state estimator exists yet.
+- The accelerometer boundary is ideal and deterministic; it does not model bias, noise,
+  scale factors, misalignment, saturation, quantization, temperature, timing, lever-arm
+  effects, vibration, mounting dynamics, or calibration.
 - No Monte Carlo campaign exists yet.
 - No completed ROS 2/PX4 adapter exists yet.
 - The current mathematical model represents only the effects present in the source: static
@@ -534,11 +575,10 @@ the final high-accuracy simulation method, especially for larger time steps or l
 
 ## Near-term roadmap
 
-1. Perform a read-only remaining-Gate-G1 evidence review to determine which deterministic
-   physical characterization is still necessary before closing the plant-model and
-   numerical-foundation gate, including whether multi-step rotational-energy drift needs its
-   own test.
-2. Add only the resulting explicitly scoped physical reference-scenario behavior.
-3. Begin feedback-controller implementation after the numerical model is characterized.
-4. Continue later with sensors, estimation, uncertainty, Monte Carlo validation, and ROS 2/PX4
+1. Conduct a read-only ideal-gyroscope API and ownership design review before adding tests or
+   production code.
+2. Add only the resulting explicitly scoped gyroscope behavior.
+3. Continue Gate G1 work without claiming completion until its remaining deterministic and
+   stochastic evidence is implemented.
+4. Continue later with estimation, control, uncertainty, Monte Carlo validation, and ROS 2/PX4
    adapters.
