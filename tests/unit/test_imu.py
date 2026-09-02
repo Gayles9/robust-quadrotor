@@ -2,9 +2,147 @@ import numpy as np
 import pytest
 
 from quadrotor_math.imu import (
+    gyroscope_angular_velocity_with_bias_body,
     ideal_accelerometer_specific_force_body,
     ideal_gyroscope_angular_velocity_body,
 )
+
+
+def test_gyroscope_angular_velocity_with_bias_body_adds_constant_bias() -> None:
+    ideal_angular_velocity_B = np.array(
+        [0.7, -0.4, 1.1],
+        dtype=np.float64,
+    )
+    gyroscope_bias_B = np.array(
+        [0.02, -0.03, 0.04],
+        dtype=np.float64,
+    )
+
+    angular_velocity_with_bias_B = gyroscope_angular_velocity_with_bias_body(
+        ideal_angular_velocity_B,
+        gyroscope_bias_B,
+    )
+
+    expected_angular_velocity_with_bias_B = np.array(
+        [0.72, -0.43, 1.14],
+        dtype=np.float64,
+    )
+    np.testing.assert_allclose(
+        angular_velocity_with_bias_B,
+        expected_angular_velocity_with_bias_B,
+        rtol=0.0,
+        atol=1e-12,
+    )
+
+
+def test_gyroscope_angular_velocity_with_bias_body_returns_independent_measurement() -> None:
+    ideal_angular_velocity_B = np.array(
+        [0.7, -0.4, 1.1],
+        dtype=np.float64,
+    )
+    gyroscope_bias_B = np.array(
+        [0.02, -0.03, 0.04],
+        dtype=np.float64,
+    )
+
+    angular_velocity_with_bias_B = gyroscope_angular_velocity_with_bias_body(
+        ideal_angular_velocity_B,
+        gyroscope_bias_B,
+    )
+
+    assert not np.shares_memory(
+        angular_velocity_with_bias_B,
+        ideal_angular_velocity_B,
+    )
+    assert not np.shares_memory(
+        angular_velocity_with_bias_B,
+        gyroscope_bias_B,
+    )
+
+
+def test_gyroscope_angular_velocity_with_bias_body_rejects_invalid_ideal_shape() -> None:
+    ideal_angular_velocity_B = np.zeros((3, 1), dtype=np.float64)
+    gyroscope_bias_B = np.zeros(3, dtype=np.float64)
+
+    with pytest.raises(
+        ValueError,
+        match=r"ideal_angular_velocity_B must have shape \(3,\)",
+    ):
+        gyroscope_angular_velocity_with_bias_body(
+            ideal_angular_velocity_B,
+            gyroscope_bias_B,
+        )
+
+
+def test_gyroscope_angular_velocity_with_bias_body_rejects_invalid_bias_shape() -> None:
+    ideal_angular_velocity_B = np.zeros(3, dtype=np.float64)
+    gyroscope_bias_B = np.zeros((3, 1), dtype=np.float64)
+
+    with pytest.raises(
+        ValueError,
+        match=r"gyroscope_bias_B must have shape \(3,\)",
+    ):
+        gyroscope_angular_velocity_with_bias_body(
+            ideal_angular_velocity_B,
+            gyroscope_bias_B,
+        )
+
+
+@pytest.mark.parametrize(
+    "invalid_value",
+    [
+        np.nan,
+        np.inf,
+        -np.inf,
+    ],
+)
+def test_gyroscope_angular_velocity_with_bias_body_rejects_nonfinite_ideal_values(
+    invalid_value: float,
+) -> None:
+    ideal_angular_velocity_B = np.array(
+        [0.7, invalid_value, 1.1],
+        dtype=np.float64,
+    )
+    gyroscope_bias_B = np.zeros(3, dtype=np.float64)
+
+    with pytest.raises(
+        ValueError,
+        match="ideal_angular_velocity_B must contain only finite values",
+    ):
+        gyroscope_angular_velocity_with_bias_body(
+            ideal_angular_velocity_B,
+            gyroscope_bias_B,
+        )
+
+
+@pytest.mark.parametrize(
+    "invalid_value",
+    [
+        np.nan,
+        np.inf,
+        -np.inf,
+    ],
+)
+def test_gyroscope_angular_velocity_with_bias_body_rejects_nonfinite_bias_values(
+    invalid_value: float,
+) -> None:
+    ideal_angular_velocity_B = np.array(
+        [0.7, -0.4, 1.1],
+        dtype=np.float64,
+    )
+    gyroscope_bias_B = np.array(
+        [0.02, invalid_value, 0.04],
+        dtype=np.float64,
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="gyroscope_bias_B must contain only finite values",
+    ):
+        gyroscope_angular_velocity_with_bias_body(
+            ideal_angular_velocity_B,
+            gyroscope_bias_B,
+        )
 
 
 def test_ideal_gyroscope_angular_velocity_body_returns_body_angular_velocity() -> None:
