@@ -48,3 +48,33 @@ def ideal_accelerometer_specific_force_body(
     )
 
     return R_WB.T @ (translational_acceleration_W - gravity_W)
+
+
+def ideal_gyroscope_angular_velocity_body(
+    omega_B: NDArray[np.float64],
+) -> NDArray[np.float64]:
+    """Return an ideal body-aligned gyroscope measurement in the FRD body frame.
+
+    Args:
+        omega_B: Rigid-body angular velocity with shape ``(3,)``, expressed in
+            the forward-right-down (FRD) body frame in rad/s.
+
+    Returns:
+        Independently owned float64 array containing the ideal body-aligned
+        gyroscope measurement in rad/s.
+
+    Raises:
+        ValueError: If ``omega_B`` does not have shape ``(3,)`` or contains a
+            non-finite value.
+    """
+    if omega_B.shape != (3,):
+        raise ValueError("omega_B must have shape (3,)")
+
+    if not np.all(np.isfinite(omega_B)):
+        raise ValueError("omega_B must contain only finite values")
+
+    return np.array(
+        omega_B,
+        dtype=np.float64,
+        copy=True,
+    )

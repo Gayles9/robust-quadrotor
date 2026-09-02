@@ -27,11 +27,12 @@ case. Torque-free asymmetric rotation characterization additionally verifies ins
 rotational-energy conservation and projected-RK4 near-conservation of inertial-frame angular
 momentum.
 
-The mathematical core now also exposes the ideal-accelerometer specific-force boundary
-`ideal_accelerometer_specific_force_body(...)` in `src/quadrotor_math/imu.py`. It applies the
-repository's NED/FRD frame contract, accepts zero gravity, and rejects malformed or non-finite
-array inputs and invalid gravity magnitudes. The verified current project gate passes 242
-tests with no warnings.
+The mathematical core now also exposes ideal accelerometer and gyroscope boundaries in
+`src/quadrotor_math/imu.py`. The accelerometer applies the repository's NED/FRD frame contract,
+accepts zero gravity, and rejects malformed or non-finite array inputs and invalid gravity
+magnitudes. The body-aligned gyroscope returns `omega_B` in the FRD body frame as an
+independently owned float64 array and rejects malformed or non-finite rates. The verified
+current project gate passes 248 tests with no warnings.
 
 The repository does not yet contain a reusable physically conditional invariant-monitoring
 API, a closed-loop controller, a state estimator, adaptive integration, robustness campaigns,
@@ -149,6 +150,41 @@ nonnegative. Proper-rotation construction and correctness remain owned by the ex
 rotations layer. This function does not independently test `R_WB` orthogonality or
 determinant. The detailed derivation, evidence, ownership, and limitations are recorded in
 the [ideal-accelerometer specific-force progress record](docs/progress/2026-09-01-ideal-accelerometer-specific-force.md).
+
+### Ideal gyroscope angular velocity
+
+The same public IMU module provides:
+
+```python
+ideal_gyroscope_angular_velocity_body(
+    omega_B: NDArray[np.float64],
+) -> NDArray[np.float64]
+```
+
+For an ideal body-aligned gyroscope, the measurement equation is
+
+```text
+gyroscope_output_B = omega_B
+```
+
+`omega_B` is rigid-body angular velocity with shape `(3,)`, expressed along the
+forward-right-down body axes in rad/s. Its components follow the right-hand rule about body
+forward, right, and down. Because the supplied quantity is already expressed in the aligned
+sensor axes, no attitude or gravity transformation is required; position, translational
+velocity, and translational acceleration are not inputs either.
+
+The returned measurement is an independently owned float64 array with no shared memory with
+caller-owned truth state. The function validates exact shape `(3,)` and finiteness in that
+order. Zero and finite negative rates remain valid, and no arbitrary magnitude restriction is
+imposed. Focused tests establish exact mixed-sign component preservation, independent-memory
+ownership, invalid-shape rejection, and rejection of NaN and both infinities.
+
+This boundary is ideal and deterministic. It includes no bias, white noise, bias drift or
+random walk, scale-factor error, axis misalignment, saturation, quantization, sampling policy,
+latency, or stochastic configuration. It does not validate the dynamics that produced
+`omega_B`, establish realistic sensor behavior, or complete Gate G1. The detailed contract,
+TDD evidence, decisions, and limitations are recorded in the
+[ideal-gyroscope angular-velocity progress record](docs/progress/2026-09-01-ideal-gyroscope-angular-velocity.md).
 
 ### Explicit-Euler propagation
 
@@ -498,6 +534,8 @@ The full convention, state shapes, signs, and hover sanity check are defined in 
 - Ideal accelerometer specific force in the FRD body frame from supplied NED inertial
   acceleration and body-to-world attitude, including shape, finiteness, and nonnegative
   gravity-magnitude validation.
+- Ideal body-aligned gyroscope angular velocity in the FRD body frame, with exact shape and
+  finiteness validation plus independent float64 measurement ownership.
 
 ## Verification and development workflow
 
@@ -522,7 +560,7 @@ uv run mypy src experiments
 uv run pytest
 ```
 
-For the current working tree, this complete gate passes 242 tests with no warnings. Ruff lint,
+For the current working tree, this complete gate passes 248 tests with no warnings. Ruff lint,
 Ruff formatting verification, and strict mypy over `src` and `experiments` pass, and
 `git diff --check` reports no errors.
 
@@ -562,6 +600,9 @@ Ruff formatting verification, and strict mypy over `src` and `experiments` pass,
 - The accelerometer boundary is ideal and deterministic; it does not model bias, noise,
   scale factors, misalignment, saturation, quantization, temperature, timing, lever-arm
   effects, vibration, mounting dynamics, or calibration.
+- The gyroscope boundary is ideal and deterministic; it does not model bias, white noise,
+  bias drift or random walk, scale factors, axis misalignment, saturation, quantization,
+  sampling, latency, or stochastic configuration.
 - No Monte Carlo campaign exists yet.
 - No completed ROS 2/PX4 adapter exists yet.
 - The current mathematical model represents only the effects present in the source: static
@@ -575,10 +616,9 @@ the final high-accuracy simulation method, especially for larger time steps or l
 
 ## Near-term roadmap
 
-1. Conduct a read-only ideal-gyroscope API and ownership design review before adding tests or
-   production code.
-2. Add only the resulting explicitly scoped gyroscope behavior.
-3. Continue Gate G1 work without claiming completion until its remaining deterministic and
+1. Conduct a read-only stochastic IMU sensor-model and RNG-ownership design review before
+   introducing bias or noise tests.
+2. Continue Gate G1 work without claiming completion until its remaining deterministic and
    stochastic evidence is implemented.
-4. Continue later with estimation, control, uncertainty, Monte Carlo validation, and ROS 2/PX4
+3. Continue later with estimation, control, uncertainty, Monte Carlo validation, and ROS 2/PX4
    adapters.

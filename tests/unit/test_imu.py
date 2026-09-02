@@ -1,7 +1,72 @@
 import numpy as np
 import pytest
 
-from quadrotor_math.imu import ideal_accelerometer_specific_force_body
+from quadrotor_math.imu import (
+    ideal_accelerometer_specific_force_body,
+    ideal_gyroscope_angular_velocity_body,
+)
+
+
+def test_ideal_gyroscope_angular_velocity_body_returns_body_angular_velocity() -> None:
+    omega_B = np.array(
+        [0.7, -0.4, 1.1],
+        dtype=np.float64,
+    )
+
+    angular_velocity_B = ideal_gyroscope_angular_velocity_body(omega_B)
+
+    expected_angular_velocity_B = np.array(
+        [0.7, -0.4, 1.1],
+        dtype=np.float64,
+    )
+    np.testing.assert_array_equal(
+        angular_velocity_B,
+        expected_angular_velocity_B,
+    )
+
+
+def test_ideal_gyroscope_angular_velocity_body_returns_independent_measurement() -> None:
+    omega_B = np.array(
+        [0.7, -0.4, 1.1],
+        dtype=np.float64,
+    )
+
+    angular_velocity_B = ideal_gyroscope_angular_velocity_body(omega_B)
+
+    assert not np.shares_memory(angular_velocity_B, omega_B)
+
+
+def test_ideal_gyroscope_angular_velocity_body_rejects_invalid_shape() -> None:
+    omega_B = np.zeros((3, 1), dtype=np.float64)
+
+    with pytest.raises(
+        ValueError,
+        match=r"omega_B must have shape \(3,\)",
+    ):
+        ideal_gyroscope_angular_velocity_body(omega_B)
+
+
+@pytest.mark.parametrize(
+    "invalid_value",
+    [
+        np.nan,
+        np.inf,
+        -np.inf,
+    ],
+)
+def test_ideal_gyroscope_angular_velocity_body_rejects_nonfinite_values(
+    invalid_value: float,
+) -> None:
+    omega_B = np.array(
+        [0.7, invalid_value, 1.1],
+        dtype=np.float64,
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="omega_B must contain only finite values",
+    ):
+        ideal_gyroscope_angular_velocity_body(omega_B)
 
 
 def test_ideal_accelerometer_specific_force_body_returns_tilted_thrust_in_frd() -> None:
