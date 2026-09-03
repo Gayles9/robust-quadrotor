@@ -2,12 +2,168 @@ import numpy as np
 import pytest
 
 from quadrotor_math.imu import (
+    accelerometer_specific_force_with_bias_body,
     gyroscope_angular_velocity_measurement_body,
     gyroscope_angular_velocity_with_bias_body,
     ideal_accelerometer_specific_force_body,
     ideal_gyroscope_angular_velocity_body,
 )
 from quadrotor_math.randomness import create_rng
+
+
+def test_accelerometer_specific_force_with_bias_body_adds_constant_bias() -> None:
+    ideal_specific_force_B = np.array(
+        [1.2, -0.8, -9.81],
+        dtype=np.float64,
+    )
+    accelerometer_bias_B = np.array(
+        [0.05, -0.02, 0.1],
+        dtype=np.float64,
+    )
+
+    specific_force_with_bias_B = accelerometer_specific_force_with_bias_body(
+        ideal_specific_force_B,
+        accelerometer_bias_B,
+    )
+
+    expected_specific_force_with_bias_B = np.array(
+        [1.25, -0.82, -9.71],
+        dtype=np.float64,
+    )
+    np.testing.assert_allclose(
+        specific_force_with_bias_B,
+        expected_specific_force_with_bias_B,
+        rtol=0.0,
+        atol=1e-12,
+    )
+
+
+def test_accelerometer_zero_bias_returns_ideal_specific_force() -> None:
+    ideal_specific_force_B = np.array(
+        [1.2, -0.8, -9.81],
+        dtype=np.float64,
+    )
+    accelerometer_bias_B = np.zeros(3, dtype=np.float64)
+
+    specific_force_with_bias_B = accelerometer_specific_force_with_bias_body(
+        ideal_specific_force_B,
+        accelerometer_bias_B,
+    )
+
+    np.testing.assert_array_equal(
+        specific_force_with_bias_B,
+        ideal_specific_force_B,
+    )
+
+
+def test_accelerometer_specific_force_with_bias_body_returns_independent_measurement() -> None:
+    ideal_specific_force_B = np.array(
+        [1.2, -0.8, -9.81],
+        dtype=np.float64,
+    )
+    accelerometer_bias_B = np.array(
+        [0.05, -0.02, 0.1],
+        dtype=np.float64,
+    )
+
+    specific_force_with_bias_B = accelerometer_specific_force_with_bias_body(
+        ideal_specific_force_B,
+        accelerometer_bias_B,
+    )
+
+    assert not np.shares_memory(
+        specific_force_with_bias_B,
+        ideal_specific_force_B,
+    )
+    assert not np.shares_memory(
+        specific_force_with_bias_B,
+        accelerometer_bias_B,
+    )
+
+
+def test_accelerometer_specific_force_with_bias_body_rejects_invalid_ideal_shape() -> None:
+    ideal_specific_force_B = np.zeros((3, 1), dtype=np.float64)
+    accelerometer_bias_B = np.zeros(3, dtype=np.float64)
+
+    with pytest.raises(
+        ValueError,
+        match=r"ideal_specific_force_B must have shape \(3,\)",
+    ):
+        accelerometer_specific_force_with_bias_body(
+            ideal_specific_force_B,
+            accelerometer_bias_B,
+        )
+
+
+def test_accelerometer_specific_force_with_bias_body_rejects_invalid_bias_shape() -> None:
+    ideal_specific_force_B = np.zeros(3, dtype=np.float64)
+    accelerometer_bias_B = np.zeros((3, 1), dtype=np.float64)
+
+    with pytest.raises(
+        ValueError,
+        match=r"accelerometer_bias_B must have shape \(3,\)",
+    ):
+        accelerometer_specific_force_with_bias_body(
+            ideal_specific_force_B,
+            accelerometer_bias_B,
+        )
+
+
+@pytest.mark.parametrize(
+    "invalid_value",
+    [
+        np.nan,
+        np.inf,
+        -np.inf,
+    ],
+)
+def test_accelerometer_specific_force_with_bias_body_rejects_nonfinite_ideal_values(
+    invalid_value: float,
+) -> None:
+    ideal_specific_force_B = np.array(
+        [1.2, invalid_value, -9.81],
+        dtype=np.float64,
+    )
+    accelerometer_bias_B = np.zeros(3, dtype=np.float64)
+
+    with pytest.raises(
+        ValueError,
+        match="ideal_specific_force_B must contain only finite values",
+    ):
+        accelerometer_specific_force_with_bias_body(
+            ideal_specific_force_B,
+            accelerometer_bias_B,
+        )
+
+
+@pytest.mark.parametrize(
+    "invalid_value",
+    [
+        np.nan,
+        np.inf,
+        -np.inf,
+    ],
+)
+def test_accelerometer_specific_force_with_bias_body_rejects_nonfinite_bias_values(
+    invalid_value: float,
+) -> None:
+    ideal_specific_force_B = np.array(
+        [1.2, -0.8, -9.81],
+        dtype=np.float64,
+    )
+    accelerometer_bias_B = np.array(
+        [0.05, invalid_value, 0.1],
+        dtype=np.float64,
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="accelerometer_bias_B must contain only finite values",
+    ):
+        accelerometer_specific_force_with_bias_body(
+            ideal_specific_force_B,
+            accelerometer_bias_B,
+        )
 
 
 def test_gyroscope_angular_velocity_measurement_body_adds_seeded_white_noise() -> None:

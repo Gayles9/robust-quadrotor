@@ -35,8 +35,9 @@ independently owned float64 array and rejects malformed or non-finite rates. A s
 deterministic boundary adds a supplied constant three-axis gyroscope bias without hidden
 sensor state. A reproducible noisy-measurement boundary adds caller-configured per-axis,
 per-sample white noise from a caller-owned NumPy generator with explicit validation and fixed
-random-consumption semantics. The verified current project gate passes 278 tests with no
-warnings.
+random-consumption semantics. A matching accelerometer boundary now adds a supplied constant
+three-axis bias to ideal FRD specific force with explicit validation and independent output
+ownership. The verified current project gate passes 289 tests with no warnings.
 
 The repository does not yet contain a reusable physically conditional invariant-monitoring
 API, a closed-loop controller, a state estimator, adaptive integration, robustness campaigns,
@@ -154,6 +155,43 @@ nonnegative. Proper-rotation construction and correctness remain owned by the ex
 rotations layer. This function does not independently test `R_WB` orthogonality or
 determinant. The detailed derivation, evidence, ownership, and limitations are recorded in
 the [ideal-accelerometer specific-force progress record](docs/progress/2026-09-01-ideal-accelerometer-specific-force.md).
+
+### Constant accelerometer bias
+
+The public IMU module now also provides:
+
+```python
+accelerometer_specific_force_with_bias_body(
+    ideal_specific_force_B: NDArray[np.float64],
+    accelerometer_bias_B: NDArray[np.float64],
+) -> NDArray[np.float64]
+```
+
+Its deterministic measurement equation is:
+
+```text
+specific_force_with_bias_B
+    = ideal_specific_force_B + accelerometer_bias_B
+```
+
+Both inputs and the output have exact shape `(3,)`, are expressed along the
+forward-right-down body axes, and use m/s². `accelerometer_bias_B` is a caller-supplied
+constant additive three-axis accelerometer bias. Finite positive, negative, and zero bias
+components are valid; a negative component represents bias in the negative direction of the
+corresponding signed FRD body axis. A zero bias returns values exactly equal to the ideal
+specific force.
+
+The function validates the ideal-input shape, bias-input shape, ideal-input finiteness, and
+bias-input finiteness in that order. Invalid inputs raise `ValueError` with input-specific
+messages. NumPy addition produces an independently owned result for the validated arrays: the
+output shares memory with neither input, and production performs no separate explicit copy.
+
+This milestone adds no accelerometer white noise, RNG behavior, bias drift, scale-factor or
+cross-axis error, saturation, quantization, latency, or sample scheduling. Gate G1 remains
+open. The next exact implementation milestone is reproducible accelerometer white noise with
+caller-owned RNG behavior, matching the established gyroscope noise architecture. The full
+contract and evidence are recorded in the
+[constant-accelerometer-bias progress record](docs/progress/2026-09-03-constant-accelerometer-bias.md).
 
 ### Ideal gyroscope angular velocity
 
@@ -631,6 +669,9 @@ The full convention, state shapes, signs, and hover sanity check are defined in 
 - Ideal accelerometer specific force in the FRD body frame from supplied NED inertial
   acceleration and body-to-world attitude, including shape, finiteness, and nonnegative
   gravity-magnitude validation.
+- Deterministic constant additive three-axis accelerometer bias in the FRD body frame, with
+  separate shape and finiteness validation, exact zero-bias behavior, and independent output
+  ownership.
 - Ideal body-aligned gyroscope angular velocity in the FRD body frame, with exact shape and
   finiteness validation plus independent float64 measurement ownership.
 - Deterministic constant additive three-axis gyroscope bias in the FRD body frame, with
@@ -662,9 +703,10 @@ uv run mypy src experiments
 uv run pytest
 ```
 
-For the current working tree, this complete gate passes 278 tests with no warnings. Ruff lint,
-Ruff formatting verification, and strict mypy over `src` and `experiments` pass, and
-`git diff --check` reports no errors.
+For the current working tree, the IMU module passes 59 tests and the complete gate passes 289
+tests, both with no warnings. Ruff lint and Ruff formatting verification pass. Strict mypy
+over `src` and `experiments` passes with no issues in 12 source files, and `git diff --check`
+reports no errors.
 
 ## Repository structure
 
@@ -699,9 +741,10 @@ Ruff formatting verification, and strict mypy over `src` and `experiments` pass,
   inertia behavior, Euler drift, or long-duration stability.
 - No controller, scheduled input, callback, event handling, or adaptive step size exists.
 - No state estimator exists yet.
-- The accelerometer boundary is ideal and deterministic; it does not model bias, noise,
-  scale factors, misalignment, saturation, quantization, temperature, timing, lever-arm
-  effects, vibration, mounting dynamics, or calibration.
+- The accelerometer measurement boundary models a supplied constant additive bias. It does
+  not model white noise, bias drift or random walk, scale factors, cross-axis error,
+  misalignment, saturation, quantization, temperature, timing, lever-arm effects, vibration,
+  mounting dynamics, or calibration.
 - The gyroscope measurement boundary models a supplied constant additive bias and per-axis,
   per-sample white-noise standard deviation. It does not model bias drift or random walk,
   continuous-time noise density, automatic sample-rate scaling, scale factors, axis
@@ -719,8 +762,9 @@ the final high-accuracy simulation method, especially for larger time steps or l
 
 ## Near-term roadmap
 
-1. Add the first RED test for constant additive accelerometer bias while preserving the
-   established NED/FRD frame and ownership contracts.
+1. Add the first RED test for reproducible accelerometer white noise with a caller-owned
+   seeded RNG, following the established gyroscope white-noise architecture and preserving
+   deterministic replay and explicit random-consumption semantics.
 2. Continue Gate G1 work without claiming completion until its remaining deterministic and
    stochastic evidence is implemented.
 3. Continue later with estimation, control, uncertainty, Monte Carlo validation, and ROS 2/PX4

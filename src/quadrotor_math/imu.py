@@ -51,6 +51,41 @@ def ideal_accelerometer_specific_force_body(
     return R_WB.T @ (translational_acceleration_W - gravity_W)
 
 
+def accelerometer_specific_force_with_bias_body(
+    ideal_specific_force_B: NDArray[np.float64],
+    accelerometer_bias_B: NDArray[np.float64],
+) -> NDArray[np.float64]:
+    """Return biased accelerometer specific force in the FRD body frame.
+
+    Args:
+        ideal_specific_force_B: Ideal body-aligned accelerometer output expected
+            to have shape ``(3,)``, expressed in the forward-right-down (FRD)
+            body frame in m/s².
+        accelerometer_bias_B: Constant additive three-axis bias expected to have
+            shape ``(3,)``, expressed in the FRD body frame in m/s².
+
+    Returns:
+        Biased body-frame specific force in m/s².
+
+    Raises:
+        ValueError: If either input does not have shape ``(3,)`` or contains a
+            non-finite value.
+    """
+    if ideal_specific_force_B.shape != (3,):
+        raise ValueError("ideal_specific_force_B must have shape (3,)")
+
+    if accelerometer_bias_B.shape != (3,):
+        raise ValueError("accelerometer_bias_B must have shape (3,)")
+
+    if not np.all(np.isfinite(ideal_specific_force_B)):
+        raise ValueError("ideal_specific_force_B must contain only finite values")
+
+    if not np.all(np.isfinite(accelerometer_bias_B)):
+        raise ValueError("accelerometer_bias_B must contain only finite values")
+
+    return ideal_specific_force_B + accelerometer_bias_B
+
+
 def ideal_gyroscope_angular_velocity_body(
     omega_B: NDArray[np.float64],
 ) -> NDArray[np.float64]:
