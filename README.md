@@ -33,7 +33,10 @@ accepts zero gravity, and rejects malformed or non-finite array inputs and inval
 magnitudes. The body-aligned gyroscope returns `omega_B` in the FRD body frame as an
 independently owned float64 array and rejects malformed or non-finite rates. A separate
 deterministic boundary adds a supplied constant three-axis gyroscope bias without hidden
-sensor state. The verified current project gate passes 258 tests with no warnings.
+sensor state. A reproducible noisy-measurement boundary adds caller-configured per-axis,
+per-sample white noise from a caller-owned NumPy generator with explicit validation and fixed
+random-consumption semantics. The verified current project gate passes 278 tests with no
+warnings.
 
 The repository does not yet contain a reusable physically conditional invariant-monitoring
 API, a closed-loop controller, a state estimator, adaptive integration, robustness campaigns,
@@ -243,6 +246,42 @@ now explicit, but stochastic reproducibility, sensor statistics, saved replay, e
 robustness, and hardware realism remain unestablished. The detailed contract, TDD evidence,
 decisions, and limitations are recorded in the
 [constant-gyroscope-bias progress record](docs/progress/2026-09-02-constant-gyroscope-bias.md).
+
+### Reproducible gyroscope white noise
+
+The public IMU module now also provides
+`gyroscope_angular_velocity_measurement_body(...)`. Its measurement equation is:
+
+```text
+angular_velocity_measurement_B =
+    ideal_angular_velocity_B
+    + gyroscope_bias_B
+    + noise_standard_deviation_B * standard_normal_sample_B
+```
+
+All three input vectors and the returned measurement have shape `(3,)`, use rad/s, and are
+resolved along the body-aligned FRD axes. `noise_standard_deviation_B` is configured per axis
+and per sample. The standard-normal sample comes from exactly one caller-owned generator
+draw:
+
+```text
+standard_normal_sample_B = rng.standard_normal(3)
+```
+
+Every valid call consumes that one vectorized draw, including when all configured standard
+deviations are zero. Equal seeds with equal call sequences reproduce identical measurements,
+and consecutive calls consume successive draws. Rejected inputs do not advance the caller's
+generator because shape, finiteness, and nonnegative-standard-deviation validation all occur
+before sampling. NumPy arithmetic produces an independently owned output.
+
+A deterministic 20,000-sample population characterization verifies the configured mean and
+sample standard deviations on all three axes using five-standard-error bounds. This evidence
+does not establish perfect Gaussianity, sample independence, hardware fidelity, estimator
+performance, or continuous-time noise-density conversion. It adds no automatic sample-rate
+scaling, accelerometer noise, bias random walk, scale-factor or misalignment error,
+saturation, quantization, latency, or sample scheduling. Gate G1 remains open. The complete
+contract and evidence are recorded in the
+[reproducible gyroscope white-noise progress record](docs/progress/2026-09-02-reproducible-gyroscope-white-noise.md).
 
 ### Explicit-Euler propagation
 
@@ -596,6 +635,9 @@ The full convention, state shapes, signs, and hover sanity check are defined in 
   finiteness validation plus independent float64 measurement ownership.
 - Deterministic constant additive three-axis gyroscope bias in the FRD body frame, with
   separate shape and finiteness validation plus independent output ownership.
+- Reproducible gyroscope white-noise measurements with per-axis, per-sample standard
+  deviations, a caller-owned generator, fixed draw consumption, pre-sampling validation,
+  deterministic replay, and population-level first-two-moment evidence.
 
 ## Verification and development workflow
 
@@ -620,7 +662,7 @@ uv run mypy src experiments
 uv run pytest
 ```
 
-For the current working tree, this complete gate passes 258 tests with no warnings. Ruff lint,
+For the current working tree, this complete gate passes 278 tests with no warnings. Ruff lint,
 Ruff formatting verification, and strict mypy over `src` and `experiments` pass, and
 `git diff --check` reports no errors.
 
@@ -660,9 +702,10 @@ Ruff formatting verification, and strict mypy over `src` and `experiments` pass,
 - The accelerometer boundary is ideal and deterministic; it does not model bias, noise,
   scale factors, misalignment, saturation, quantization, temperature, timing, lever-arm
   effects, vibration, mounting dynamics, or calibration.
-- The gyroscope bias boundary models only a supplied constant additive three-axis vector. It
-  does not model white noise, bias drift or random walk, RNG ownership, scale factors, axis
-  misalignment, saturation, quantization, sampling, latency, or stochastic configuration.
+- The gyroscope measurement boundary models a supplied constant additive bias and per-axis,
+  per-sample white-noise standard deviation. It does not model bias drift or random walk,
+  continuous-time noise density, automatic sample-rate scaling, scale factors, axis
+  misalignment, saturation, quantization, latency, sample scheduling, or hardware fidelity.
 - No Monte Carlo campaign exists yet.
 - No completed ROS 2/PX4 adapter exists yet.
 - The current mathematical model represents only the effects present in the source: static
@@ -676,9 +719,8 @@ the final high-accuracy simulation method, especially for larger time steps or l
 
 ## Near-term roadmap
 
-1. Add the first RED test for a gyroscope measurement with caller-owned RNG and three-axis
-   per-sample white-noise standard deviation, following the completed stochastic IMU design
-   review.
+1. Add the first RED test for constant additive accelerometer bias while preserving the
+   established NED/FRD frame and ownership contracts.
 2. Continue Gate G1 work without claiming completion until its remaining deterministic and
    stochastic evidence is implemented.
 3. Continue later with estimation, control, uncertainty, Monte Carlo validation, and ROS 2/PX4

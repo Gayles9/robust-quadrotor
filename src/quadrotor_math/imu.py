@@ -1,4 +1,5 @@
 import numpy as np
+from numpy.random import Generator
 from numpy.typing import NDArray
 
 
@@ -113,3 +114,61 @@ def gyroscope_angular_velocity_with_bias_body(
         raise ValueError("gyroscope_bias_B must contain only finite values")
 
     return ideal_angular_velocity_B + gyroscope_bias_B
+
+
+def gyroscope_angular_velocity_measurement_body(
+    ideal_angular_velocity_B: NDArray[np.float64],
+    gyroscope_bias_B: NDArray[np.float64],
+    noise_standard_deviation_B: NDArray[np.float64],
+    rng: Generator,
+) -> NDArray[np.float64]:
+    """Return a biased gyroscope measurement with per-axis white noise.
+
+    Args:
+        ideal_angular_velocity_B: Ideal body-aligned gyroscope value expected
+            to have shape ``(3,)``, expressed along FRD body axes in rad/s.
+        gyroscope_bias_B: Constant additive three-axis bias expected to have
+            shape ``(3,)``, expressed along FRD body axes in rad/s.
+        noise_standard_deviation_B: Per-axis, per-sample white-noise standard
+            deviations expected to have shape ``(3,)``, expressed along FRD
+            body axes in rad/s. Changing sample rate does not automatically
+            rescale these supplied standard deviations.
+        rng: Caller-owned generator that supplies the stochastic sample. One
+            call consumes three standard-normal variates in one vectorized
+            draw.
+
+    Returns:
+        Noisy biased angular-velocity measurement along FRD body axes in rad/s.
+
+    Raises:
+        ValueError: If any of the three array inputs does not have shape
+            ``(3,)``, any contains a non-finite value, or
+            ``noise_standard_deviation_B`` contains a negative value.
+    """
+    if ideal_angular_velocity_B.shape != (3,):
+        raise ValueError("ideal_angular_velocity_B must have shape (3,)")
+
+    if gyroscope_bias_B.shape != (3,):
+        raise ValueError("gyroscope_bias_B must have shape (3,)")
+
+    if noise_standard_deviation_B.shape != (3,):
+        raise ValueError("noise_standard_deviation_B must have shape (3,)")
+
+    if not np.all(np.isfinite(ideal_angular_velocity_B)):
+        raise ValueError("ideal_angular_velocity_B must contain only finite values")
+
+    if not np.all(np.isfinite(gyroscope_bias_B)):
+        raise ValueError("gyroscope_bias_B must contain only finite values")
+
+    if not np.all(np.isfinite(noise_standard_deviation_B)):
+        raise ValueError("noise_standard_deviation_B must contain only finite values")
+
+    if np.any(noise_standard_deviation_B < 0.0):
+        raise ValueError("noise_standard_deviation_B must be nonnegative")
+
+    standard_normal_sample_B = rng.standard_normal(3)
+    return (
+        ideal_angular_velocity_B
+        + gyroscope_bias_B
+        + noise_standard_deviation_B * standard_normal_sample_B
+    )
