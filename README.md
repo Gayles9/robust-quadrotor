@@ -35,9 +35,13 @@ independently owned float64 array and rejects malformed or non-finite rates. A s
 deterministic boundary adds a supplied constant three-axis gyroscope bias without hidden
 sensor state. A reproducible noisy-measurement boundary adds caller-configured per-axis,
 per-sample white noise from a caller-owned NumPy generator with explicit validation and fixed
-random-consumption semantics. A matching accelerometer boundary now adds a supplied constant
-three-axis bias to ideal FRD specific force with explicit validation and independent output
-ownership. The verified current project gate passes 289 tests with no warnings.
+random-consumption semantics. A matching accelerometer measurement boundary now combines
+ideal FRD specific force, a caller-supplied constant three-axis bias, and caller-configured
+per-axis, per-sample white noise. It uses a caller-owned NumPy generator, validates all inputs
+before sampling, has fixed one-vector draw semantics for valid calls, preserves RNG state for
+rejected calls, and returns an independently owned float64 measurement. Deterministic replay,
+successive-draw behavior, and population-level first-two-moment consistency are characterized.
+The verified current project gate passes 309 tests with no warnings.
 
 The repository does not yet contain a reusable physically conditional invariant-monitoring
 API, a closed-loop controller, a state estimator, adaptive integration, robustness campaigns,
@@ -186,12 +190,52 @@ bias-input finiteness in that order. Invalid inputs raise `ValueError` with inpu
 messages. NumPy addition produces an independently owned result for the validated arrays: the
 output shares memory with neither input, and production performs no separate explicit copy.
 
-This milestone adds no accelerometer white noise, RNG behavior, bias drift, scale-factor or
-cross-axis error, saturation, quantization, latency, or sample scheduling. Gate G1 remains
-open. The next exact implementation milestone is reproducible accelerometer white noise with
-caller-owned RNG behavior, matching the established gyroscope noise architecture. The full
-contract and evidence are recorded in the
+This bias-only milestone added no accelerometer white noise, RNG behavior, bias drift,
+scale-factor or cross-axis error, saturation, quantization, latency, or sample scheduling.
+Its historical next action—reproducible accelerometer white noise with caller-owned RNG
+behavior—has now been completed as the separate measurement boundary documented below.
+Gate G1 remains open. The bias-only contract and evidence remain recorded in the
 [constant-accelerometer-bias progress record](docs/progress/2026-09-03-constant-accelerometer-bias.md).
+
+### Reproducible accelerometer white noise
+
+The public IMU module now also provides
+`accelerometer_specific_force_measurement_body(...)`. Its measurement equation is:
+
+```text
+specific_force_measurement_B =
+    ideal_specific_force_B
+    + accelerometer_bias_B
+    + noise_standard_deviation_B * standard_normal_sample_B
+```
+
+All three input vectors and the returned measurement have shape `(3,)`, use m/s², and are
+resolved along the body-aligned forward-right-down axes.
+`noise_standard_deviation_B` is configured per axis and per sample. The dimensionless
+standard-normal sample comes from exactly one caller-owned generator draw:
+
+```text
+standard_normal_sample_B = rng.standard_normal(3)
+```
+
+Every valid call consumes that one vectorized draw, including when all configured standard
+deviations are zero. Equal seeds with equal call sequences reproduce identical measurements,
+and consecutive calls consume successive draws. Shape, finiteness, and nonnegative-noise
+validation all complete before sampling, so rejected inputs do not advance the caller-owned
+generator. NumPy arithmetic produces an independently owned float64 output.
+
+A deterministic 20,000-sample characterization uses sample standard deviations with
+`ddof=1`. On every axis, both the empirical-mean error and sample-standard-deviation error
+remain below five normalized standard errors. This finite-sample evidence supports
+consistency with the configured first two moments. It does not prove Gaussianity,
+independence, stationarity, hardware fidelity, sensor bandwidth, sample-rate scaling, or
+continuous-time noise-density conversion.
+
+This boundary adds no bias drift or random walk, scale-factor or cross-axis error,
+misalignment, saturation, quantization, latency, timestamps, sample scheduling, vibration,
+temperature, calibration, or simulator integration. Gate G1 remains open. The complete
+contract and evidence are recorded in the
+[reproducible accelerometer white-noise progress record](docs/progress/2026-09-08-reproducible-accelerometer-white-noise.md).
 
 ### Ideal gyroscope angular velocity
 
@@ -672,6 +716,10 @@ The full convention, state shapes, signs, and hover sanity check are defined in 
 - Deterministic constant additive three-axis accelerometer bias in the FRD body frame, with
   separate shape and finiteness validation, exact zero-bias behavior, and independent output
   ownership.
+- Reproducible accelerometer white-noise measurements in the FRD body frame with per-axis,
+  per-sample standard deviations, a caller-owned generator, fixed draw consumption,
+  pre-sampling validation, deterministic replay, rejected-call RNG preservation, and
+  population-level first-two-moment evidence.
 - Ideal body-aligned gyroscope angular velocity in the FRD body frame, with exact shape and
   finiteness validation plus independent float64 measurement ownership.
 - Deterministic constant additive three-axis gyroscope bias in the FRD body frame, with
@@ -703,7 +751,7 @@ uv run mypy src experiments
 uv run pytest
 ```
 
-For the current working tree, the IMU module passes 59 tests and the complete gate passes 289
+For the current working tree, the IMU module passes 79 tests and the complete gate passes 309
 tests, both with no warnings. Ruff lint and Ruff formatting verification pass. Strict mypy
 over `src` and `experiments` passes with no issues in 12 source files, and `git diff --check`
 reports no errors.
@@ -741,10 +789,12 @@ reports no errors.
   inertia behavior, Euler drift, or long-duration stability.
 - No controller, scheduled input, callback, event handling, or adaptive step size exists.
 - No state estimator exists yet.
-- The accelerometer measurement boundary models a supplied constant additive bias. It does
-  not model white noise, bias drift or random walk, scale factors, cross-axis error,
-  misalignment, saturation, quantization, temperature, timing, lever-arm effects, vibration,
-  mounting dynamics, or calibration.
+- The accelerometer measurement boundary models a supplied constant additive bias and
+  caller-configured per-axis, per-sample white-noise standard deviation. It does not model
+  bias drift or random walk, continuous-time noise density, automatic sample-rate scaling,
+  scale factors, cross-axis error, misalignment, saturation, quantization, temperature,
+  timing, lever-arm effects, vibration, mounting dynamics, calibration, sensor bandwidth,
+  stationarity, or hardware fidelity.
 - The gyroscope measurement boundary models a supplied constant additive bias and per-axis,
   per-sample white-noise standard deviation. It does not model bias drift or random walk,
   continuous-time noise density, automatic sample-rate scaling, scale factors, axis
@@ -762,10 +812,7 @@ the final high-accuracy simulation method, especially for larger time steps or l
 
 ## Near-term roadmap
 
-1. Add the first RED test for reproducible accelerometer white noise with a caller-owned
-   seeded RNG, following the established gyroscope white-noise architecture and preserving
-   deterministic replay and explicit random-consumption semantics.
-2. Continue Gate G1 work without claiming completion until its remaining deterministic and
+1. Continue Gate G1 work without claiming completion until its remaining deterministic and
    stochastic evidence is implemented.
-3. Continue later with estimation, control, uncertainty, Monte Carlo validation, and ROS 2/PX4
+2. Continue later with estimation, control, uncertainty, Monte Carlo validation, and ROS 2/PX4
    adapters.

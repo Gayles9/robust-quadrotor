@@ -86,6 +86,48 @@ def accelerometer_specific_force_with_bias_body(
     return ideal_specific_force_B + accelerometer_bias_B
 
 
+def accelerometer_specific_force_measurement_body(
+    ideal_specific_force_B: NDArray[np.float64],
+    accelerometer_bias_B: NDArray[np.float64],
+    noise_standard_deviation_B: NDArray[np.float64],
+    rng: Generator,
+) -> NDArray[np.float64]:
+    """Return biased accelerometer specific force with per-axis white noise.
+
+    Raises:
+        ValueError: If any of the three array inputs does not have shape
+            ``(3,)`` or contains a non-finite value, or if
+            ``noise_standard_deviation_B`` contains a negative value.
+    """
+    if ideal_specific_force_B.shape != (3,):
+        raise ValueError("ideal_specific_force_B must have shape (3,)")
+
+    if accelerometer_bias_B.shape != (3,):
+        raise ValueError("accelerometer_bias_B must have shape (3,)")
+
+    if noise_standard_deviation_B.shape != (3,):
+        raise ValueError("noise_standard_deviation_B must have shape (3,)")
+
+    if not np.all(np.isfinite(ideal_specific_force_B)):
+        raise ValueError("ideal_specific_force_B must contain only finite values")
+
+    if not np.all(np.isfinite(accelerometer_bias_B)):
+        raise ValueError("accelerometer_bias_B must contain only finite values")
+
+    if not np.all(np.isfinite(noise_standard_deviation_B)):
+        raise ValueError("noise_standard_deviation_B must contain only finite values")
+
+    if np.any(noise_standard_deviation_B < 0.0):
+        raise ValueError("noise_standard_deviation_B must be nonnegative")
+
+    standard_normal_sample_B = rng.standard_normal(3)
+    return (
+        ideal_specific_force_B
+        + accelerometer_bias_B
+        + noise_standard_deviation_B * standard_normal_sample_B
+    )
+
+
 def ideal_gyroscope_angular_velocity_body(
     omega_B: NDArray[np.float64],
 ) -> NDArray[np.float64]:
