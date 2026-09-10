@@ -86,6 +86,42 @@ def accelerometer_specific_force_with_bias_body(
     return ideal_specific_force_B + accelerometer_bias_B
 
 
+def accelerometer_bias_random_walk_step_body(
+    current_accelerometer_bias_B: NDArray[np.float64],
+    accelerometer_bias_random_walk_density_B: NDArray[np.float64],
+    time_step: float,
+    rng: Generator,
+) -> NDArray[np.float64]:
+    """Advance accelerometer bias by one continuous-time random-walk step."""
+    if current_accelerometer_bias_B.shape != (3,):
+        raise ValueError("current_accelerometer_bias_B must have shape (3,)")
+
+    if accelerometer_bias_random_walk_density_B.shape != (3,):
+        raise ValueError("accelerometer_bias_random_walk_density_B must have shape (3,)")
+
+    if not np.all(np.isfinite(current_accelerometer_bias_B)):
+        raise ValueError("current_accelerometer_bias_B must contain only finite values")
+
+    if not np.all(np.isfinite(accelerometer_bias_random_walk_density_B)):
+        raise ValueError("accelerometer_bias_random_walk_density_B must contain only finite values")
+
+    if np.any(accelerometer_bias_random_walk_density_B < 0.0):
+        raise ValueError("accelerometer_bias_random_walk_density_B must be nonnegative")
+
+    if not np.isfinite(time_step):
+        raise ValueError("time_step must be finite")
+
+    if time_step <= 0.0:
+        raise ValueError("time_step must be positive")
+
+    standard_normal_sample_B = rng.standard_normal(3)
+    return np.asarray(
+        current_accelerometer_bias_B
+        + accelerometer_bias_random_walk_density_B * np.sqrt(time_step) * standard_normal_sample_B,
+        dtype=np.float64,
+    )
+
+
 def accelerometer_specific_force_measurement_body(
     ideal_specific_force_B: NDArray[np.float64],
     accelerometer_bias_B: NDArray[np.float64],
@@ -191,6 +227,42 @@ def gyroscope_angular_velocity_with_bias_body(
         raise ValueError("gyroscope_bias_B must contain only finite values")
 
     return ideal_angular_velocity_B + gyroscope_bias_B
+
+
+def gyroscope_bias_random_walk_step_body(
+    current_gyroscope_bias_B: NDArray[np.float64],
+    gyroscope_bias_random_walk_density_B: NDArray[np.float64],
+    time_step: float,
+    rng: Generator,
+) -> NDArray[np.float64]:
+    """Advance gyroscope bias by one continuous-time random-walk step."""
+    if current_gyroscope_bias_B.shape != (3,):
+        raise ValueError("current_gyroscope_bias_B must have shape (3,)")
+
+    if gyroscope_bias_random_walk_density_B.shape != (3,):
+        raise ValueError("gyroscope_bias_random_walk_density_B must have shape (3,)")
+
+    if not np.all(np.isfinite(current_gyroscope_bias_B)):
+        raise ValueError("current_gyroscope_bias_B must contain only finite values")
+
+    if not np.all(np.isfinite(gyroscope_bias_random_walk_density_B)):
+        raise ValueError("gyroscope_bias_random_walk_density_B must contain only finite values")
+
+    if np.any(gyroscope_bias_random_walk_density_B < 0.0):
+        raise ValueError("gyroscope_bias_random_walk_density_B must be nonnegative")
+
+    if not np.isfinite(time_step):
+        raise ValueError("time_step must be finite")
+
+    if time_step <= 0.0:
+        raise ValueError("time_step must be positive")
+
+    standard_normal_sample_B = rng.standard_normal(3)
+    return np.asarray(
+        current_gyroscope_bias_B
+        + gyroscope_bias_random_walk_density_B * np.sqrt(time_step) * standard_normal_sample_B,
+        dtype=np.float64,
+    )
 
 
 def gyroscope_angular_velocity_measurement_body(

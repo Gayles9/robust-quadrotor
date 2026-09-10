@@ -41,7 +41,11 @@ per-axis, per-sample white noise. It uses a caller-owned NumPy generator, valida
 before sampling, has fixed one-vector draw semantics for valid calls, preserves RNG state for
 rejected calls, and returns an independently owned float64 measurement. Deterministic replay,
 successive-draw behavior, and population-level first-two-moment consistency are characterized.
-The verified current project gate passes 309 tests with no warnings.
+Separate reproducible accelerometer and gyroscope bias-random-walk boundaries now advance
+caller-owned three-axis bias state using continuous-time densities and positive time steps.
+They retain caller ownership of both state and RNG, validate before sampling, and have fixed
+random-consumption semantics. The verified current project gate passes 348 tests with no
+warnings.
 
 The repository does not yet contain a reusable physically conditional invariant-monitoring
 API, a closed-loop controller, a state estimator, adaptive integration, robustness campaigns,
@@ -364,6 +368,52 @@ scaling, accelerometer noise, bias random walk, scale-factor or misalignment err
 saturation, quantization, latency, or sample scheduling. Gate G1 remains open. The complete
 contract and evidence are recorded in the
 [reproducible gyroscope white-noise progress record](docs/progress/2026-09-02-reproducible-gyroscope-white-noise.md).
+
+### Reproducible IMU bias random walk
+
+The public IMU module provides two explicit bias-state update boundaries:
+
+```python
+accelerometer_bias_random_walk_step_body(
+    current_accelerometer_bias_B: NDArray[np.float64],
+    accelerometer_bias_random_walk_density_B: NDArray[np.float64],
+    time_step: float,
+    rng: Generator,
+) -> NDArray[np.float64]
+
+gyroscope_bias_random_walk_step_body(
+    current_gyroscope_bias_B: NDArray[np.float64],
+    gyroscope_bias_random_walk_density_B: NDArray[np.float64],
+    time_step: float,
+    rng: Generator,
+) -> NDArray[np.float64]
+```
+
+Both implement the component-wise discrete update
+
+```text
+b_(k+1) = b_k + sigma_b * sqrt(dt) * z_k
+z_k ~ N(0, I_3)
+```
+
+Here `dt` is `time_step` in seconds. The `sqrt(dt)` factor is required for a
+continuous-time random-walk density so that increment variance scales linearly with elapsed
+time. The bias and density vectors have shape `(3,)` and are resolved along the FRD body
+axes. Accelerometer bias uses m/s², gyroscope bias uses rad/s, and each density multiplied by
+the square root of seconds yields its corresponding bias-increment units.
+
+Bias state and the NumPy `Generator` remain caller-owned. A valid call consumes exactly one
+vectorized `rng.standard_normal(3)` draw, including a zero-density call. A rejected call
+consumes no random values because validation completes before sampling. The returned float64
+state is independently allocated, and neither caller-owned input vector is mutated.
+
+Each function validates, in order, current-bias shape, density shape, current-bias
+finiteness, density finiteness, density nonnegativity, time-step finiteness, and strict
+time-step positivity before sampling. Invalid inputs raise input-specific `ValueError`
+messages. This boundary does not create hidden sensor state or promise identical random
+bitstreams across NumPy versions or different bit generators. Sprint 3, Week 6 remains in
+progress, and Gate G1 remains open. The full contract and evidence are recorded in the
+[reproducible IMU bias-random-walk progress record](docs/progress/2026-09-09-reproducible-imu-bias-random-walk.md).
 
 ### Explicit-Euler propagation
 
@@ -727,6 +777,10 @@ The full convention, state shapes, signs, and hover sanity check are defined in 
 - Reproducible gyroscope white-noise measurements with per-axis, per-sample standard
   deviations, a caller-owned generator, fixed draw consumption, pre-sampling validation,
   deterministic replay, and population-level first-two-moment evidence.
+- Reproducible accelerometer and gyroscope bias-random-walk steps in the FRD body frame with
+  continuous-time density scaling, caller-owned bias state and generators, fixed valid-call
+  draw consumption, pre-sampling validation, rejected-call RNG preservation, and independent
+  output ownership.
 
 ## Verification and development workflow
 
@@ -751,7 +805,7 @@ uv run mypy src experiments
 uv run pytest
 ```
 
-For the current working tree, the IMU module passes 79 tests and the complete gate passes 309
+For the current working tree, the IMU module passes 118 tests and the complete gate passes 348
 tests, both with no warnings. Ruff lint and Ruff formatting verification pass. Strict mypy
 over `src` and `experiments` passes with no issues in 12 source files, and `git diff --check`
 reports no errors.
@@ -790,15 +844,16 @@ reports no errors.
 - No controller, scheduled input, callback, event handling, or adaptive step size exists.
 - No state estimator exists yet.
 - The accelerometer measurement boundary models a supplied constant additive bias and
-  caller-configured per-axis, per-sample white-noise standard deviation. It does not model
-  bias drift or random walk, continuous-time noise density, automatic sample-rate scaling,
-  scale factors, cross-axis error, misalignment, saturation, quantization, temperature,
-  timing, lever-arm effects, vibration, mounting dynamics, calibration, sensor bandwidth,
-  stationarity, or hardware fidelity.
+  caller-configured per-axis, per-sample white-noise standard deviation. Accelerometer bias
+  evolution is available only through the separate caller-driven random-walk step; these
+  boundaries do not model scale factors, cross-axis error, misalignment, saturation,
+  quantization, temperature, timing, lever-arm effects, vibration, mounting dynamics,
+  calibration, sensor bandwidth, stationarity, or hardware fidelity.
 - The gyroscope measurement boundary models a supplied constant additive bias and per-axis,
-  per-sample white-noise standard deviation. It does not model bias drift or random walk,
-  continuous-time noise density, automatic sample-rate scaling, scale factors, axis
-  misalignment, saturation, quantization, latency, sample scheduling, or hardware fidelity.
+  per-sample white-noise standard deviation. Gyroscope bias evolution is available only
+  through the separate caller-driven random-walk step; these boundaries do not model scale
+  factors, axis misalignment, saturation, quantization, latency, sample scheduling, or
+  hardware fidelity.
 - No Monte Carlo campaign exists yet.
 - No completed ROS 2/PX4 adapter exists yet.
 - The current mathematical model represents only the effects present in the source: static
