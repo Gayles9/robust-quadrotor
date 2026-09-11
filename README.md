@@ -51,10 +51,18 @@ measurements in the NED world frame together with ideal and noisy positive-up ba
 altitude boundaries. Position vectors have shape `(3,)`, dtype float64, and units of metres;
 altitude outputs are Python floats in metres. Bias and per-sample white-noise standard
 deviations are supplied per call, RNGs remain caller-owned, and validation completes before
-sampling. The module contains 54 focused tests. The completed repository gate verified that
-Ruff lint passed, Ruff format verification reported 53 files already formatted, mypy found no
-issues in 13 source files, and pytest passed exactly 402 tests in 1.44s. There were no
-failures, errors, skips, or warnings.
+sampling. The module contains 54 focused tests.
+
+A ROS/PX4-independent fixed-rate sensor scheduler now separates measurement acquisition from
+fixed-delay delivery on the existing fixed truth grid. It derives acquisition timestamps from
+integer truth indices, catches up every crossed acquisition in order, queues delayed records
+FIFO, returns every due delivery, and holds an independently owned snapshot of the latest
+delivered value. The caller supplies the measurement producer and owns any RNG it uses, so
+random sampling occurs only at acquisition and never during delivery. The focused scheduler
+module contains 58 tests. The completed repository gate passed Ruff lint, Ruff format
+verification reported 56 files already formatted, mypy found no issues in 14 source files,
+and pytest passed exactly 460 tests in 1.55s. There were no failures, errors, skips, or
+warnings.
 
 The repository does not yet contain a reusable physically conditional invariant-monitoring
 API, a closed-loop controller, a state estimator, adaptive integration, robustness campaigns,
@@ -502,10 +510,86 @@ consume no draws.
 Position bias and barometric bias are caller-supplied on each call. The functions contain no
 hidden sensor state, and the caller owns every NumPy generator. They do not determine whether
 a sample is due and do not own sample rates, timestamps, held values, acquisition scheduling,
-truth interpolation, or delivery delay. Those concerns remain deferred to a future
-ROS/PX4/Gazebo-independent scheduling abstraction. The complete contract, TDD record, and
+truth interpolation, or delivery delay. Fixed-rate acquisition and fixed delivery delay now
+belong to the separate scheduling abstraction documented below; the measurement functions
+remain pure value boundaries. The complete position-sensor contract, TDD record, and
 deterministic evidence are in the
 [local-position and barometric-altitude progress record](docs/progress/2026-09-10-local-position-and-barometric-altitude-sensors.md).
+
+### Fixed-rate sensor scheduling
+
+The public module `src/quadrotor_math/sensor_scheduling.py` schedules scalar Python-float or
+float64 NumPy-array measurements without importing ROS 2, PX4, Gazebo, or any sensor-specific
+physics. Each `FixedRateSensorScheduler` is configured by a public sample period, the fixed
+truth-history time step, and an optional fixed nonnegative delivery delay. The configured
+sample period must align with an integer number of truth steps. The implementation
+canonicalizes that alignment to an integer stride rather than accumulating floating-point
+periods.
+
+For zero-based sequence index `k`, the schedule is:
+
+```text
+sample_stride = round(sample_period_s / truth_time_step_s)
+truth_index_k = (k + 1) * sample_stride
+acquisition_time_k = truth_index_k * truth_time_step_s
+delivery_time_k = acquisition_time_k + delivery_delay_s
+```
+
+The first acquisition therefore occurs after one complete sample period, never at time zero.
+Acquisition timestamps are derived from authoritative integer truth indices. An update that
+crosses multiple acquisition boundaries catches up every due row in chronological order; it
+does not skip to only the newest row. For each acquisition, the caller-provided callable
+receives `(truth_index, acquisition_time_s)` and returns the measurement value. Measurement
+frames and physical units remain defined by that producer: the scheduler transports the
+value without interpreting its frame or units. All scheduler timestamps are elapsed
+simulation seconds.
+
+Each acquired value is stored in a `SensorMeasurement` with its zero-based sequence index,
+acquisition timestamp, fixed-delay delivery timestamp, and measurement. All acquisitions due
+at an update complete before delivery processing begins. Because a single scheduler has a
+fixed nonnegative delay and monotonically increasing acquisition times, pending records have
+the same order by acquisition and delivery time; a FIFO queue is therefore sufficient.
+Delivery never invokes or resamples the producer. Every record due at the current update is
+returned in sequence order, and `latest_delivered_measurement` holds the newest delivered
+record until a later delivery replaces it.
+
+The alignment check uses `rtol=1e-12` and `atol=0.0`. Acquisition, delivery, and monotonic-time
+comparisons use the scale-aware tolerance
+
+```text
+16 * eps_float64 * max(1, abs(a), abs(b))
+```
+
+A scheduled event is due when its timestamp is no later than the current time plus that
+tolerance. Updates must otherwise be finite, nonnegative, and monotonically nondecreasing.
+A tiny backward time within tolerance is accepted, but the scheduler retains the previous
+authoritative time instead of moving it backward. Scheduler-owned validation completes before
+the first producer invocation, so rejected scheduler updates consume no producer RNG.
+
+The scheduler does not own, create, seed, or serialize RNGs. Random consumption occurs inside
+the caller's producer when an acquisition is due. Delivery-only updates consume no random
+values. Equal scheduler configuration, truth, initial state, RNG state, update sequence, and
+producer behavior reproduce equal acquisitions and timestamps. Incremental and catch-up
+updates preserve acquisition order and values when they reach the same final time, although
+delivery batch boundaries can differ because deliveries are observed only when `update` is
+called. Separate stochastic sensors and bias processes should use separate caller-owned
+generators.
+
+`SensorMeasurement` records are frozen, slotted, and use identity rather than field equality.
+Producer arrays are copied into pending storage, returned array deliveries cannot mutate the
+internally held value, and every latest-delivered array snapshot owns independent storage.
+Python floats remain Python floats; arrays within the declared float64 contract preserve
+their dtype and values. Pending records are not automatically flushed when a simulation
+terminates: the caller must issue a sufficiently late update if it wants later deliveries.
+
+This scheduling boundary does not provide ROS 2 or PX4 integration, asynchronous threads,
+truth interpolation, off-grid acquisition, variable or adaptive truth stepping, stochastic
+latency, packet loss or dropout, clock offsets or drift, bounded-buffer overflow policies,
+transactional recovery from producer exceptions, scheduler or RNG serialization, automatic
+end-of-run draining, or estimator or controller integration. It is a timing and ownership
+primitive, not a complete sensor layer, estimator, controller, or Monte Carlo program. Gate
+G1 remains open. The complete contract and development evidence are recorded in the
+[fixed-rate sensor-scheduling progress record](docs/progress/2026-09-11-fixed-rate-sensor-scheduling.md).
 
 ### Explicit-Euler propagation
 
@@ -883,6 +967,18 @@ The full convention, state shapes, signs, and hover sanity check are defined in 
 - Reproducible positive-up barometric-altitude proxy measurements with supplied scalar bias,
   per-sample white noise, caller-owned RNG, fixed scalar-draw semantics, pre-sampling
   validation, rejected-call preservation, and bounded first-two-moment evidence.
+- Fixed-rate sensor acquisition on an integer stride of the existing fixed truth grid, with
+  integer-derived acquisition timestamps and the first acquisition after one full period.
+- Chronological catch-up of every crossed acquisition through a caller-provided truth-index
+  and acquisition-time callable.
+- Fixed nonnegative delivery delay, FIFO pending records, delivery of every due record, and a
+  held latest-delivered snapshot with zero-based sequence indices.
+- Scalar Python-float and float64-array measurement transport with defensive array ownership
+  across pending storage, returned deliveries, and repeated latest-delivered snapshots.
+- Caller-owned acquisition RNG behavior with no resampling or random consumption during
+  delivery, plus deterministic incremental-versus-catch-up replay evidence.
+- Finite, nonnegative, monotonic scheduler-time validation with scale-aware boundary
+  tolerance and no backward movement of authoritative time.
 
 ## Verification and development workflow
 
@@ -907,18 +1003,19 @@ uv run mypy src experiments
 uv run pytest
 ```
 
-For the current working tree, the IMU module passes 118 tests and the position-sensor module
-passes 54 tests, both with no warnings. The completed repository gate passed Ruff lint, Ruff
-format verification reported 53 files already formatted, strict mypy over `src` and
-`experiments` found no issues in 13 source files, and pytest passed exactly 402 tests in
-1.44s. There were no failures, errors, skips, or warnings, and `git diff --check` reports no
-errors.
+For the current working tree, the IMU module passes 118 tests, the position-sensor module
+passes 54 tests, and the sensor-scheduling module passes 58 tests. The completed repository
+gate passed Ruff lint, Ruff format verification reported 56 files already formatted, strict
+mypy over `src` and `experiments` found no issues in 14 source files, and pytest collected and
+passed exactly 460 tests in 1.55s. There were no failures, errors, skips, or warnings, and the
+post-gate documentation correction did not rerun the gate.
 
 ## Repository structure
 
 - `src/quadrotor_math/`: ROS/PX4-independent vector, randomness, rotation, actuation,
   dynamics, integration, deterministic simulation, ideal IMU mathematics, state-history
-  validation, and trajectory-error algorithms.
+  validation, sensor measurement, fixed-rate sensor scheduling, and trajectory-error
+  algorithms.
 - `experiments/`: reproducible numerical studies built from the public mathematical core.
 - `tests/unit/`: focused unit and composition tests for the mathematical core.
 - `docs/architecture/`: architectural contracts, including frames and state conventions.
@@ -945,7 +1042,8 @@ errors.
 - The torque-free rotation evidence covers one identity-attitude, diagonal-inertia scenario
   and one 10-second RK4 grid. It does not establish exact discrete conservation, arbitrary
   inertia behavior, Euler drift, or long-duration stability.
-- No controller, scheduled input, callback, event handling, or adaptive step size exists.
+- No controller, scheduled rotor input, integration callback, dynamics event handling, or
+  adaptive step size exists.
 - No state estimator exists yet.
 - The accelerometer measurement boundary models a supplied constant additive bias and
   caller-configured per-axis, per-sample white-noise standard deviation. Accelerometer bias
@@ -964,6 +1062,12 @@ errors.
   hardware calibration. These boundaries do not model correlated noise, drift, dropouts,
   quantization, saturation, sample-rate management, timestamps, held values, or delivery
   delay.
+- The fixed-rate scheduler requires sample periods aligned to the fixed truth grid. It does
+  not interpolate truth, acquire off-grid, vary or adapt the truth step, model stochastic
+  latency, packet loss, dropouts, clock offset or drift, bound its pending queue, roll back
+  caller state after producer exceptions, serialize scheduler or RNG state, drain pending
+  deliveries automatically at termination, or integrate with an estimator, controller,
+  ROS 2, or PX4.
 - No Monte Carlo campaign exists yet.
 - No completed ROS 2/PX4 adapter exists yet.
 - The current mathematical model represents only the effects present in the source: static
@@ -977,10 +1081,10 @@ the final high-accuracy simulation method, especially for larger time steps or l
 
 ## Near-term roadmap
 
-1. Perform a read-only architecture review for the ROS-independent sensor scheduling and
-   timestamp boundary. The review must resolve sample rates, timestamps, held measurements,
-   truth interpolation, and delivery delay before any implementation commitment.
-2. Continue Gate G1 work on truth/nominal separation, run-level replay, wind, drag, and
-   deliberate model mismatch. Sprint 3, Week 6 and Gate G1 remain open.
-3. Continue later with estimation, control, uncertainty, Monte Carlo validation, and ROS 2/PX4
-   adapters.
+1. Continue Gate G1 with the next bounded architecture review for truth/nominal separation
+   and run-level replay, preserving independent caller-owned RNG streams across sensor and
+   bias processes.
+2. Continue Gate G1 with wind, drag, and deliberate model mismatch. Sprint 3, Week 6 and Gate
+   G1 remain open.
+3. Continue later with estimation, control, uncertainty, Monte Carlo validation, and ROS
+   2/PX4 adapters.
