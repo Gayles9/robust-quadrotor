@@ -44,8 +44,17 @@ successive-draw behavior, and population-level first-two-moment consistency are 
 Separate reproducible accelerometer and gyroscope bias-random-walk boundaries now advance
 caller-owned three-axis bias state using continuous-time densities and positive time steps.
 They retain caller ownership of both state and RNG, validate before sampling, and have fixed
-random-consumption semantics. The verified current project gate passes 348 tests with no
-warnings.
+random-consumption semantics.
+
+A ROS/PX4-independent position-sensor module now provides ideal and noisy local-position
+measurements in the NED world frame together with ideal and noisy positive-up barometric
+altitude boundaries. Position vectors have shape `(3,)`, dtype float64, and units of metres;
+altitude outputs are Python floats in metres. Bias and per-sample white-noise standard
+deviations are supplied per call, RNGs remain caller-owned, and validation completes before
+sampling. The module contains 54 focused tests. The completed repository gate verified that
+Ruff lint passed, Ruff format verification reported 53 files already formatted, mypy found no
+issues in 13 source files, and pytest passed exactly 402 tests in 1.44s. There were no
+failures, errors, skips, or warnings.
 
 The repository does not yet contain a reusable physically conditional invariant-monitoring
 API, a closed-loop controller, a state estimator, adaptive integration, robustness campaigns,
@@ -415,6 +424,89 @@ bitstreams across NumPy versions or different bit generators. Sprint 3, Week 6 r
 progress, and Gate G1 remains open. The full contract and evidence are recorded in the
 [reproducible IMU bias-random-walk progress record](docs/progress/2026-09-09-reproducible-imu-bias-random-walk.md).
 
+### Local position and barometric altitude
+
+The public module `src/quadrotor_math/position_sensors.py` provides four pure measurement
+boundaries:
+
+```python
+ideal_position_measurement_world(
+    position_W: NDArray[np.float64],
+) -> NDArray[np.float64]
+
+position_measurement_world(
+    ideal_position_W: NDArray[np.float64],
+    position_bias_W: NDArray[np.float64],
+    noise_standard_deviation_W: NDArray[np.float64],
+    rng: Generator,
+) -> NDArray[np.float64]
+
+ideal_barometric_altitude_from_position_world(
+    position_W: NDArray[np.float64],
+    reference_altitude: float,
+) -> float
+
+barometric_altitude_measurement(
+    ideal_altitude: float,
+    barometric_altitude_bias: float,
+    noise_standard_deviation: float,
+    rng: Generator,
+) -> float
+```
+
+The local-position boundary is generic local Cartesian position, not GPS latitude/longitude.
+Its input and output vectors use the NED world frame, have exact shape `(3,)`, use float64,
+and are measured in metres. The ideal boundary returns an independent copy of `position_W`.
+The noisy boundary implements
+
+```text
+standard_normal_sample_W = rng.standard_normal(3)
+
+position_measurement_W =
+    ideal_position_W
+    + position_bias_W
+    + noise_standard_deviation_W * standard_normal_sample_W
+```
+
+The configured position-noise standard deviation is per sample, not a continuous-time noise
+density. Every valid call consumes exactly one vector draw, including a zero-noise call.
+Shape, finiteness, and nonnegative-noise validation all complete before sampling, so rejected
+calls consume no draws. Inputs remain caller-owned and unmodified, while vector outputs own
+independent storage.
+
+Public barometric altitude is positive up, while NED `position_W[2]` is positive down. The
+explicit conversion is
+
+```text
+altitude = reference_altitude - position_W[2]
+```
+
+`reference_altitude` is the caller-selected altitude assigned to the NED origin. There is no
+hidden mean-sea-level, ellipsoid, or pressure datum: this boundary is a geometric or indicated
+altitude proxy rather than an atmospheric-pressure model. The noisy scalar boundary implements
+
+```text
+standard_normal_sample = rng.standard_normal()
+
+measured_altitude =
+    ideal_altitude
+    + barometric_altitude_bias
+    + noise_standard_deviation * standard_normal_sample
+```
+
+Its output is a Python float in metres, and its standard deviation is configured per sample.
+Every valid call consumes exactly one scalar draw, including a zero-noise call. Scalar
+finiteness and nonnegative-noise validation complete before sampling, so rejected calls
+consume no draws.
+
+Position bias and barometric bias are caller-supplied on each call. The functions contain no
+hidden sensor state, and the caller owns every NumPy generator. They do not determine whether
+a sample is due and do not own sample rates, timestamps, held values, acquisition scheduling,
+truth interpolation, or delivery delay. Those concerns remain deferred to a future
+ROS/PX4/Gazebo-independent scheduling abstraction. The complete contract, TDD record, and
+deterministic evidence are in the
+[local-position and barometric-altitude progress record](docs/progress/2026-09-10-local-position-and-barometric-altitude-sensors.md).
+
 ### Explicit-Euler propagation
 
 ```text
@@ -781,6 +873,16 @@ The full convention, state shapes, signs, and hover sanity check are defined in 
   continuous-time density scaling, caller-owned bias state and generators, fixed valid-call
   draw consumption, pre-sampling validation, rejected-call RNG preservation, and independent
   output ownership.
+- Ideal generic local-position measurement in the NED world frame with exact `(3,)` float64
+  shape, metre units, validation, and independent output ownership.
+- Reproducible NED local-position measurements with supplied bias, per-axis per-sample white
+  noise, caller-owned RNG, fixed vector-draw semantics, validation before sampling, replay,
+  rejected-call preservation, and bounded first-two-moment evidence.
+- Positive-up altitude conversion from NED down-position using an explicit caller-selected
+  origin altitude and no hidden geodetic, mean-sea-level, ellipsoid, or pressure datum.
+- Reproducible positive-up barometric-altitude proxy measurements with supplied scalar bias,
+  per-sample white noise, caller-owned RNG, fixed scalar-draw semantics, pre-sampling
+  validation, rejected-call preservation, and bounded first-two-moment evidence.
 
 ## Verification and development workflow
 
@@ -805,10 +907,12 @@ uv run mypy src experiments
 uv run pytest
 ```
 
-For the current working tree, the IMU module passes 118 tests and the complete gate passes 348
-tests, both with no warnings. Ruff lint and Ruff formatting verification pass. Strict mypy
-over `src` and `experiments` passes with no issues in 12 source files, and `git diff --check`
-reports no errors.
+For the current working tree, the IMU module passes 118 tests and the position-sensor module
+passes 54 tests, both with no warnings. The completed repository gate passed Ruff lint, Ruff
+format verification reported 53 files already formatted, strict mypy over `src` and
+`experiments` found no issues in 13 source files, and pytest passed exactly 402 tests in
+1.44s. There were no failures, errors, skips, or warnings, and `git diff --check` reports no
+errors.
 
 ## Repository structure
 
@@ -854,6 +958,12 @@ reports no errors.
   through the separate caller-driven random-walk step; these boundaries do not model scale
   factors, axis misalignment, saturation, quantization, latency, sample scheduling, or
   hardware fidelity.
+- The local-position boundary is local NED Cartesian position, not GPS geodesy or
+  latitude/longitude. The barometric boundary is a positive-up geometric/indicated-altitude
+  proxy and does not model pressure, temperature, mean-sea-level or ellipsoid datums, or
+  hardware calibration. These boundaries do not model correlated noise, drift, dropouts,
+  quantization, saturation, sample-rate management, timestamps, held values, or delivery
+  delay.
 - No Monte Carlo campaign exists yet.
 - No completed ROS 2/PX4 adapter exists yet.
 - The current mathematical model represents only the effects present in the source: static
@@ -867,7 +977,10 @@ the final high-accuracy simulation method, especially for larger time steps or l
 
 ## Near-term roadmap
 
-1. Continue Gate G1 work without claiming completion until its remaining deterministic and
-   stochastic evidence is implemented.
-2. Continue later with estimation, control, uncertainty, Monte Carlo validation, and ROS 2/PX4
+1. Perform a read-only architecture review for the ROS-independent sensor scheduling and
+   timestamp boundary. The review must resolve sample rates, timestamps, held measurements,
+   truth interpolation, and delivery delay before any implementation commitment.
+2. Continue Gate G1 work on truth/nominal separation, run-level replay, wind, drag, and
+   deliberate model mismatch. Sprint 3, Week 6 and Gate G1 remain open.
+3. Continue later with estimation, control, uncertainty, Monte Carlo validation, and ROS 2/PX4
    adapters.
