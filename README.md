@@ -59,10 +59,17 @@ integer truth indices, catches up every crossed acquisition in order, queues del
 FIFO, returns every due delivery, and holds an independently owned snapshot of the latest
 delivered value. The caller supplies the measurement producer and owns any RNG it uses, so
 random sampling occurs only at acquisition and never during delivery. The focused scheduler
-module contains 58 tests. The completed repository gate passed Ruff lint, Ruff format
-verification reported 56 files already formatted, mypy found no issues in 14 source files,
-and pytest passed exactly 460 tests in 1.55s. There were no failures, errors, skips, or
-warnings.
+module contains 58 tests.
+
+Run 1 of the reproducible run architecture is complete. The mathematical core now groups
+validated truth and nominal parameters, an independently owned initial truth state, fixed
+truth numerics, four sensor schedules, a constant four-rotor input, a 128-bit root seed, and
+explicit truth/nominal mismatch declarations. Six persistent named random generators use a
+versioned derivation with explicit stream IDs, so consuming one stream does not advance any
+other. The completed repository gate passed Ruff lint, Ruff format verification reported 59
+files already formatted, mypy found no issues in 15 source files, and pytest collected and
+passed exactly 645 tests in 14.03s. `test_run_configuration.py` contains 169 tests and
+`test_run_randomness.py` contains 16 tests. There were no failures, errors, skips, or warnings.
 
 The repository does not yet contain a reusable physically conditional invariant-monitoring
 API, a closed-loop controller, a state estimator, adaptive integration, robustness campaigns,
@@ -591,6 +598,132 @@ primitive, not a complete sensor layer, estimator, controller, or Monte Carlo pr
 G1 remains open. The complete contract and development evidence are recorded in the
 [fixed-rate sensor-scheduling progress record](docs/progress/2026-09-11-fixed-rate-sensor-scheduling.md).
 
+### Reproducible run configuration and named random streams
+
+The public run-configuration foundation separates the values used by truth from the values
+assumed by future consumers. `TruthConfiguration` and `NominalConfiguration` each group
+rigid-body, rotor, world, IMU, and position-sensor parameters. `RunConfiguration` adds an
+independently owned initial truth state, the truth integration method, a finite positive fixed
+truth time step, an authoritative positive non-Boolean integer step count, explicit schedules
+for the accelerometer, gyroscope, local-position sensor, and barometric-altitude sensor, a
+constant four-rotor speed input in rad/s, one root seed, and declared truth/nominal
+mismatches. The integration methods have stable values `euler` and `projected_rk4`.
+
+The configuration dataclasses are frozen, slotted, and use `eq=False`. Generated field
+equality is deliberately avoided because NumPy arrays do not have a suitable scalar truth
+value for general dataclass equality; array-bearing result-record design follows the same
+policy. At every array-bearing configuration boundary, valid input is copied into
+independently owned float64 storage, no caller-owned view is retained, and the stored array is
+marked non-writeable. Validation completes before a constructed object is returned. The
+NumPy writeable flag is an ownership and accidental-mutation guard, not an adversarial
+security boundary.
+
+Frames and units follow the existing contract: the world frame is NED, the body frame is
+FRD, and `R_WB` maps body-coordinate vectors into world coordinates. Initial position and
+velocity are world-frame quantities, `omega_B` is FRD body angular velocity, and `q_WB` is a
+Hamilton scalar-first body-to-world attitude quaternion. Sensor periods and delivery delays
+are seconds, rotor speeds are rad/s, and the existing IMU parameter units remain those of
+their measurement and random-walk boundaries. Barometric altitude stays positive-up relative
+to its explicit reference datum.
+
+Local validation rejects non-finite or non-positive mass; malformed, non-finite,
+non-symmetric, or non-positive-definite inertia; malformed rotor geometry or spin directions;
+negative thrust or moment coefficients; negative gravity magnitude; malformed or non-finite
+sensor vectors; negative sensor noise and random-walk density values; malformed or non-finite
+initial state; and a non-unit `q_WB` without silently normalizing it. It also requires a valid
+integration enum, a finite positive truth step, a positive non-Boolean integer step count,
+finite positive sample periods, finite nonnegative delivery delays, a shape `(4,)`, finite,
+nonnegative constant rotor-speed input, nonempty mismatch paths and rationales, and a
+non-Boolean Python integer root seed in `[0, 2**128)`.
+
+Each requested sensor period must align with the fixed truth grid. Configuration validation
+uses:
+
+```text
+sample_stride = round(sample_period_s / truth_time_step_s)
+effective_sample_period_s = sample_stride * truth_time_step_s
+```
+
+Acceptance requires `sample_stride > 0` and:
+
+```python
+np.isclose(
+    sample_period_s,
+    effective_sample_period_s,
+    rtol=1e-12,
+    atol=0.0,
+)
+```
+
+Delivery delays must be finite and nonnegative but need not be truth-grid multiples. This
+cross-field check neither constructs nor advances a scheduler and does not rewrite the
+requested period. The prior scheduling milestone remains authoritative for stateful
+fixed-rate acquisition and delivery behavior.
+
+A deliberate model mismatch has exactly two representations: differing truth and nominal
+values, plus a declaration containing the exact parameter path and a rationale. There is no
+third numerical override set. Unsupported and duplicate paths are rejected; every actual
+difference must be declared; and every declaration must identify an actual difference.
+Scalars are compared exactly and arrays use `np.array_equal`. Caller declaration order is
+retained as historical input but does not affect mismatch-set equality. The supported schema
+is exactly:
+
+```text
+rigid_body.mass
+rigid_body.inertia_B
+rotors.rotor_positions_B
+rotors.rotor_spin_directions
+rotors.thrust_coefficient
+rotors.moment_coefficient
+world.gravity_acceleration
+imu.initial_accelerometer_bias_B
+imu.accelerometer_noise_standard_deviation_B
+imu.accelerometer_bias_random_walk_density_B
+imu.initial_gyroscope_bias_B
+imu.gyroscope_noise_standard_deviation_B
+imu.gyroscope_bias_random_walk_density_B
+position_sensors.local_position_bias_W
+position_sensors.local_position_noise_standard_deviation_W
+position_sensors.barometric_reference_altitude
+position_sensors.barometric_altitude_bias
+position_sensors.barometric_altitude_noise_standard_deviation
+```
+
+The six stable random-stream names and their explicit numeric IDs are:
+
+| ID | Stable stream name |
+| ---: | --- |
+| 1 | `accelerometer.measurement_noise` |
+| 2 | `accelerometer.bias_random_walk` |
+| 3 | `gyroscope.measurement_noise` |
+| 4 | `gyroscope.bias_random_walk` |
+| 5 | `local_position.measurement_noise` |
+| 6 | `barometric_altitude.measurement_noise` |
+
+The implemented derivation protocol has version `1`. For one named stream it constructs:
+
+```python
+SeedSequence(
+    [derivation_version, stable_numeric_stream_id, root_seed],
+    pool_size=4,
+)
+```
+
+Each child generator explicitly uses `PCG64`. `create_run_random_streams` creates a persistent
+bundle of six distinct generators, and explicit IDs keep derivation independent of enum
+iteration order. Recreating the same name from the same root seed replays its sequence in the
+tested environment, while consuming one generator leaves the others untouched. `create_rng`
+retains its original `np.random.default_rng(seed)` behavior. The narrow reproducibility claim
+is: the same configuration, root seed, stream protocol, NumPy environment, and consumption
+order reproduce the same stochastic sequences. This is not a promise across arbitrary NumPy
+or Python versions, platforms, or future distribution implementations.
+
+Run 1 establishes structural truth/nominal separation, but full truth isolation is not proven
+until the Run 3 nominal-perturbation composition test. Run-level replay, manifests, canonical
+JSON, saved NPZ artifacts, simulation composition, wind, drag, estimation, and control do not
+exist yet. Gate G1 remains open. The complete contract and historical TDD evidence are in the
+[run-configuration and named-stream progress record](docs/progress/2026-09-14-run-configuration-and-random-streams.md).
+
 ### Explicit-Euler propagation
 
 ```text
@@ -901,6 +1034,13 @@ The full convention, state shapes, signs, and hover sanity check are defined in 
 ## Implemented capabilities
 
 - Deterministic NumPy random-number generator construction from explicit seeds.
+- An immutable, validated run-configuration schema with explicit truth and nominal parameter
+  groups, initial truth state, fixed truth numerics, four sensor schedules, constant rotor
+  input, root seed, and declared mismatch ownership.
+- Exact cross-field truth-grid schedule validation and exact array-aware mismatch-set
+  validation over 18 supported parameter paths.
+- Six persistent named random generators derived through versioned explicit stream IDs,
+  `SeedSequence(..., pool_size=4)`, and explicit `PCG64` construction.
 - A squared-norm vector primitive.
 - Skew-symmetric matrices, quaternion normalization and differentiation, and active
   body-to-world rotation matrices.
@@ -1004,18 +1144,20 @@ uv run pytest
 ```
 
 For the current working tree, the IMU module passes 118 tests, the position-sensor module
-passes 54 tests, and the sensor-scheduling module passes 58 tests. The completed repository
-gate passed Ruff lint, Ruff format verification reported 56 files already formatted, strict
-mypy over `src` and `experiments` found no issues in 14 source files, and pytest collected and
-passed exactly 460 tests in 1.55s. There were no failures, errors, skips, or warnings, and the
-post-gate documentation correction did not rerun the gate.
+passes 54 tests, the sensor-scheduling module passes 58 tests, the run-configuration module
+passes 169 tests, and the named run-randomness module passes 16 tests. The completed
+repository gate passed Ruff lint, Ruff format verification reported 59 files already
+formatted, strict mypy over `src` and `experiments` found no issues in 15 source files, and
+pytest collected and passed exactly 645 tests in 14.03s. There were no failures, errors,
+skips, or warnings. Documentation was updated only after that successful gate and the gate
+was not rerun.
 
 ## Repository structure
 
 - `src/quadrotor_math/`: ROS/PX4-independent vector, randomness, rotation, actuation,
   dynamics, integration, deterministic simulation, ideal IMU mathematics, state-history
-  validation, sensor measurement, fixed-rate sensor scheduling, and trajectory-error
-  algorithms.
+  validation, sensor measurement, fixed-rate sensor scheduling, immutable run configuration,
+  named run-random-stream ownership, and trajectory-error algorithms.
 - `experiments/`: reproducible numerical studies built from the public mathematical core.
 - `tests/unit/`: focused unit and composition tests for the mathematical core.
 - `docs/architecture/`: architectural contracts, including frames and state conventions.
@@ -1068,6 +1210,12 @@ post-gate documentation correction did not rerun the gate.
   caller state after producer exceptions, serialize scheduler or RNG state, drain pending
   deliveries automatically at termination, or integrate with an estimator, controller,
   ROS 2, or PX4.
+- Run 1 establishes immutable configuration and named stream ownership, not a complete
+  simulator runner. No run manifest, canonical JSON representation, saved NPZ artifact,
+  artifact hash, or run-level replay implementation exists yet.
+- Truth and nominal configuration are structurally separate, but full truth isolation remains
+  unproven until the planned Run 3 nominal-perturbation composition test. Deliberate mismatch
+  effects in simulation, including future wind and drag parameters, are not implemented.
 - No Monte Carlo campaign exists yet.
 - No completed ROS 2/PX4 adapter exists yet.
 - The current mathematical model represents only the effects present in the source: static
@@ -1081,10 +1229,12 @@ the final high-accuracy simulation method, especially for larger time steps or l
 
 ## Near-term roadmap
 
-1. Continue Gate G1 with the next bounded architecture review for truth/nominal separation
-   and run-level replay, preserving independent caller-owned RNG streams across sensor and
-   bias processes.
-2. Continue Gate G1 with wind, drag, and deliberate model mismatch. Sprint 3, Week 6 and Gate
-   G1 remain open.
-3. Continue later with estimation, control, uncertainty, Monte Carlo validation, and ROS
-   2/PX4 adapters.
+1. Run 1 of the reproducible run architecture is complete: immutable run configuration,
+   structural truth/nominal separation, and six named persistent random streams are
+   established.
+2. Run 2 is the immediate next implementation: an explicit run-manifest schema, canonical
+   JSON, a saved NPZ artifact, and strict validation, hashing, and ownership.
+3. Run 3 will compose and test replay, including the nominal-perturbation proof that truth is
+   isolated from nominal configuration. Wind, drag, and deliberate mismatch behavior follow.
+4. Gate G1 remains open. Estimation, control, uncertainty campaigns, Monte Carlo validation,
+   ROS 2, and PX4 integration remain future work.
