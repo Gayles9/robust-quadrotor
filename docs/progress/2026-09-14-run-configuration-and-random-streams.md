@@ -14,10 +14,10 @@ six persistent named random generators derived from one root seed. The configura
 requested sample periods against the fixed truth grid but neither constructs a scheduler nor
 composes a simulation.
 
-Run manifests, canonical JSON, saved NPZ artifacts, artifact hashing, composed simulation,
-and replay remain deferred to Runs 2 and 3. Wind, drag, deliberate mismatch effects in the
-simulator, estimation, control, Monte Carlo campaigns, ROS 2, and PX4 are also outside this
-milestone. Gate G1 remains open.
+At this Run 1 checkpoint, run manifests, canonical JSON, saved NPZ artifacts, artifact
+hashing, composed simulation, and replay remained deferred to Runs 2 and 3. Wind, drag,
+deliberate mismatch effects in the simulator, estimation, control, Monte Carlo campaigns,
+ROS 2, and PX4 were also outside this milestone. Gate G1 remained open.
 
 ## 2. Repository baseline and scope
 
@@ -587,11 +587,12 @@ Run 1 of the reproducible run architecture is complete. It establishes immutable
 structural truth/nominal separation, exact mismatch declarations, and independent named
 random-stream ownership. Gate G1 remains open.
 
-Run 2 is the exact next action: add an explicit run-manifest schema, canonical JSON, a saved
-NPZ artifact, and strict validation, hashing, and ownership. Run 3 will compose those pieces
-and test replay, including the nominal-perturbation proof that nominal changes do not leak
-into truth. Wind, drag, and deliberate environmental mismatch behavior follow. Estimation,
-control, Monte Carlo campaigns, ROS 2, and PX4 remain later work.
+At this Run 1 checkpoint, Run 2 was the exact next action: add an explicit run-manifest
+schema, canonical JSON, a saved NPZ artifact, and strict validation, hashing, and ownership.
+Run 3 will compose those pieces and test replay, including the nominal-perturbation proof
+that nominal changes do not leak into truth. Wind, drag, and deliberate environmental
+mismatch behavior follow. Estimation, control, Monte Carlo campaigns, ROS 2, and PX4 remain
+later work.
 
 ## 13. Final repository state
 
@@ -630,4 +631,177 @@ The expected actual Git status after this documentation increment is:
 
 Only README is tracked in this documentation diff; ordinary `git diff --stat` does not count
 the untracked progress record or the other untracked milestone files. Nothing is staged,
-committed, or pushed. Run 2 has not started.
+committed, or pushed. Run 2 had not started at that checkpoint.
+
+## Run 2B closeout — 2026-09-16
+
+### Status
+
+Run 2B implementation and the subsequent read-only completeness audit are complete. The
+audit found no blocking correctness defect or missing Run 2B test. This section records the
+prepared working tree; it does not claim that these files have been staged, committed, or
+pushed. Gate G1 remains open because run composition, replay, estimation, and control are
+later work.
+
+### Files prepared
+
+The complete Run 2B implementation and test scope before documentation closeout is:
+
+```text
+src/quadrotor_math/run_manifest.py
+src/quadrotor_math/run_artifact.py
+tests/unit/test_run_manifest.py
+tests/unit/test_run_artifact.py
+```
+
+`README.md` and this existing progress record are the documentation-closeout scope. No
+production or test file is changed by documentation closeout.
+
+### Manifest result
+
+`RunManifest` retains backward-compatible version-1 decoding and stable canonical version-1
+bytes. An artifact-bound version-2 manifest adds only `data_artifact.sha256`, with exactly 64
+lowercase hexadecimal characters. Decoding enforces the declared version's exact schema and
+keys; encoding is deterministic canonical UTF-8 JSON. Invalid schema values and digests are
+rejected instead of repaired. Save creates a distinct bound manifest with
+`dataclasses.replace`; the caller's unbound manifest remains unchanged.
+
+### Artifact model result
+
+`RunArtifactData` has exactly 35 explicitly ordered arrays: 25 one-dimensional fields, eight
+width-three fields, and two width-four fields. The groups are truth and command histories,
+four six-array sensor streams, accelerometer and gyroscope bias histories, and the three
+global-delivery columns. Exact NumPy array type, little-endian float64 or int64 dtype, rank,
+and trailing shape are required. Every stored array is an owned, C-contiguous, read-only
+copy. The dataclass is frozen, slotted, and identity-equal.
+
+### Intrinsic validation result
+
+Construction validates the static array schema, truth/bias/command leading-dimension
+relationships, and the six aligned arrays within each sensor stream. Each stream's sequence
+and observation indices are consecutive from zero. Delivered-at-truth entries are either
+pending `-1` or a truth update row from 1 through the final row, and all acquisition and
+delivery timestamp arrays are finite. The global table accepts only stable sensor IDs 1–4,
+contains each delivered observation exactly once with multiplicity, excludes pending
+observations, and orders records by delivered truth row, sensor ID, and sequence index.
+
+### Manifest/artifact compatibility result
+
+Save and authenticated load call the same compatibility validator. It checks truth rows
+against the configured step count plus one, command rows against the step count, the exact
+configured truth-time grid, and every row of the constant four-rotor command. All four sensor
+streams must match their configured acquisition counts and acquisition/delivery timestamps.
+Sensor timestamp comparisons use `rtol=0` and `atol=1.0e-12` seconds. Delivered-at-truth
+rows must be the first truth update reaching the scheduled delivery time under the same
+absolute boundary tolerance, or `-1` when no update reaches it. The shared rigid-body
+history validator requires finite, strictly increasing and uniformly spaced truth times,
+finite state histories, and unit quaternions. Row-zero position, velocity, attitude, angular
+velocity, and the initial accelerometer and gyroscope biases must exactly match the
+manifest.
+
+### NPZ result
+
+Encoding uses one deterministic in-memory, uncompressed `np.savez` call with the 35 members
+named explicitly in data-model order. Decoding uses one in-memory `np.load` call through
+`BytesIO` with `allow_pickle=False`. It checks the exact logical member set before reading
+any member, then constructs owned immutable arrays while the archive is open. Valid decode
+and re-encode produce byte-identical NPZ payloads in the tested environment.
+
+### Save and publication result
+
+`save_run_directory` refuses an existing destination before validation or encoding. It
+validates compatibility before creating staging, encodes NPZ bytes once in memory, hashes
+those exact bytes, and canonically encodes the bound version-2 manifest. Staging is created
+in the destination's parent and contains only `data.npz` and `manifest.json`. Each file is
+written and fsynced, then the staging directory is fsynced. One Linux `renameat2` operation
+with `RENAME_NOREPLACE` publishes the whole directory; afterward the parent directory is
+fsynced before save returns. A racing destination is never replaced. Pre-publication and
+publication failures propagate and clean staging. If parent fsync fails after publication,
+the failure propagates while the complete published directory remains present and loadable.
+
+### Load result
+
+`load_run_directory` follows this order:
+
+1. Require a directory.
+2. Require exactly `manifest.json` and `data.npz` as its entries.
+3. Read and decode `manifest.json`.
+4. Require a bound manifest.
+5. Read `data.npz` once.
+6. Verify SHA-256 against the bound manifest before NPZ parsing.
+7. Decode those exact authenticated bytes with `allow_pickle=False` and the exact member set.
+8. Validate decoded data against the manifest.
+9. Return the bound manifest and immutable artifact.
+
+### TDD development record
+
+The bounded RED/GREEN progression covered manifest versioning and digest binding; the data
+model and static array schema; leading dimensions; deterministic encoding; save/load happy
+paths; destination and cleanup failures; atomic no-replace publication; decoder and
+directory-shell validation; exact NPZ member sets; zero-based stream indices; delivered-index
+domain; finite sensor timestamps; global delivery-table membership and order; manifest
+compatibility; initial-state and bias compatibility; shared rigid-body validation; configured
+sensor counts and timestamps; delivery-row and pending semantics; and crash-durable
+publication. Each accepted RED failed only for its intended missing behavior, and each GREEN
+retained the protected tests and files. The read-only closeout audit then checked the full
+implementation and test matrix.
+
+### Final verification
+
+The 2026-09-16 audited gate produced:
+
+| Check | Result |
+| --- | ---: |
+| Focused artifact and manifest tests | 409 passed |
+| Bounded artifact, manifest, configuration, and randomness tests | 594 passed |
+| Sensor-scheduling tests | 58 passed |
+| Rigid-body validation tests | 22 passed |
+| Full suite | 1,054 passed; 0 skipped; 0 xfailed |
+| Ruff lint | Passed |
+| Ruff format check | 64 files already formatted |
+| Mypy over `src/quadrotor_math` | No issues in 16 source files |
+
+The Run 2B source and tests contained no `TODO`, `FIXME`, `NotImplementedError`, `xfail`,
+or skip markers. These results are a verified working-tree snapshot, not a standing promise
+about later revisions.
+
+### Design decisions
+
+- Version 1 remains the unbound compatibility format; artifact binding requires version 2.
+- Schema, digest, array, and configuration checks reject invalid data rather than repairing
+  or normalizing it.
+- Persisted arrays are independently owned and marked read-only.
+- Digest authentication precedes NPZ parsing. It binds data to the supplied manifest; it is
+  not a signature over a potentially malicious manifest.
+- Publication uses Linux no-replace `renameat2` with file, staging-directory, and
+  parent-directory fsyncs for crash durability. Missing `renameat2` support fails closed.
+- Save and load share one configuration-compatibility validator.
+- Run 2B does not claim hostile-input hardening.
+
+### Run 2C deferrals
+
+Run 2C intentionally owns corrupted or adversarial ZIP headers, duplicate physical ZIP
+members, decompression limits and ZIP bombs, archive path traversal, symlink and special-file
+rejection, load-time directory-entry races, duplicate JSON-key detection, broader malformed
+input fuzzing, additional sensor-measurement plausibility rules, and a cross-platform
+replacement for Linux `renameat2`. These are explicit later hardening tasks, not accidental
+omissions from Run 2B.
+
+### Next exact step
+
+1. Review the documentation-only diff.
+2. Rerun the complete quality gate.
+3. Stage exactly these six Run 2B code, test, and documentation files when preparing the
+   publication:
+
+   ```text
+   README.md
+   docs/progress/2026-09-14-run-configuration-and-random-streams.md
+   src/quadrotor_math/run_artifact.py
+   src/quadrotor_math/run_manifest.py
+   tests/unit/test_run_artifact.py
+   tests/unit/test_run_manifest.py
+   ```
+
+4. Commit and push only after explicit publication authorization; then begin Run 2C
+   hardening as a separate bounded milestone.

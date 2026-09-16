@@ -66,10 +66,17 @@ validated truth and nominal parameters, an independently owned initial truth sta
 truth numerics, four sensor schedules, a constant four-rotor input, a 128-bit root seed, and
 explicit truth/nominal mismatch declarations. Six persistent named random generators use a
 versioned derivation with explicit stream IDs, so consuming one stream does not advance any
-other. The completed repository gate passed Ruff lint, Ruff format verification reported 59
-files already formatted, mypy found no issues in 15 source files, and pytest collected and
-passed exactly 645 tests in 14.03s. `test_run_configuration.py` contains 169 tests and
-`test_run_randomness.py` contains 16 tests. There were no failures, errors, skips, or warnings.
+other. At the Run 1 checkpoint, the repository gate passed Ruff lint, Ruff format verification
+reported 59 files already formatted, mypy found no issues in 15 source files, and pytest
+collected and passed exactly 645 tests in 14.03s. `test_run_configuration.py` contains 169
+tests and `test_run_randomness.py` contains 16 tests. There were no failures, errors, skips,
+or warnings.
+
+Run 2A's reproducible run manifest and Run 2B's immutable, authenticated NPZ run-artifact
+layer are now implemented and tested. Run 2B covers persistence, shared configuration
+validation, digest authentication, and durable no-replace publication on Linux. The
+2026-09-16 closeout audit found no unresolved Run 2B correctness defect; hostile-input and
+filesystem-race hardening remains a separate Run 2C milestone.
 
 The repository does not yet contain a reusable physically conditional invariant-monitoring
 API, a closed-loop controller, a state estimator, adaptive integration, robustness campaigns,
@@ -719,10 +726,94 @@ order reproduce the same stochastic sequences. This is not a promise across arbi
 or Python versions, platforms, or future distribution implementations.
 
 Run 1 establishes structural truth/nominal separation, but full truth isolation is not proven
-until the Run 3 nominal-perturbation composition test. Run-level replay, manifests, canonical
-JSON, saved NPZ artifacts, simulation composition, wind, drag, estimation, and control do not
-exist yet. Gate G1 remains open. The complete contract and historical TDD evidence are in the
+until the Run 3 nominal-perturbation composition test. Run-level replay, simulation
+composition, wind, drag, estimation, and control do not exist yet. Gate G1 remains open. The
+complete Run 1 contract and historical TDD evidence are in the
 [run-configuration and named-stream progress record](docs/progress/2026-09-14-run-configuration-and-random-streams.md).
+
+### Reproducible run manifests and authenticated artifacts
+
+Run 2A adds a canonical UTF-8 JSON run manifest. Version 1 contains the `schema` name and
+version, `randomness`, `software_provenance`, and `run_configuration`. Its canonical bytes
+remain stable and version-1 manifests remain decodable as unbound compatibility manifests.
+Version 2 adds only this binding object:
+
+```json
+{
+  "data_artifact": {
+    "sha256": "<64 lowercase hexadecimal characters>"
+  }
+}
+```
+
+Invalid keys, types, versions, and digests are rejected rather than normalized. Run 2B saves
+one run directory with exactly two entries:
+
+```text
+run-directory/
+├── manifest.json
+└── data.npz
+```
+
+`manifest.json` is canonical UTF-8 JSON. `data.npz` is a deterministic, uncompressed NumPy
+archive. The version-2 manifest binds the exact archive bytes by SHA-256; an unbound
+version-1 manifest cannot be loaded as a run directory.
+
+`RunArtifactData` is frozen, slotted, and identity-equal. Its 35 explicitly ordered NumPy
+arrays comprise truth and command histories; six aligned arrays for each of four sensor
+streams; accelerometer and gyroscope bias histories; and three columns for the global
+delivery table. Construction requires exact `np.ndarray` inputs with the specified
+little-endian float64 or int64 dtype, rank, and trailing shape. Stored arrays are owned,
+C-contiguous, read-only copies. Intrinsic checks enforce aligned dimensions, stream indices,
+and exact global delivery-table membership and order.
+
+Save and authenticated load share one compatibility validator. It checks configured truth and
+command row counts, the exact truth-time grid and constant rotor commands, sensor acquisition
+counts and timestamps, delivered-at-truth rows with pending `-1` semantics, finite valid
+rigid-body histories with unit quaternions, and configured initial state and bias values.
+Artifact sensor timestamps and delivery matching use zero relative tolerance and an absolute
+tolerance of `1.0e-12` seconds; this is not a general simulation tolerance.
+
+`save_run_directory` requires an absent destination and checks compatibility before NPZ
+encoding or filesystem staging. It encodes the NPZ in memory, hashes those exact bytes, and
+returns a distinct bound version-2 manifest without changing the caller's manifest. In the
+destination's parent directory, it writes and individually fsyncs `data.npz` and
+`manifest.json`, fsyncs their staging directory, publishes with one Linux `renameat2` call
+using `RENAME_NOREPLACE`, and fsyncs the parent. Failures before publication clean staging;
+a racing destination is never replaced. There is no overwrite mode. If the final parent
+fsync fails, the error propagates while the published two-file directory remains present.
+
+`load_run_directory` requires a directory containing exactly those two entries. It reads and
+decodes the manifest first and requires a data binding. It reads `data.npz` once, checks its
+SHA-256 before NPZ parsing, decodes with `allow_pickle=False`, requires exactly the 35
+expected logical members, and validates the decoded artifact against the manifest before
+returning the bound manifest and immutable data.
+
+Given an already valid `manifest` and `data`, the public calls are:
+
+```python
+from pathlib import Path
+
+from quadrotor_math.run_artifact import load_run_directory, save_run_directory
+
+run_directory = Path("runs/example")  # Must not exist before saving.
+bound_manifest = save_run_directory(run_directory, manifest, data)
+loaded_manifest, loaded_data = load_run_directory(run_directory)
+```
+
+Atomic no-replace publication requires Linux `renameat2`; an unavailable symbol fails
+closed. Run 2B authenticates and structurally validates trusted, locally produced artifacts.
+The digest binds data to the supplied manifest; it is not a signature protecting against a
+maliciously replaced manifest.
+
+Run 2C is reserved for corrupted or adversarial ZIP headers, duplicate physical ZIP members,
+decompression limits and ZIP bombs, archive path traversal, symlink and special-file
+rejection, load-time directory-entry races, duplicate JSON-key detection, broader malformed
+input fuzzing, additional sensor-measurement plausibility rules, and a cross-platform
+replacement for `renameat2`.
+
+The [Run 2B closeout](docs/progress/2026-09-14-run-configuration-and-random-streams.md)
+records the detailed implementation and verification history.
 
 ### Explicit-Euler propagation
 
@@ -1041,6 +1132,10 @@ The full convention, state shapes, signs, and hover sanity check are defined in 
   validation over 18 supported parameter paths.
 - Six persistent named random generators derived through versioned explicit stream IDs,
   `SeedSequence(..., pool_size=4)`, and explicit `PCG64` construction.
+- Canonical version-1 and artifact-bound version-2 run manifests with strict schema and
+  SHA-256 digest validation.
+- An immutable 35-array NPZ run artifact with shared configuration validation, authenticated
+  loading, and durable Linux no-replace directory publication.
 - A squared-norm vector primitive.
 - Skew-symmetric matrices, quaternion normalization and differentiation, and active
   body-to-world rotation matrices.
@@ -1143,21 +1238,27 @@ uv run mypy src experiments
 uv run pytest
 ```
 
-For the current working tree, the IMU module passes 118 tests, the position-sensor module
-passes 54 tests, the sensor-scheduling module passes 58 tests, the run-configuration module
-passes 169 tests, and the named run-randomness module passes 16 tests. The completed
+At the Run 1 checkpoint, the IMU module passed 118 tests, the position-sensor module
+passed 54 tests, the sensor-scheduling module passed 58 tests, the run-configuration module
+passed 169 tests, and the named run-randomness module passed 16 tests. The completed
 repository gate passed Ruff lint, Ruff format verification reported 59 files already
 formatted, strict mypy over `src` and `experiments` found no issues in 15 source files, and
 pytest collected and passed exactly 645 tests in 14.03s. There were no failures, errors,
 skips, or warnings. Documentation was updated only after that successful gate and the gate
 was not rerun.
 
+At the 2026-09-16 Run 2B closeout audit, the full suite passed 1,054 tests with zero skipped
+or xfailed. Ruff lint passed, Ruff format verification found 64 files already formatted, and
+mypy found no issues in all 16 source files. The audit found no unresolved Run 2B correctness
+defect. These counts record that verified working-tree snapshot.
+
 ## Repository structure
 
 - `src/quadrotor_math/`: ROS/PX4-independent vector, randomness, rotation, actuation,
   dynamics, integration, deterministic simulation, ideal IMU mathematics, state-history
   validation, sensor measurement, fixed-rate sensor scheduling, immutable run configuration,
-  named run-random-stream ownership, and trajectory-error algorithms.
+  named run-random-stream ownership, canonical run manifests, immutable run artifacts, and
+  trajectory-error algorithms.
 - `experiments/`: reproducible numerical studies built from the public mathematical core.
 - `tests/unit/`: focused unit and composition tests for the mathematical core.
 - `docs/architecture/`: architectural contracts, including frames and state conventions.
@@ -1210,9 +1311,9 @@ was not rerun.
   caller state after producer exceptions, serialize scheduler or RNG state, drain pending
   deliveries automatically at termination, or integrate with an estimator, controller,
   ROS 2, or PX4.
-- Run 1 establishes immutable configuration and named stream ownership, not a complete
-  simulator runner. No run manifest, canonical JSON representation, saved NPZ artifact,
-  artifact hash, or run-level replay implementation exists yet.
+- Runs 1, 2A, and 2B establish reproducible configuration, named streams, manifests, and
+  authenticated artifacts, but do not yet compose a complete simulator runner or run-level
+  replay. Hostile archive and filesystem-race hardening is reserved for Run 2C.
 - Truth and nominal configuration are structurally separate, but full truth isolation remains
   unproven until the planned Run 3 nominal-perturbation composition test. Deliberate mismatch
   effects in simulation, including future wind and drag parameters, are not implemented.
@@ -1232,8 +1333,8 @@ the final high-accuracy simulation method, especially for larger time steps or l
 1. Run 1 of the reproducible run architecture is complete: immutable run configuration,
    structural truth/nominal separation, and six named persistent random streams are
    established.
-2. Run 2 is the immediate next implementation: an explicit run-manifest schema, canonical
-   JSON, a saved NPZ artifact, and strict validation, hashing, and ownership.
+2. Run 2A and Run 2B are complete: canonical run manifests and a durable, authenticated NPZ
+   artifact are implemented. Run 2C is the next bounded hardening milestone.
 3. Run 3 will compose and test replay, including the nominal-perturbation proof that truth is
    isolated from nominal configuration. Wind, drag, and deliberate mismatch behavior follow.
 4. Gate G1 remains open. Estimation, control, uncertainty campaigns, Monte Carlo validation,
