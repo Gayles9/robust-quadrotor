@@ -2,6 +2,87 @@ import numpy as np
 from numpy.typing import NDArray
 
 
+def motor_speed_first_order_step(
+    actual_rotor_omega: NDArray[np.float64],
+    commanded_rotor_omega: NDArray[np.float64],
+    minimum_rotor_omega: float,
+    maximum_rotor_omega: float,
+    motor_time_constant_s: float,
+    time_step_s: float,
+) -> NDArray[np.float64]:
+    """Advance actual rotor speeds over one constant-command interval.
+
+    Speeds are in rad/s. The commanded speeds are clipped to the rotor limits,
+    then the exact finite-time first-order response approaches that saturated
+    target. Return the next actual rotor speeds in rad/s. Zero elapsed time
+    returns a copy of the unchanged actual rotor speeds.
+
+    Raises:
+        ValueError: If either rotor-speed array does not have shape ``(4,)`` or
+            contains a non-finite value, if an actual speed is outside the
+            supplied rotor-speed limits, or if a commanded speed is negative.
+            Also raised if either speed limit, the motor time constant, or the
+            time step is non-finite; if the minimum speed or time step is
+            negative; if the maximum speed is not greater than the minimum;
+            or if the motor time constant is not positive.
+    """
+    if actual_rotor_omega.shape != (4,):
+        raise ValueError("actual_rotor_omega must have shape (4,)")
+
+    if commanded_rotor_omega.shape != (4,):
+        raise ValueError("commanded_rotor_omega must have shape (4,)")
+
+    if not np.all(np.isfinite(actual_rotor_omega)):
+        raise ValueError("actual_rotor_omega must contain only finite values")
+
+    if not np.all(np.isfinite(commanded_rotor_omega)):
+        raise ValueError("commanded_rotor_omega must contain only finite values")
+
+    if not np.isfinite(minimum_rotor_omega):
+        raise ValueError("minimum_rotor_omega must be finite")
+
+    if not np.isfinite(maximum_rotor_omega):
+        raise ValueError("maximum_rotor_omega must be finite")
+
+    if minimum_rotor_omega < 0.0:
+        raise ValueError("minimum_rotor_omega must be nonnegative")
+
+    if maximum_rotor_omega <= minimum_rotor_omega:
+        raise ValueError("maximum_rotor_omega must be greater than minimum_rotor_omega")
+
+    if not np.isfinite(motor_time_constant_s):
+        raise ValueError("motor_time_constant_s must be finite")
+
+    if motor_time_constant_s <= 0.0:
+        raise ValueError("motor_time_constant_s must be positive")
+
+    if not np.isfinite(time_step_s):
+        raise ValueError("time_step_s must be finite")
+
+    if time_step_s < 0.0:
+        raise ValueError("time_step_s must be nonnegative")
+
+    if not np.all(
+        (actual_rotor_omega >= minimum_rotor_omega) & (actual_rotor_omega <= maximum_rotor_omega)
+    ):
+        raise ValueError("actual_rotor_omega must be within rotor speed limits")
+
+    if not np.all(commanded_rotor_omega >= 0.0):
+        raise ValueError("commanded_rotor_omega must be nonnegative")
+
+    if time_step_s == 0.0:
+        return actual_rotor_omega.copy()
+
+    saturated_target = np.clip(
+        commanded_rotor_omega,
+        minimum_rotor_omega,
+        maximum_rotor_omega,
+    )
+    decay = np.exp(-time_step_s / motor_time_constant_s)
+    next_actual_rotor_omega = saturated_target + (actual_rotor_omega - saturated_target) * decay
+    return np.asarray(next_actual_rotor_omega, dtype=np.float64)
+
+
 def rotor_thrusts_from_speeds(
     rotor_omega: NDArray[np.float64],
     thrust_coefficient: float,
