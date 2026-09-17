@@ -75,8 +75,8 @@ or warnings.
 Run 2A's reproducible run manifest and Run 2B's immutable, authenticated NPZ run-artifact
 layer are now implemented and tested. Run 2B covers persistence, shared configuration
 validation, digest authentication, and durable no-replace publication on Linux. The
-2026-09-16 closeout audit found no unresolved Run 2B correctness defect; hostile-input and
-filesystem-race hardening remains a separate Run 2C milestone.
+2026-09-16 closeout audit found no unresolved Run 2B correctness defect. Run 2C's bounded
+manifest-decoder validation is also complete.
 
 The repository does not yet contain a reusable physically conditional invariant-monitoring
 API, a closed-loop controller, a state estimator, adaptive integration, robustness campaigns,
@@ -789,6 +789,13 @@ SHA-256 before NPZ parsing, decodes with `allow_pickle=False`, requires exactly 
 expected logical members, and validates the decoded artifact against the manifest before
 returning the bound manifest and immutable data.
 
+Manifest decoding rejects duplicate JSON keys in the top-level or any nested object before
+they can be discarded by dictionary construction. It also rejects the nonstandard numeric
+constants `NaN`, `Infinity`, and `-Infinity`, and requires
+`run_configuration.numerics.duration_s` to equal exactly `truth_time_step_s * number_of_steps`.
+These invalid manifests raise `ValueError`. The public APIs, manifest versions, and
+deterministic canonical encoding remain unchanged.
+
 Given an already valid `manifest` and `data`, the public calls are:
 
 ```python
@@ -806,14 +813,8 @@ closed. Run 2B authenticates and structurally validates trusted, locally produce
 The digest binds data to the supplied manifest; it is not a signature protecting against a
 maliciously replaced manifest.
 
-Run 2C is reserved for corrupted or adversarial ZIP headers, duplicate physical ZIP members,
-decompression limits and ZIP bombs, archive path traversal, symlink and special-file
-rejection, load-time directory-entry races, duplicate JSON-key detection, broader malformed
-input fuzzing, additional sensor-measurement plausibility rules, and a cross-platform
-replacement for `renameat2`.
-
-The [Run 2B closeout](docs/progress/2026-09-14-run-configuration-and-random-streams.md)
-records the detailed implementation and verification history.
+The [run-architecture progress record](docs/progress/2026-09-14-run-configuration-and-random-streams.md)
+records the Run 2B and Run 2C implementation and verification history.
 
 ### Explicit-Euler propagation
 
@@ -1247,10 +1248,10 @@ pytest collected and passed exactly 645 tests in 14.03s. There were no failures,
 skips, or warnings. Documentation was updated only after that successful gate and the gate
 was not rerun.
 
-At the 2026-09-16 Run 2B closeout audit, the full suite passed 1,054 tests with zero skipped
-or xfailed. Ruff lint passed, Ruff format verification found 64 files already formatted, and
-mypy found no issues in all 16 source files. The audit found no unresolved Run 2B correctness
-defect. These counts record that verified working-tree snapshot.
+The completed Run 2C verification snapshot passed 1,060 tests with zero skipped or xfailed
+and no warnings. Ruff lint passed, Ruff format verification found 64 files already formatted,
+and mypy found no issues in 16 source files. These counts record the verified working-tree
+snapshot before this documentation update.
 
 ## Repository structure
 
@@ -1311,9 +1312,9 @@ defect. These counts record that verified working-tree snapshot.
   caller state after producer exceptions, serialize scheduler or RNG state, drain pending
   deliveries automatically at termination, or integrate with an estimator, controller,
   ROS 2, or PX4.
-- Runs 1, 2A, and 2B establish reproducible configuration, named streams, manifests, and
-  authenticated artifacts, but do not yet compose a complete simulator runner or run-level
-  replay. Hostile archive and filesystem-race hardening is reserved for Run 2C.
+- Runs 1, 2A, 2B, and 2C establish reproducible configuration, named streams, manifests,
+  authenticated artifacts, and the bounded manifest-decoder validation described above,
+  but do not yet compose a complete simulator runner or run-level replay.
 - Truth and nominal configuration are structurally separate, but full truth isolation remains
   unproven until the planned Run 3 nominal-perturbation composition test. Deliberate mismatch
   effects in simulation, including future wind and drag parameters, are not implemented.
@@ -1333,9 +1334,10 @@ the final high-accuracy simulation method, especially for larger time steps or l
 1. Run 1 of the reproducible run architecture is complete: immutable run configuration,
    structural truth/nominal separation, and six named persistent random streams are
    established.
-2. Run 2A and Run 2B are complete: canonical run manifests and a durable, authenticated NPZ
-   artifact are implemented. Run 2C is the next bounded hardening milestone.
-3. Run 3 will compose and test replay, including the nominal-perturbation proof that truth is
-   isolated from nominal configuration. Wind, drag, and deliberate mismatch behavior follow.
+2. Runs 2A, 2B, and the bounded Run 2C manifest-validation increment are complete: canonical
+   manifests, a durable authenticated NPZ artifact, and manifest-decoder checks are implemented.
+3. Run 3 is next. It will compose and test replay, including the nominal-perturbation proof
+   that truth is isolated from nominal configuration. Wind, drag, and deliberate mismatch
+   behavior follow.
 4. Gate G1 remains open. Estimation, control, uncertainty campaigns, Monte Carlo validation,
    ROS 2, and PX4 integration remain future work.

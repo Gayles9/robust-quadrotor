@@ -1,4 +1,5 @@
 import json
+import math
 from pathlib import Path
 from subprocess import CompletedProcess
 from typing import cast
@@ -472,6 +473,170 @@ def test_decode_run_manifest_round_trips_data_npz_digest() -> None:
     standalone_manifest = decode_run_manifest(standalone_bytes)
     assert standalone_manifest.data_npz_sha256 is None
     assert encode_run_manifest(standalone_manifest) == standalone_bytes
+
+
+def test_decode_run_manifest_rejects_duplicate_json_key() -> None:
+    canonical_bytes = encode_run_manifest(_artifact_bound_manifest())
+    canonical_mapping = json.loads(canonical_bytes)
+    assert canonical_mapping["schema"] == {
+        "name": "robust_quadrotor.run_manifest",
+        "version": 2,
+    }
+    schema_member = b'"schema":' + json.dumps(
+        canonical_mapping["schema"], sort_keys=True, separators=(",", ":")
+    ).encode("utf-8")
+    assert canonical_bytes.count(b"," + schema_member) == 1
+
+    duplicated_bytes = canonical_bytes.replace(
+        b"," + schema_member, b"," + schema_member + b"," + schema_member, 1
+    )
+
+    assert duplicated_bytes.count(b'"schema":') == 2
+    top_level_pairs = json.loads(duplicated_bytes, object_pairs_hook=list)
+    schema_values = [value for key, value in top_level_pairs if key == "schema"]
+    assert len(schema_values) == 2
+    assert schema_values[0] == schema_values[1]
+    assert json.loads(duplicated_bytes) == canonical_mapping
+
+    with pytest.raises(ValueError) as error:
+        decode_run_manifest(duplicated_bytes)
+
+    assert str(error.value) == "manifest JSON contains duplicate key: schema"
+
+
+def test_decode_run_manifest_rejects_nested_duplicate_json_key() -> None:
+    canonical_bytes = encode_run_manifest(_artifact_bound_manifest())
+    canonical_mapping = json.loads(canonical_bytes)
+    assert canonical_mapping["schema"] == {
+        "name": "robust_quadrotor.run_manifest",
+        "version": 2,
+    }
+    schema_member = b'"schema":' + json.dumps(
+        canonical_mapping["schema"], sort_keys=True, separators=(",", ":")
+    ).encode("utf-8")
+    version_member = b'"version":2'
+    assert canonical_bytes.count(schema_member) == 1
+    assert schema_member.count(version_member) == 1
+
+    duplicated_schema_member = schema_member.replace(
+        version_member, version_member + b"," + version_member, 1
+    )
+    duplicated_bytes = canonical_bytes.replace(schema_member, duplicated_schema_member, 1)
+
+    top_level_pairs = json.loads(duplicated_bytes, object_pairs_hook=list)
+    top_level_keys = [key for key, _ in top_level_pairs]
+    assert len(top_level_keys) == len(set(top_level_keys))
+    schema_pairs = [value for key, value in top_level_pairs if key == "schema"]
+    assert len(schema_pairs) == 1
+    version_values = [value for key, value in schema_pairs[0] if key == "version"]
+    assert version_values == [2, 2]
+    assert json.loads(duplicated_bytes) == canonical_mapping
+
+    with pytest.raises(ValueError) as error:
+        decode_run_manifest(duplicated_bytes)
+
+    assert str(error.value) == "manifest JSON contains duplicate key: version"
+
+
+def test_decode_run_manifest_rejects_nonstandard_nan_constant() -> None:
+    canonical_bytes = encode_run_manifest(_artifact_bound_manifest())
+    canonical_numerics = json.loads(canonical_bytes)["run_configuration"]["numerics"]
+    assert canonical_numerics["duration_s"] == 0.5
+    assert math.isfinite(canonical_numerics["duration_s"])
+
+    duration_member = b'"duration_s":0.5'
+    nan_member = b'"duration_s":NaN'
+    assert canonical_bytes.count(duration_member) == 1
+    mutated_bytes = canonical_bytes.replace(duration_member, nan_member, 1)
+    assert mutated_bytes.count(nan_member) == 1
+    assert b'"duration_s":"NaN"' not in mutated_bytes
+    assert mutated_bytes.count(b'"duration_s":') == 1
+    assert mutated_bytes.replace(nan_member, duration_member, 1) == canonical_bytes
+
+    mutated_numerics = json.loads(mutated_bytes)["run_configuration"]["numerics"]
+    assert math.isnan(mutated_numerics["duration_s"])
+
+    with pytest.raises(ValueError) as error:
+        decode_run_manifest(mutated_bytes)
+
+    assert str(error.value) == "manifest JSON contains nonstandard constant: NaN"
+
+
+@pytest.mark.parametrize(
+    ("constant", "expected_message", "expected_sign"),
+    [
+        pytest.param(
+            "Infinity",
+            "manifest JSON contains nonstandard constant: Infinity",
+            1.0,
+            id="positive-infinity",
+        ),
+        pytest.param(
+            "-Infinity",
+            "manifest JSON contains nonstandard constant: -Infinity",
+            -1.0,
+            id="negative-infinity",
+        ),
+    ],
+)
+def test_decode_run_manifest_rejects_nonstandard_infinity_constant(
+    constant: str, expected_message: str, expected_sign: float
+) -> None:
+    canonical_bytes = encode_run_manifest(_artifact_bound_manifest())
+    canonical_numerics = json.loads(canonical_bytes)["run_configuration"]["numerics"]
+    assert canonical_numerics["duration_s"] == 0.5
+    assert math.isfinite(canonical_numerics["duration_s"])
+
+    duration_member = b'"duration_s":0.5'
+    infinity_member = b'"duration_s":' + constant.encode("ascii")
+    assert canonical_bytes.count(duration_member) == 1
+    mutated_bytes = canonical_bytes.replace(duration_member, infinity_member, 1)
+    assert mutated_bytes.count(infinity_member) == 1
+    assert b'"duration_s":"' + constant.encode("ascii") + b'"' not in mutated_bytes
+    assert mutated_bytes.count(b'"duration_s":') == 1
+    assert mutated_bytes.replace(infinity_member, duration_member, 1) == canonical_bytes
+
+    mutated_numerics = json.loads(mutated_bytes)["run_configuration"]["numerics"]
+    assert math.isinf(mutated_numerics["duration_s"])
+    assert math.copysign(1.0, mutated_numerics["duration_s"]) == expected_sign
+
+    with pytest.raises(ValueError) as error:
+        decode_run_manifest(mutated_bytes)
+
+    assert str(error.value) == expected_message
+
+
+def test_decode_run_manifest_rejects_inconsistent_duration() -> None:
+    canonical_bytes = encode_run_manifest(_artifact_bound_manifest())
+    canonical_numerics = json.loads(canonical_bytes)["run_configuration"]["numerics"]
+    assert canonical_numerics["truth_time_step_s"] == 0.02
+    assert canonical_numerics["number_of_steps"] == 25
+    assert canonical_numerics["duration_s"] == 0.5
+
+    duration_member = b'"duration_s":0.5'
+    inconsistent_member = b'"duration_s":0.75'
+    assert canonical_bytes.count(duration_member) == 1
+    mutated_bytes = canonical_bytes.replace(duration_member, inconsistent_member, 1)
+    assert mutated_bytes.count(inconsistent_member) == 1
+    assert mutated_bytes.count(b'"duration_s":') == 1
+    assert mutated_bytes.replace(inconsistent_member, duration_member, 1) == canonical_bytes
+
+    mutated_numerics = json.loads(mutated_bytes)["run_configuration"]["numerics"]
+    assert mutated_numerics["truth_time_step_s"] == 0.02
+    assert mutated_numerics["number_of_steps"] == 25
+    assert mutated_numerics["duration_s"] == 0.75
+    expected_duration = mutated_numerics["truth_time_step_s"] * mutated_numerics["number_of_steps"]
+    assert expected_duration == 0.5
+    assert mutated_numerics["duration_s"] != expected_duration
+
+    with pytest.raises(
+        ValueError,
+        match=(
+            r"^manifest run_configuration\.numerics\.duration_s must equal "
+            r"truth_time_step_s \* number_of_steps$"
+        ),
+    ):
+        decode_run_manifest(mutated_bytes)
 
 
 def test_decode_run_manifest_reconstructs_fresh_read_only_arrays() -> None:

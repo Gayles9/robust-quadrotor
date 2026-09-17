@@ -778,30 +778,88 @@ about later revisions.
 - Save and load share one configuration-compatibility validator.
 - Run 2B does not claim hostile-input hardening.
 
-### Run 2C deferrals
+### Run 2B handoff
 
-Run 2C intentionally owns corrupted or adversarial ZIP headers, duplicate physical ZIP
-members, decompression limits and ZIP bombs, archive path traversal, symlink and special-file
-rejection, load-time directory-entry races, duplicate JSON-key detection, broader malformed
-input fuzzing, additional sensor-measurement plausibility rules, and a cross-platform
-replacement for Linux `renameat2`. These are explicit later hardening tasks, not accidental
-omissions from Run 2B.
+Run 2C followed as a separate, bounded manifest-decoder validation increment. Its completed
+scope and verification are recorded below.
 
-### Next exact step
+## Run 2C manifest-decoder validation closeout — 2026-09-17
+
+### Scope and result
+
+The complete Run 2C code and test scope before this documentation closeout is exactly:
+
+```text
+src/quadrotor_math/run_manifest.py
+tests/unit/test_run_manifest.py
+```
+
+Manifest decoding rejects duplicate keys before a JSON object's pairs become a dictionary.
+The check applies independently to every object, including nested objects. Its exact
+`ValueError` format is:
+
+```text
+manifest JSON contains duplicate key: <key>
+```
+
+JSON parsing rejects the nonstandard numeric constants `NaN`, `Infinity`, and `-Infinity`.
+Their exact `ValueError` format is:
+
+```text
+manifest JSON contains nonstandard constant: <token>
+```
+
+The decoded `run_configuration.numerics.duration_s` must exactly equal
+`truth_time_step_s * number_of_steps`. A mismatch raises `ValueError` with this exact message:
+
+```text
+manifest run_configuration.numerics.duration_s must equal truth_time_step_s * number_of_steps
+```
+
+Canonical encoding, manifest versions, and public APIs are unchanged.
+
+### RED/GREEN progression
+
+The sequence was a top-level duplicate-key RED test, duplicate-key GREEN implementation,
+nested duplicate-key characterization, `NaN` RED test, nonstandard-constant GREEN
+implementation, positive- and negative-infinity characterization, inconsistent-duration RED
+test, and exact derived-duration GREEN validation. Each RED failure was limited to its
+intended missing behavior; each GREEN retained the previously accepted tests.
+
+### Audited verification
+
+| Check | Result |
+| --- | ---: |
+| Manifest tests | 138 passed |
+| Manifest and artifact tests | 415 passed |
+| Full suite | 1,060 passed; 0 skipped; 0 xfailed; 0 warnings |
+| Ruff lint | Passed |
+| Ruff format check | 64 files already formatted |
+| Mypy | No issues in 16 source files |
+
+These results cover the byte-identical production and test files present before this
+documentation-only closeout.
+
+### Design decisions
+
+- JSON object keys must be unique at every nesting level.
+- Manifest decoding accepts only standard JSON numeric syntax.
+- Redundant derived configuration values are validated rather than trusted or repaired;
+  the derived-duration comparison is exact.
+- The validation remains internal to decoding. No public API or encoded schema changed.
+
+### Next exact project action
 
 1. Review the documentation-only diff.
-2. Rerun the complete quality gate.
-3. Stage exactly these six Run 2B code, test, and documentation files when preparing the
-   publication:
+2. Run the final complete quality gate.
+3. Stage exactly these four Run 2C code, test, and documentation files for publication:
 
    ```text
    README.md
    docs/progress/2026-09-14-run-configuration-and-random-streams.md
-   src/quadrotor_math/run_artifact.py
    src/quadrotor_math/run_manifest.py
-   tests/unit/test_run_artifact.py
    tests/unit/test_run_manifest.py
    ```
 
-4. Commit and push only after explicit publication authorization; then begin Run 2C
-   hardening as a separate bounded milestone.
+4. Commit and push only after explicit publication authorization.
+5. Begin Run 3 as the next separate milestone.

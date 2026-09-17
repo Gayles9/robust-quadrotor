@@ -6,7 +6,7 @@ import subprocess
 from dataclasses import dataclass
 from importlib import metadata
 from pathlib import Path
-from typing import Final, cast
+from typing import Final, Never, cast
 
 import numpy as np
 from numpy.typing import NDArray
@@ -803,11 +803,21 @@ def _decode_initial_truth_state(mapping: dict[str, object]) -> RigidBodyInitialS
 
 
 def _decode_numerics(mapping: dict[str, object]) -> RunNumerics:
-    return RunNumerics(
+    truth_time_step_s = cast(float, mapping["truth_time_step_s"])
+    number_of_steps = cast(int, mapping["number_of_steps"])
+    duration_s = cast(float, mapping["duration_s"])
+    numerics = RunNumerics(
         integration_method=IntegrationMethod(cast(str, mapping["integration_method"])),
-        truth_time_step_s=cast(float, mapping["truth_time_step_s"]),
-        number_of_steps=cast(int, mapping["number_of_steps"]),
+        truth_time_step_s=truth_time_step_s,
+        number_of_steps=number_of_steps,
     )
+    expected_duration_s = truth_time_step_s * number_of_steps
+    if duration_s != expected_duration_s:
+        raise ValueError(
+            "manifest run_configuration.numerics.duration_s must equal "
+            "truth_time_step_s * number_of_steps"
+        )
+    return numerics
 
 
 def _decode_sensor_schedule(mapping: dict[str, object]) -> SensorSchedule:
@@ -867,9 +877,28 @@ def _decode_software_provenance(mapping: dict[str, object]) -> SoftwareProvenanc
     )
 
 
+def _reject_duplicate_json_keys(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    """Build one JSON object while rejecting duplicate member names."""
+    mapping: dict[str, object] = {}
+    for key, value in pairs:
+        if key in mapping:
+            raise ValueError(f"manifest JSON contains duplicate key: {key}")
+        mapping[key] = value
+    return mapping
+
+
+def _reject_nonstandard_json_constant(constant: str) -> Never:
+    """Reject a nonstandard numeric constant during JSON parsing."""
+    raise ValueError(f"manifest JSON contains nonstandard constant: {constant}")
+
+
 def decode_run_manifest(manifest_bytes: bytes) -> RunManifest:
     """Reconstruct a run manifest from valid canonical JSON bytes."""
-    parsed_manifest: object = json.loads(manifest_bytes)
+    parsed_manifest: object = json.loads(
+        manifest_bytes,
+        object_pairs_hook=_reject_duplicate_json_keys,
+        parse_constant=_reject_nonstandard_json_constant,
+    )
     manifest_mapping = _require_json_object(
         parsed_manifest,
         error_message="manifest must be a JSON object",
