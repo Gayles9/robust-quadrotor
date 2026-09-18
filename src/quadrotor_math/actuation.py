@@ -2,6 +2,132 @@ import numpy as np
 from numpy.typing import NDArray
 
 
+def commanded_rotor_speeds_from_collective_thrust_and_body_moment(
+    collective_thrust: float,
+    moment_B: NDArray[np.float64],
+    rotor_positions_B: NDArray[np.float64],
+    rotor_spin_directions: NDArray[np.float64],
+    thrust_coefficient: float,
+    moment_coefficient: float,
+    minimum_rotor_omega: float,
+    maximum_rotor_omega: float,
+) -> NDArray[np.float64]:
+    """Compute commanded rotor speeds for a feasible collective-thrust and FRD moment demand.
+
+    Roundoff-sized solved-square excursions at feasible rotor-speed boundaries
+    are repaired before conversion to rotor speeds.
+
+    Raises:
+        ValueError: If collective thrust is non-finite or negative, or if the
+            body moment, rotor positions, or spin directions have an invalid
+            shape or contain non-finite values; if a spin direction is not
+            ``-1`` or ``+1``; if an actuation coefficient is non-finite or
+            not positive; or if the rotor-speed limits are non-finite,
+            negative, not strictly ordered, or too large to square safely; or
+            if the allocation matrix is singular; or if the demand is
+            infeasible within the rotor-speed limits.
+    """
+    if not np.isfinite(collective_thrust):
+        raise ValueError("collective_thrust must be finite")
+
+    if collective_thrust < 0.0:
+        raise ValueError("collective_thrust must be nonnegative")
+
+    if moment_B.shape != (3,):
+        raise ValueError("moment_B must have shape (3,)")
+
+    if not np.all(np.isfinite(moment_B)):
+        raise ValueError("moment_B must contain only finite values")
+
+    if rotor_positions_B.shape != (4, 3):
+        raise ValueError("rotor_positions_B must have shape (4, 3)")
+
+    if rotor_spin_directions.shape != (4,):
+        raise ValueError("rotor_spin_directions must have shape (4,)")
+
+    if not np.all(np.isfinite(rotor_positions_B)):
+        raise ValueError("rotor_positions_B must contain only finite values")
+
+    if not np.all(np.isfinite(rotor_spin_directions)):
+        raise ValueError("rotor_spin_directions must contain only finite values")
+
+    if not np.all((rotor_spin_directions == -1.0) | (rotor_spin_directions == 1.0)):
+        raise ValueError("rotor_spin_directions must contain only -1 or +1")
+
+    if not np.isfinite(thrust_coefficient):
+        raise ValueError("thrust_coefficient must be finite")
+
+    if thrust_coefficient <= 0.0:
+        raise ValueError("thrust_coefficient must be positive")
+
+    if not np.isfinite(moment_coefficient):
+        raise ValueError("moment_coefficient must be finite")
+
+    if moment_coefficient <= 0.0:
+        raise ValueError("moment_coefficient must be positive")
+
+    if not np.isfinite(minimum_rotor_omega):
+        raise ValueError("minimum_rotor_omega must be finite")
+
+    if not np.isfinite(maximum_rotor_omega):
+        raise ValueError("maximum_rotor_omega must be finite")
+
+    if minimum_rotor_omega < 0.0:
+        raise ValueError("minimum_rotor_omega must be nonnegative")
+
+    if maximum_rotor_omega <= minimum_rotor_omega:
+        raise ValueError("maximum_rotor_omega must be greater than minimum_rotor_omega")
+
+    maximum_safe_rotor_omega = np.sqrt(np.finfo(np.float64).max)
+    if maximum_rotor_omega > maximum_safe_rotor_omega:
+        raise ValueError("maximum_rotor_omega must be small enough to square safely")
+
+    demand = np.array(
+        [collective_thrust, moment_B[0], moment_B[1], moment_B[2]],
+        dtype=np.float64,
+    )
+    allocation_matrix = np.array(
+        [
+            np.full(4, thrust_coefficient),
+            -rotor_positions_B[:, 1] * thrust_coefficient,
+            rotor_positions_B[:, 0] * thrust_coefficient,
+            -rotor_spin_directions * moment_coefficient,
+        ],
+        dtype=np.float64,
+    )
+    if np.linalg.matrix_rank(allocation_matrix) != 4:
+        raise ValueError("allocation matrix must be nonsingular")
+
+    squared_rotor_omega = np.linalg.solve(allocation_matrix, demand)
+    minimum_squared_rotor_omega = minimum_rotor_omega**2
+    maximum_squared_rotor_omega = maximum_rotor_omega**2
+    squared_speed_scale = max(
+        1.0,
+        float(np.max(np.abs(squared_rotor_omega))),
+    )
+    squared_speed_tolerance = 4.0 * np.finfo(np.float64).eps * squared_speed_scale
+    maximum_float64 = np.finfo(np.float64).max
+    if maximum_squared_rotor_omega > maximum_float64 - squared_speed_tolerance:
+        maximum_squared_rotor_omega_with_tolerance = maximum_float64
+    else:
+        maximum_squared_rotor_omega_with_tolerance = (
+            maximum_squared_rotor_omega + squared_speed_tolerance
+        )
+    if np.any(
+        squared_rotor_omega < minimum_squared_rotor_omega - squared_speed_tolerance
+    ) or np.any(squared_rotor_omega > maximum_squared_rotor_omega_with_tolerance):
+        raise ValueError(
+            "requested collective thrust and body moment are infeasible within rotor speed limits"
+        )
+
+    bounded_squared_rotor_omega = np.clip(
+        squared_rotor_omega,
+        minimum_squared_rotor_omega,
+        maximum_squared_rotor_omega,
+    )
+    return np.sqrt(bounded_squared_rotor_omega)
+
+
 def motor_speed_first_order_step(
     actual_rotor_omega: NDArray[np.float64],
     commanded_rotor_omega: NDArray[np.float64],
