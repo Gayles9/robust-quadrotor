@@ -59,12 +59,15 @@ def _take_read_only_float64_array(
 
 @dataclass(frozen=True, slots=True, eq=False)
 class RotorParameters:
-    """Store immutable rotor geometry and aerodynamic coefficients."""
+    """Store rotor geometry, aerodynamic coefficients, and optional motor parameters."""
 
     rotor_positions_B: NDArray[np.float64]
     rotor_spin_directions: NDArray[np.float64]
     thrust_coefficient: float
     moment_coefficient: float
+    minimum_rotor_omega: float | None = None
+    maximum_rotor_omega: float | None = None
+    motor_time_constant_s: float | None = None
 
     def __post_init__(self) -> None:
         """Validate and take read-only float64 copies of rotor arrays."""
@@ -97,6 +100,44 @@ class RotorParameters:
 
         if self.moment_coefficient < 0.0:
             raise ValueError("moment_coefficient must be nonnegative")
+
+        minimum_rotor_omega = self.minimum_rotor_omega
+        maximum_rotor_omega = self.maximum_rotor_omega
+        motor_time_constant_s = self.motor_time_constant_s
+
+        if not (
+            minimum_rotor_omega is None
+            and maximum_rotor_omega is None
+            and motor_time_constant_s is None
+        ):
+            if (
+                minimum_rotor_omega is None
+                or maximum_rotor_omega is None
+                or motor_time_constant_s is None
+            ):
+                raise ValueError("motor parameters must either all be provided or all be omitted")
+
+            if not np.isfinite(minimum_rotor_omega):
+                raise ValueError("minimum_rotor_omega must be finite")
+
+            if not np.isfinite(maximum_rotor_omega):
+                raise ValueError("maximum_rotor_omega must be finite")
+
+            if minimum_rotor_omega < 0.0:
+                raise ValueError("minimum_rotor_omega must be nonnegative")
+
+            if maximum_rotor_omega <= minimum_rotor_omega:
+                raise ValueError("maximum_rotor_omega must be greater than minimum_rotor_omega")
+
+            maximum_safe_rotor_omega = np.sqrt(np.finfo(np.float64).max)
+            if maximum_rotor_omega > maximum_safe_rotor_omega:
+                raise ValueError("maximum_rotor_omega must be small enough to square safely")
+
+            if not np.isfinite(motor_time_constant_s):
+                raise ValueError("motor_time_constant_s must be finite")
+
+            if motor_time_constant_s <= 0.0:
+                raise ValueError("motor_time_constant_s must be positive")
 
         object.__setattr__(
             self,
@@ -331,6 +372,15 @@ def _truth_nominal_parameter_equalities(
         "rotors.moment_coefficient": bool(
             truth.rotors.moment_coefficient == nominal.rotors.moment_coefficient
         ),
+        "rotors.minimum_rotor_omega": bool(
+            truth.rotors.minimum_rotor_omega == nominal.rotors.minimum_rotor_omega
+        ),
+        "rotors.maximum_rotor_omega": bool(
+            truth.rotors.maximum_rotor_omega == nominal.rotors.maximum_rotor_omega
+        ),
+        "rotors.motor_time_constant_s": bool(
+            truth.rotors.motor_time_constant_s == nominal.rotors.motor_time_constant_s
+        ),
         "world.gravity_acceleration": bool(
             truth.world.gravity_acceleration == nominal.world.gravity_acceleration
         ),
@@ -563,7 +613,11 @@ class DeclaredMismatch:
 
 @dataclass(frozen=True, slots=True, eq=False)
 class RunConfiguration:
-    """Group the complete immutable inputs required to reproduce one run."""
+    """Group the complete immutable inputs required to reproduce one run.
+
+    initial_actual_rotor_omega is the actual rotor angular-speed state at the
+    initial truth time, in rad/s. None preserves historical configurations.
+    """
 
     truth: TruthConfiguration
     nominal: NominalConfiguration
@@ -573,6 +627,7 @@ class RunConfiguration:
     rotor_speed_input: ConstantRotorSpeedInput
     root_seed: int
     declared_mismatches: tuple[DeclaredMismatch, ...]
+    initial_actual_rotor_omega: NDArray[np.float64] | None = None
 
     def __post_init__(self) -> None:
         """Validate run-level values and own the mismatch sequence."""
@@ -645,3 +700,34 @@ class RunConfiguration:
             "declared_mismatches",
             owned_declared_mismatches,
         )
+        if self.initial_actual_rotor_omega is not None:
+            minimum_rotor_omega = self.truth.rotors.minimum_rotor_omega
+            maximum_rotor_omega = self.truth.rotors.maximum_rotor_omega
+            if minimum_rotor_omega is None or maximum_rotor_omega is None:
+                raise ValueError("initial_actual_rotor_omega requires truth motor parameters")
+
+            owned_initial_actual_rotor_omega = np.array(
+                self.initial_actual_rotor_omega,
+                dtype=np.float64,
+                order="C",
+                copy=True,
+            )
+            if owned_initial_actual_rotor_omega.shape != (4,):
+                raise ValueError("initial_actual_rotor_omega must have shape (4,)")
+
+            if not np.all(np.isfinite(owned_initial_actual_rotor_omega)):
+                raise ValueError("initial_actual_rotor_omega must contain only finite values")
+
+            if np.any(owned_initial_actual_rotor_omega < minimum_rotor_omega) or np.any(
+                owned_initial_actual_rotor_omega > maximum_rotor_omega
+            ):
+                raise ValueError(
+                    "initial_actual_rotor_omega must be within truth rotor speed limits"
+                )
+
+            owned_initial_actual_rotor_omega.flags.writeable = False
+            object.__setattr__(
+                self,
+                "initial_actual_rotor_omega",
+                owned_initial_actual_rotor_omega,
+            )

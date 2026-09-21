@@ -37,6 +37,14 @@ from .run_configuration import (
 RUN_MANIFEST_SCHEMA_NAME: Final[str] = "robust_quadrotor.run_manifest"
 RUN_MANIFEST_SCHEMA_VERSION: Final[int] = 1
 _ARTIFACT_BOUND_SCHEMA_VERSION: Final[int] = 2
+_MOTORIZED_UNBOUND_SCHEMA_VERSION: Final[int] = 3
+_MOTORIZED_BOUND_SCHEMA_VERSION: Final[int] = 4
+_BOUND_SCHEMA_VERSIONS: Final[frozenset[int]] = frozenset(
+    {_ARTIFACT_BOUND_SCHEMA_VERSION, _MOTORIZED_BOUND_SCHEMA_VERSION}
+)
+_MOTORIZED_SCHEMA_VERSIONS: Final[frozenset[int]] = frozenset(
+    {_MOTORIZED_UNBOUND_SCHEMA_VERSION, _MOTORIZED_BOUND_SCHEMA_VERSION}
+)
 
 _MANIFEST_V1_KEYS: Final[frozenset[str]] = frozenset(
     {"randomness", "run_configuration", "schema", "software_provenance"}
@@ -69,6 +77,9 @@ _RUN_CONFIGURATION_KEYS: Final[frozenset[str]] = frozenset(
         "truth",
     }
 )
+_RUN_CONFIGURATION_V3_KEYS: Final[frozenset[str]] = _RUN_CONFIGURATION_KEYS | frozenset(
+    {"initial_actual_rotor_omega"}
+)
 _CONFIGURATION_GROUP_KEYS: Final[frozenset[str]] = frozenset(
     {"imu", "position_sensors", "rigid_body", "rotors", "world"}
 )
@@ -85,6 +96,9 @@ _ROTOR_SPEED_INPUT_KEYS: Final[frozenset[str]] = frozenset({"rotor_omega"})
 _RIGID_BODY_KEYS: Final[frozenset[str]] = frozenset({"inertia_B", "mass"})
 _ROTOR_KEYS: Final[frozenset[str]] = frozenset(
     {"moment_coefficient", "rotor_positions_B", "rotor_spin_directions", "thrust_coefficient"}
+)
+_ROTOR_V3_KEYS: Final[frozenset[str]] = _ROTOR_KEYS | frozenset(
+    {"minimum_rotor_omega", "maximum_rotor_omega", "motor_time_constant_s"}
 )
 _WORLD_KEYS: Final[frozenset[str]] = frozenset({"gravity_acceleration"})
 _IMU_KEYS: Final[frozenset[str]] = frozenset(
@@ -178,13 +192,33 @@ def _encode_rigid_body(parameters: RigidBodyParameters) -> dict[str, object]:
     }
 
 
-def _encode_rotors(parameters: RotorParameters) -> dict[str, object]:
-    return {
+def _encode_rotors(
+    parameters: RotorParameters, *, include_motor_parameters: bool = False
+) -> dict[str, object]:
+    encoded_rotors: dict[str, object] = {
         "rotor_positions_B": parameters.rotor_positions_B.tolist(),
         "rotor_spin_directions": parameters.rotor_spin_directions.tolist(),
         "thrust_coefficient": parameters.thrust_coefficient,
         "moment_coefficient": parameters.moment_coefficient,
     }
+    if include_motor_parameters:
+        minimum_rotor_omega = parameters.minimum_rotor_omega
+        maximum_rotor_omega = parameters.maximum_rotor_omega
+        motor_time_constant_s = parameters.motor_time_constant_s
+        if (
+            minimum_rotor_omega is None
+            or maximum_rotor_omega is None
+            or motor_time_constant_s is None
+        ):
+            raise ValueError("version-3 rotor parameters must be complete")
+        encoded_rotors.update(
+            {
+                "minimum_rotor_omega": minimum_rotor_omega,
+                "maximum_rotor_omega": maximum_rotor_omega,
+                "motor_time_constant_s": motor_time_constant_s,
+            }
+        )
+    return encoded_rotors
 
 
 def _encode_world(parameters: WorldParameters) -> dict[str, object]:
@@ -226,10 +260,14 @@ def _encode_position_sensors(parameters: PositionSensorParameters) -> dict[str, 
 
 def _encode_configuration_group(
     configuration: TruthConfiguration | NominalConfiguration,
+    *,
+    include_motor_parameters: bool = False,
 ) -> dict[str, object]:
     return {
         "rigid_body": _encode_rigid_body(configuration.rigid_body),
-        "rotors": _encode_rotors(configuration.rotors),
+        "rotors": _encode_rotors(
+            configuration.rotors, include_motor_parameters=include_motor_parameters
+        ),
         "world": _encode_world(configuration.world),
         "imu": _encode_imu(configuration.imu),
         "position_sensors": _encode_position_sensors(configuration.position_sensors),
@@ -292,10 +330,16 @@ def _encode_declared_mismatch(mismatch: DeclaredMismatch) -> dict[str, object]:
     }
 
 
-def _encode_run_configuration(configuration: RunConfiguration) -> dict[str, object]:
-    return {
-        "truth": _encode_configuration_group(configuration.truth),
-        "nominal": _encode_configuration_group(configuration.nominal),
+def _encode_run_configuration(
+    configuration: RunConfiguration, *, include_motor_parameters: bool = False
+) -> dict[str, object]:
+    encoded_configuration: dict[str, object] = {
+        "truth": _encode_configuration_group(
+            configuration.truth, include_motor_parameters=include_motor_parameters
+        ),
+        "nominal": _encode_configuration_group(
+            configuration.nominal, include_motor_parameters=include_motor_parameters
+        ),
         "initial_truth_state": _encode_initial_truth_state(configuration.initial_truth_state),
         "numerics": _encode_numerics(configuration.numerics),
         "sensor_schedules": _encode_sensor_schedules(
@@ -308,6 +352,30 @@ def _encode_run_configuration(configuration: RunConfiguration) -> dict[str, obje
             _encode_declared_mismatch(mismatch) for mismatch in configuration.declared_mismatches
         ],
     }
+    if include_motor_parameters:
+        initial_actual_rotor_omega = configuration.initial_actual_rotor_omega
+        if initial_actual_rotor_omega is None:
+            raise ValueError("version-3 initial actual rotor speed must be present")
+        encoded_configuration["initial_actual_rotor_omega"] = initial_actual_rotor_omega.tolist()
+    return encoded_configuration
+
+
+def _has_complete_motor_configuration(configuration: RunConfiguration) -> bool:
+    """Distinguish wholly historical, complete modern, and partial motor state."""
+    motor_values = (
+        configuration.truth.rotors.minimum_rotor_omega,
+        configuration.truth.rotors.maximum_rotor_omega,
+        configuration.truth.rotors.motor_time_constant_s,
+        configuration.nominal.rotors.minimum_rotor_omega,
+        configuration.nominal.rotors.maximum_rotor_omega,
+        configuration.nominal.rotors.motor_time_constant_s,
+        configuration.initial_actual_rotor_omega,
+    )
+    if all(value is None for value in motor_values):
+        return False
+    if all(value is not None for value in motor_values):
+        return True
+    raise ValueError("manifest motor configuration must be either entirely omitted or complete")
 
 
 def _ordered_run_random_streams() -> list[tuple[RunRandomStream, int]]:
@@ -347,16 +415,26 @@ def encode_run_manifest(manifest: RunManifest) -> bytes:
     """Encode a supplied manifest as compact, sorted, finite UTF-8 JSON bytes."""
     schema_version = RUN_MANIFEST_SCHEMA_VERSION
     data_npz_sha256 = manifest.data_npz_sha256
+    has_complete_motor_configuration = _has_complete_motor_configuration(manifest.run_configuration)
+    include_motor_parameters = has_complete_motor_configuration
     if data_npz_sha256 is not None:
         data_npz_sha256 = _validate_data_npz_sha256(data_npz_sha256)
-        schema_version = _ARTIFACT_BOUND_SCHEMA_VERSION
+        schema_version = (
+            _MOTORIZED_BOUND_SCHEMA_VERSION
+            if has_complete_motor_configuration
+            else _ARTIFACT_BOUND_SCHEMA_VERSION
+        )
+    elif has_complete_motor_configuration:
+        schema_version = _MOTORIZED_UNBOUND_SCHEMA_VERSION
 
     manifest_mapping: dict[str, object] = {
         "schema": {
             "name": RUN_MANIFEST_SCHEMA_NAME,
             "version": schema_version,
         },
-        "run_configuration": _encode_run_configuration(manifest.run_configuration),
+        "run_configuration": _encode_run_configuration(
+            manifest.run_configuration, include_motor_parameters=include_motor_parameters
+        ),
         "randomness": _encode_randomness(),
         "software_provenance": _encode_software_provenance(manifest.software_provenance),
     }
@@ -532,6 +610,7 @@ def _validate_parameter_group_objects(
     group_mapping: dict[str, object],
     *,
     group_name: str,
+    schema_version: int,
 ) -> None:
     """Require the five child parameter schemas in fixed protocol order."""
     _validate_parameter_object(
@@ -545,9 +624,14 @@ def _validate_parameter_group_objects(
         group_mapping,
         group_name=group_name,
         parameter_name="rotors",
-        expected_keys=_ROTOR_KEYS,
+        expected_keys=(
+            _ROTOR_V3_KEYS if schema_version in _MOTORIZED_SCHEMA_VERSIONS else _ROTOR_KEYS
+        ),
         exact_keys_text=(
-            "moment_coefficient, rotor_positions_B, rotor_spin_directions, thrust_coefficient"
+            "maximum_rotor_omega, minimum_rotor_omega, moment_coefficient, "
+            "motor_time_constant_s, rotor_positions_B, rotor_spin_directions, thrust_coefficient"
+            if schema_version in _MOTORIZED_SCHEMA_VERSIONS
+            else "moment_coefficient, rotor_positions_B, rotor_spin_directions, thrust_coefficient"
         ),
     )
     _validate_parameter_object(
@@ -628,7 +712,9 @@ def _validate_declared_mismatch_entries(encoded_mismatches: list[object]) -> Non
         )
 
 
-def _validate_run_configuration_structure(value: object) -> dict[str, object]:
+def _validate_run_configuration_structure(
+    value: object, *, schema_version: int
+) -> dict[str, object]:
     """Require the encoded run configuration's outer object and key boundaries."""
     configuration_mapping = _require_json_object(
         value,
@@ -636,11 +722,19 @@ def _validate_run_configuration_structure(value: object) -> dict[str, object]:
     )
     _require_exact_keys(
         configuration_mapping,
-        expected_keys=_RUN_CONFIGURATION_KEYS,
+        expected_keys=(
+            _RUN_CONFIGURATION_V3_KEYS
+            if schema_version in _MOTORIZED_SCHEMA_VERSIONS
+            else _RUN_CONFIGURATION_KEYS
+        ),
         error_message=(
             "run_configuration keys must be exactly: "
-            "declared_mismatches, initial_truth_state, nominal, numerics, root_seed, "
-            "rotor_speed_input, sensor_schedules, truth"
+            + (
+                "declared_mismatches, initial_actual_rotor_omega, initial_truth_state, "
+                if schema_version in _MOTORIZED_SCHEMA_VERSIONS
+                else "declared_mismatches, initial_truth_state, "
+            )
+            + "nominal, numerics, root_seed, rotor_speed_input, sensor_schedules, truth"
         ),
     )
 
@@ -652,8 +746,12 @@ def _validate_run_configuration_structure(value: object) -> dict[str, object]:
         configuration_mapping["nominal"],
         path="run_configuration.nominal",
     )
-    _validate_parameter_group_objects(truth_mapping, group_name="truth")
-    _validate_parameter_group_objects(nominal_mapping, group_name="nominal")
+    _validate_parameter_group_objects(
+        truth_mapping, group_name="truth", schema_version=schema_version
+    )
+    _validate_parameter_group_objects(
+        nominal_mapping, group_name="nominal", schema_version=schema_version
+    )
 
     initial_truth_state = _require_json_object(
         configuration_mapping["initial_truth_state"],
@@ -725,12 +823,16 @@ def _decode_rigid_body(mapping: dict[str, object]) -> RigidBodyParameters:
     )
 
 
-def _decode_rotors(mapping: dict[str, object]) -> RotorParameters:
+def _decode_rotors(mapping: dict[str, object], *, schema_version: int) -> RotorParameters:
+    motorized = schema_version in _MOTORIZED_SCHEMA_VERSIONS
     return RotorParameters(
         rotor_positions_B=_decoded_array(mapping["rotor_positions_B"]),
         rotor_spin_directions=_decoded_array(mapping["rotor_spin_directions"]),
         thrust_coefficient=cast(float, mapping["thrust_coefficient"]),
         moment_coefficient=cast(float, mapping["moment_coefficient"]),
+        minimum_rotor_omega=cast(float, mapping["minimum_rotor_omega"]) if motorized else None,
+        maximum_rotor_omega=cast(float, mapping["maximum_rotor_omega"]) if motorized else None,
+        motor_time_constant_s=cast(float, mapping["motor_time_constant_s"]) if motorized else None,
     )
 
 
@@ -773,20 +875,24 @@ def _decode_position_sensors(mapping: dict[str, object]) -> PositionSensorParame
     )
 
 
-def _decode_truth_configuration(mapping: dict[str, object]) -> TruthConfiguration:
+def _decode_truth_configuration(
+    mapping: dict[str, object], *, schema_version: int
+) -> TruthConfiguration:
     return TruthConfiguration(
         rigid_body=_decode_rigid_body(_decoded_object(mapping["rigid_body"])),
-        rotors=_decode_rotors(_decoded_object(mapping["rotors"])),
+        rotors=_decode_rotors(_decoded_object(mapping["rotors"]), schema_version=schema_version),
         world=_decode_world(_decoded_object(mapping["world"])),
         imu=_decode_imu(_decoded_object(mapping["imu"])),
         position_sensors=_decode_position_sensors(_decoded_object(mapping["position_sensors"])),
     )
 
 
-def _decode_nominal_configuration(mapping: dict[str, object]) -> NominalConfiguration:
+def _decode_nominal_configuration(
+    mapping: dict[str, object], *, schema_version: int
+) -> NominalConfiguration:
     return NominalConfiguration(
         rigid_body=_decode_rigid_body(_decoded_object(mapping["rigid_body"])),
-        rotors=_decode_rotors(_decoded_object(mapping["rotors"])),
+        rotors=_decode_rotors(_decoded_object(mapping["rotors"]), schema_version=schema_version),
         world=_decode_world(_decoded_object(mapping["world"])),
         imu=_decode_imu(_decoded_object(mapping["imu"])),
         position_sensors=_decode_position_sensors(_decoded_object(mapping["position_sensors"])),
@@ -849,11 +955,17 @@ def _decode_declared_mismatch(mapping: dict[str, object]) -> DeclaredMismatch:
     )
 
 
-def _decode_run_configuration(mapping: dict[str, object]) -> RunConfiguration:
+def _decode_run_configuration(
+    mapping: dict[str, object], *, schema_version: int
+) -> RunConfiguration:
     encoded_mismatches = cast(list[object], mapping["declared_mismatches"])
     return RunConfiguration(
-        truth=_decode_truth_configuration(_decoded_object(mapping["truth"])),
-        nominal=_decode_nominal_configuration(_decoded_object(mapping["nominal"])),
+        truth=_decode_truth_configuration(
+            _decoded_object(mapping["truth"]), schema_version=schema_version
+        ),
+        nominal=_decode_nominal_configuration(
+            _decoded_object(mapping["nominal"]), schema_version=schema_version
+        ),
         initial_truth_state=_decode_initial_truth_state(
             _decoded_object(mapping["initial_truth_state"])
         ),
@@ -863,6 +975,11 @@ def _decode_run_configuration(mapping: dict[str, object]) -> RunConfiguration:
         root_seed=int(cast(str, mapping["root_seed"])),
         declared_mismatches=tuple(
             _decode_declared_mismatch(_decoded_object(mismatch)) for mismatch in encoded_mismatches
+        ),
+        initial_actual_rotor_omega=(
+            _decoded_array(mapping["initial_actual_rotor_omega"])
+            if schema_version in _MOTORIZED_SCHEMA_VERSIONS
+            else None
         ),
     )
 
@@ -937,11 +1054,13 @@ def decode_run_manifest(manifest_bytes: bytes) -> RunManifest:
     if type(schema_version) is not int or schema_version not in (
         RUN_MANIFEST_SCHEMA_VERSION,
         _ARTIFACT_BOUND_SCHEMA_VERSION,
+        _MOTORIZED_UNBOUND_SCHEMA_VERSION,
+        _MOTORIZED_BOUND_SCHEMA_VERSION,
     ):
-        raise ValueError("schema.version must be 1 or 2")
+        raise ValueError("schema.version must be 1, 2, 3, or 4")
 
     data_npz_sha256: str | None = None
-    if schema_version == _ARTIFACT_BOUND_SCHEMA_VERSION:
+    if schema_version in _BOUND_SCHEMA_VERSIONS:
         _require_exact_keys(
             manifest_mapping,
             expected_keys=_MANIFEST_V2_KEYS,
@@ -975,11 +1094,13 @@ def decode_run_manifest(manifest_bytes: bytes) -> RunManifest:
         manifest_mapping["software_provenance"]
     )
     run_configuration_mapping = _validate_run_configuration_structure(
-        manifest_mapping["run_configuration"]
+        manifest_mapping["run_configuration"], schema_version=schema_version
     )
 
     return RunManifest(
-        run_configuration=_decode_run_configuration(run_configuration_mapping),
+        run_configuration=_decode_run_configuration(
+            run_configuration_mapping, schema_version=schema_version
+        ),
         software_provenance=_decode_software_provenance(software_provenance_mapping),
         data_npz_sha256=data_npz_sha256,
     )

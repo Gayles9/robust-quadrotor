@@ -1,3 +1,4 @@
+import re
 from dataclasses import replace
 
 import numpy as np
@@ -175,6 +176,213 @@ def test_rotor_parameters_take_read_only_owned_arrays() -> None:
     )
     assert not parameters.rotor_positions_B.flags.writeable
     assert not parameters.rotor_spin_directions.flags.writeable
+
+
+def test_rotor_parameters_store_motor_limits_and_time_constant() -> None:
+    parameters = RotorParameters(
+        rotor_positions_B=np.array(
+            [
+                [0.2, 0.2, 0.0],
+                [0.2, -0.2, 0.0],
+                [-0.2, -0.2, 0.0],
+                [-0.2, 0.2, 0.0],
+            ],
+            dtype=np.float64,
+        ),
+        rotor_spin_directions=np.array([1.0, -1.0, 1.0, -1.0], dtype=np.float64),
+        thrust_coefficient=1.2e-5,
+        moment_coefficient=2.0e-7,
+        minimum_rotor_omega=100.0,
+        maximum_rotor_omega=1000.0,
+        motor_time_constant_s=0.2,
+    )
+
+    assert parameters.minimum_rotor_omega == 100.0
+    assert parameters.maximum_rotor_omega == 1000.0
+    assert parameters.motor_time_constant_s == 0.2
+
+
+@pytest.mark.parametrize(
+    (
+        "minimum_rotor_omega",
+        "maximum_rotor_omega",
+        "motor_time_constant_s",
+        "expected_message",
+    ),
+    [
+        pytest.param(
+            100.0,
+            None,
+            None,
+            "motor parameters must either all be provided or all be omitted",
+            id="minimum-only",
+        ),
+        pytest.param(
+            None,
+            1000.0,
+            None,
+            "motor parameters must either all be provided or all be omitted",
+            id="maximum-only",
+        ),
+        pytest.param(
+            None,
+            None,
+            0.2,
+            "motor parameters must either all be provided or all be omitted",
+            id="time-constant-only",
+        ),
+        pytest.param(
+            100.0,
+            1000.0,
+            None,
+            "motor parameters must either all be provided or all be omitted",
+            id="minimum-and-maximum",
+        ),
+        pytest.param(
+            100.0,
+            None,
+            0.2,
+            "motor parameters must either all be provided or all be omitted",
+            id="minimum-and-time-constant",
+        ),
+        pytest.param(
+            None,
+            1000.0,
+            0.2,
+            "motor parameters must either all be provided or all be omitted",
+            id="maximum-and-time-constant",
+        ),
+        pytest.param(
+            np.nan,
+            1000.0,
+            0.2,
+            "minimum_rotor_omega must be finite",
+            id="minimum-nan",
+        ),
+        pytest.param(
+            np.inf,
+            1000.0,
+            0.2,
+            "minimum_rotor_omega must be finite",
+            id="minimum-positive-infinity",
+        ),
+        pytest.param(
+            -np.inf,
+            1000.0,
+            0.2,
+            "minimum_rotor_omega must be finite",
+            id="minimum-negative-infinity",
+        ),
+        pytest.param(
+            -1.0,
+            1000.0,
+            0.2,
+            "minimum_rotor_omega must be nonnegative",
+            id="minimum-negative",
+        ),
+        pytest.param(
+            100.0,
+            np.nan,
+            0.2,
+            "maximum_rotor_omega must be finite",
+            id="maximum-nan",
+        ),
+        pytest.param(
+            100.0,
+            np.inf,
+            0.2,
+            "maximum_rotor_omega must be finite",
+            id="maximum-positive-infinity",
+        ),
+        pytest.param(
+            100.0,
+            -np.inf,
+            0.2,
+            "maximum_rotor_omega must be finite",
+            id="maximum-negative-infinity",
+        ),
+        pytest.param(
+            100.0,
+            100.0,
+            0.2,
+            "maximum_rotor_omega must be greater than minimum_rotor_omega",
+            id="maximum-equals-minimum",
+        ),
+        pytest.param(
+            100.0,
+            99.0,
+            0.2,
+            "maximum_rotor_omega must be greater than minimum_rotor_omega",
+            id="maximum-below-minimum",
+        ),
+        pytest.param(
+            100.0,
+            np.nextafter(np.sqrt(np.finfo(np.float64).max), np.inf),
+            0.2,
+            "maximum_rotor_omega must be small enough to square safely",
+            id="maximum-too-large-to-square",
+        ),
+        pytest.param(
+            100.0,
+            1000.0,
+            np.nan,
+            "motor_time_constant_s must be finite",
+            id="time-constant-nan",
+        ),
+        pytest.param(
+            100.0,
+            1000.0,
+            np.inf,
+            "motor_time_constant_s must be finite",
+            id="time-constant-positive-infinity",
+        ),
+        pytest.param(
+            100.0,
+            1000.0,
+            -np.inf,
+            "motor_time_constant_s must be finite",
+            id="time-constant-negative-infinity",
+        ),
+        pytest.param(
+            100.0,
+            1000.0,
+            0.0,
+            "motor_time_constant_s must be positive",
+            id="time-constant-zero",
+        ),
+        pytest.param(
+            100.0,
+            1000.0,
+            -0.2,
+            "motor_time_constant_s must be positive",
+            id="time-constant-negative",
+        ),
+    ],
+)
+def test_rotor_parameters_reject_invalid_motor_parameter_configuration(
+    minimum_rotor_omega: float | None,
+    maximum_rotor_omega: float | None,
+    motor_time_constant_s: float | None,
+    expected_message: str,
+) -> None:
+    with pytest.raises(ValueError, match=f"^{expected_message}$"):
+        RotorParameters(
+            rotor_positions_B=np.array(
+                [
+                    [0.2, 0.2, 0.0],
+                    [0.2, -0.2, 0.0],
+                    [-0.2, -0.2, 0.0],
+                    [-0.2, 0.2, 0.0],
+                ],
+                dtype=np.float64,
+            ),
+            rotor_spin_directions=np.array([1.0, -1.0, 1.0, -1.0], dtype=np.float64),
+            thrust_coefficient=1.2e-5,
+            moment_coefficient=2.0e-7,
+            minimum_rotor_omega=minimum_rotor_omega,
+            maximum_rotor_omega=maximum_rotor_omega,
+            motor_time_constant_s=motor_time_constant_s,
+        )
 
 
 def test_imu_parameters_take_read_only_owned_arrays() -> None:
@@ -1634,6 +1842,210 @@ def test_run_configuration_accepts_exactly_declared_supported_mismatch(
 
     assert len(configuration.declared_mismatches) == 1
     assert configuration.declared_mismatches[0].parameter_path == parameter_path
+
+
+@pytest.mark.parametrize(
+    ("parameter_path", "different_nominal_value", "mode"),
+    [
+        pytest.param("rotors.minimum_rotor_omega", 125.0, "undeclared", id="minimum-undeclared"),
+        pytest.param("rotors.minimum_rotor_omega", 125.0, "declared", id="minimum-declared"),
+        pytest.param(
+            "rotors.minimum_rotor_omega", 125.0, "declared-equal", id="minimum-declared-equal"
+        ),
+        pytest.param("rotors.maximum_rotor_omega", 900.0, "undeclared", id="maximum-undeclared"),
+        pytest.param("rotors.maximum_rotor_omega", 900.0, "declared", id="maximum-declared"),
+        pytest.param(
+            "rotors.maximum_rotor_omega", 900.0, "declared-equal", id="maximum-declared-equal"
+        ),
+        pytest.param(
+            "rotors.motor_time_constant_s", 0.25, "undeclared", id="time-constant-undeclared"
+        ),
+        pytest.param("rotors.motor_time_constant_s", 0.25, "declared", id="time-constant-declared"),
+        pytest.param(
+            "rotors.motor_time_constant_s",
+            0.25,
+            "declared-equal",
+            id="time-constant-declared-equal",
+        ),
+    ],
+)
+def test_run_configuration_enforces_motor_parameter_mismatch_declarations(
+    parameter_path: str,
+    different_nominal_value: float,
+    mode: str,
+) -> None:
+    arguments = _matching_run_configuration_arguments()
+    truth = arguments["truth"]
+    nominal = arguments["nominal"]
+    assert isinstance(truth, TruthConfiguration)
+    assert isinstance(nominal, NominalConfiguration)
+
+    motor_parameters = {
+        "minimum_rotor_omega": 100.0,
+        "maximum_rotor_omega": 1000.0,
+        "motor_time_constant_s": 0.2,
+    }
+    arguments["truth"] = replace(truth, rotors=replace(truth.rotors, **motor_parameters))
+    nominal_rotors = replace(nominal.rotors, **motor_parameters)
+    if mode != "declared-equal":
+        field_name = parameter_path.removeprefix("rotors.")
+        nominal_rotors = replace(nominal_rotors, **{field_name: different_nominal_value})
+    arguments["nominal"] = replace(nominal, rotors=nominal_rotors)
+
+    if mode != "undeclared":
+        arguments["declared_mismatches"] = [
+            DeclaredMismatch(
+                parameter_path=parameter_path,
+                rationale="Exercise one motor-parameter model mismatch.",
+            )
+        ]
+
+    escaped_parameter_path = parameter_path.replace(".", r"\.")
+    if mode == "undeclared":
+        with pytest.raises(
+            ValueError,
+            match=(
+                r"^truth and nominal differ without a declared mismatch: "
+                rf"{escaped_parameter_path}$"
+            ),
+        ):
+            RunConfiguration(**arguments)
+    elif mode == "declared":
+        configuration = RunConfiguration(**arguments)
+        assert len(configuration.declared_mismatches) == 1
+        assert configuration.declared_mismatches[0].parameter_path == parameter_path
+    else:
+        with pytest.raises(
+            ValueError,
+            match=(
+                r"^declared mismatch has equal truth and nominal values: "
+                rf"{escaped_parameter_path}$"
+            ),
+        ):
+            RunConfiguration(**arguments)
+
+
+def test_run_configuration_owns_initial_actual_rotor_speed() -> None:
+    arguments = _matching_run_configuration_arguments()
+    truth = arguments["truth"]
+    nominal = arguments["nominal"]
+    assert isinstance(truth, TruthConfiguration)
+    assert isinstance(nominal, NominalConfiguration)
+
+    motor_parameters = {
+        "minimum_rotor_omega": 100.0,
+        "maximum_rotor_omega": 1000.0,
+        "motor_time_constant_s": 0.2,
+    }
+    arguments["truth"] = replace(truth, rotors=replace(truth.rotors, **motor_parameters))
+    arguments["nominal"] = replace(nominal, rotors=replace(nominal.rotors, **motor_parameters))
+
+    initial_actual_rotor_omega = np.array(
+        [100.0, 300.0, 700.0, 1000.0],
+        dtype=np.float64,
+    )
+    expected_rotor_omega = initial_actual_rotor_omega.copy()
+    arguments["initial_actual_rotor_omega"] = initial_actual_rotor_omega
+
+    configuration = RunConfiguration(**arguments)
+    initial_actual_rotor_omega[...] = 99.0
+
+    stored_rotor_omega = configuration.initial_actual_rotor_omega
+    assert stored_rotor_omega.shape == (4,)
+    np.testing.assert_array_equal(stored_rotor_omega, expected_rotor_omega)
+    assert stored_rotor_omega.dtype == np.float64
+    assert stored_rotor_omega.flags.c_contiguous
+    assert stored_rotor_omega.flags.owndata
+    assert not np.shares_memory(stored_rotor_omega, initial_actual_rotor_omega)
+    assert not stored_rotor_omega.flags.writeable
+    with pytest.raises(ValueError, match="assignment destination is read-only"):
+        stored_rotor_omega[0] = 200.0
+
+
+@pytest.mark.parametrize(
+    ("initial_actual_rotor_omega", "has_motor_parameters", "expected_message"),
+    [
+        pytest.param(
+            np.array([100.0, 300.0, 700.0, 1000.0], dtype=np.float64),
+            False,
+            "initial_actual_rotor_omega requires truth motor parameters",
+            id="missing-truth-motor-parameters",
+        ),
+        pytest.param(
+            np.array([100.0, 300.0, 700.0], dtype=np.float64),
+            True,
+            "initial_actual_rotor_omega must have shape (4,)",
+            id="shape-three",
+        ),
+        pytest.param(
+            np.array([[100.0], [300.0], [700.0], [1000.0]], dtype=np.float64),
+            True,
+            "initial_actual_rotor_omega must have shape (4,)",
+            id="shape-column",
+        ),
+        pytest.param(
+            np.array([100.0, 300.0, 500.0, 700.0, 1000.0], dtype=np.float64),
+            True,
+            "initial_actual_rotor_omega must have shape (4,)",
+            id="shape-five",
+        ),
+        pytest.param(
+            np.array([100.0, 300.0, np.nan, 1000.0], dtype=np.float64),
+            True,
+            "initial_actual_rotor_omega must contain only finite values",
+            id="nan",
+        ),
+        pytest.param(
+            np.array([100.0, 300.0, np.inf, 1000.0], dtype=np.float64),
+            True,
+            "initial_actual_rotor_omega must contain only finite values",
+            id="positive-infinity",
+        ),
+        pytest.param(
+            np.array([100.0, 300.0, -np.inf, 1000.0], dtype=np.float64),
+            True,
+            "initial_actual_rotor_omega must contain only finite values",
+            id="negative-infinity",
+        ),
+        pytest.param(
+            np.array([99.0, 300.0, 700.0, 1000.0], dtype=np.float64),
+            True,
+            "initial_actual_rotor_omega must be within truth rotor speed limits",
+            id="below-truth-minimum",
+        ),
+        pytest.param(
+            np.array([100.0, 300.0, 700.0, 1001.0], dtype=np.float64),
+            True,
+            "initial_actual_rotor_omega must be within truth rotor speed limits",
+            id="above-truth-maximum",
+        ),
+    ],
+)
+def test_run_configuration_rejects_invalid_initial_actual_rotor_speed(
+    initial_actual_rotor_omega: np.ndarray,
+    has_motor_parameters: bool,
+    expected_message: str,
+) -> None:
+    arguments = _matching_run_configuration_arguments()
+    if has_motor_parameters:
+        truth = arguments["truth"]
+        nominal = arguments["nominal"]
+        assert isinstance(truth, TruthConfiguration)
+        assert isinstance(nominal, NominalConfiguration)
+        motor_parameters = {
+            "minimum_rotor_omega": 100.0,
+            "maximum_rotor_omega": 1000.0,
+            "motor_time_constant_s": 0.2,
+        }
+        arguments["truth"] = replace(truth, rotors=replace(truth.rotors, **motor_parameters))
+        arguments["nominal"] = replace(
+            nominal,
+            rotors=replace(nominal.rotors, **motor_parameters),
+        )
+    arguments["initial_actual_rotor_omega"] = initial_actual_rotor_omega
+
+    with pytest.raises(ValueError, match=rf"^{re.escape(expected_message)}$"):
+        RunConfiguration(**arguments)
 
 
 def test_run_configuration_rejects_unknown_declared_mismatch_path() -> None:

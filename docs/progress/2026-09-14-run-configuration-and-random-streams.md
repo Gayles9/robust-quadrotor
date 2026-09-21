@@ -863,3 +863,112 @@ documentation-only closeout.
 
 4. Commit and push only after explicit publication authorization.
 5. Begin Run 3 as the next separate milestone.
+
+## Run 3 motorized configuration and persistence closeout — 2026-09-21
+
+### Scope and status
+
+First-order motor dynamics and rotor control allocation are published in separate actuation
+commits. This locally completed, uncommitted Run 3 increment adds motorized run configuration,
+manifest versions 3 and 4, motorized save/load characterization, and a 20-case motorized
+exact-schema characterization. It does not change `run_artifact.py` or expand the artifact schema.
+It does not implement a complete-run generator or run-level replay.
+
+### Configuration result
+
+`RotorParameters` adds optional `minimum_rotor_omega`, `maximum_rotor_omega`, and
+`motor_time_constant_s`. All three are either omitted for historical construction or supplied
+together. Supplied limits must be finite, nonnegative at the minimum, strictly ordered, and
+safe to square in float64; the time constant must be finite and positive. Truth and nominal
+motor differences use the existing mismatch rules through three new paths:
+`rotors.minimum_rotor_omega`, `rotors.maximum_rotor_omega`, and
+`rotors.motor_time_constant_s`. The registry now contains 21 paths.
+
+`RunConfiguration.initial_actual_rotor_omega` remains optional for historical construction.
+When present, it requires truth motor parameters and a finite, float64-compatible `(4,)`
+vector within the inclusive **truth** rotor-speed limits. Accepted storage is an independent,
+C-contiguous, read-only float64 copy. The final exact-schema characterization confirms that
+decoding rejects an initial speed inside declared nominal limits but outside truth limits.
+
+### Manifest result
+
+| Configuration | Unbound | SHA-256 bound |
+| --- | ---: | ---: |
+| Historical | Version 1 | Version 2 |
+| Complete motorized | Version 3 | Version 4 |
+
+Versions 1 and 2 retain their historical canonical bytes and decode compatibility. Versions
+3 and 4 persist the three motor values in both truth and nominal rotor objects and the
+initial actual speed. Encoding rejects partial motor configurations rather than downgrading
+them. Decoding enforces exact version-specific member sets for the top level, run
+configuration, and both rotor objects; malformed bindings and configuration values are
+rejected. Canonical encoding remains compact, sorted, finite UTF-8 JSON without a trailing
+newline. Valid v1–v4 decode/re-encode round trips are byte-identical in the tested
+environment.
+
+### Persistence and artifact-schema decision
+
+The existing public `save_run_directory` and `load_run_directory` APIs need no production
+change. Saving an unbound v3 motorized manifest returns a distinct SHA-256-bound v4 manifest
+and publishes exactly `manifest.json` and `data.npz`. Loading verifies the digest against the
+exact NPZ bytes before parsing the archive. All seven motorized values survive save/load;
+loaded configuration values and all artifact arrays retain independent immutable ownership.
+Valid manifest and NPZ re-encoding is byte-identical in the tested environment.
+
+The artifact retains exactly 35 arrays. It stores `commanded_rotor_omega`, not an actual
+rotor-speed trajectory. The persisted initial actual speed, truth motor parameters, command
+history, truth step, and fixed `motor_speed_first_order_step` policy make that trajectory
+deterministically reconstructible under the current model. `actual_rotor_omega_history` was
+not added prematurely. The complete-run generator will revisit explicit persisted actuator
+history only if its replay, reporting, or independent verification contract requires it.
+
+### TDD and verification
+
+Bounded RED/GREEN increments established motor field storage and validation, mismatch
+declarations, initial actual-speed ownership and validation, v3 encoding, rejection of
+incomplete configurations, v3 decoding, v4 encoding and decoding, and v3-save/v4-load
+characterization. The final 20-case GREEN characterization protects representative exact
+v3/v4 schema boundaries, artifact-binding rules, and truth-limit validation. RED failures
+were limited to the intended missing behavior; each GREEN retained the protected behavior
+and historical compatibility tests.
+
+The local verification snapshot is:
+
+| Check | Result |
+| --- | ---: |
+| Exact modern-schema characterization | 20 passed |
+| Manifest tests | 165 passed |
+| Configuration, manifest, and artifact tests | 653 passed |
+| Actuation plus configuration, manifest, and artifact tests | 810 passed |
+| Full suite | 1,226 passed; no failures, errors, skips, xfails, or warnings |
+| Ruff lint | Passed |
+| Ruff format check | 64 files already formatted |
+| Mypy | No issues in 17 source files |
+| `make check` | Passed with all 1,226 tests |
+
+These are local working-tree results, not a claim of publication. Historical manifests
+remain supported; complete motorized configurations select v3/v4; incomplete motor
+persistence is rejected; exact schemas are preferred over repair or normalization; initial
+actual speed is checked against truth limits; and the unchanged 35-array artifact is retained.
+
+### Publication handoff and next milestone
+
+The implementation is locally verified but not staged, committed, pushed, or published. The
+next exact action is to review this documentation-only diff, perform a final complete audit,
+rerun the full quality gate, then stage exactly these seven milestone files:
+
+```text
+README.md
+docs/progress/2026-09-14-run-configuration-and-random-streams.md
+src/quadrotor_math/run_configuration.py
+src/quadrotor_math/run_manifest.py
+tests/unit/test_run_configuration.py
+tests/unit/test_run_manifest.py
+tests/unit/test_run_artifact.py
+```
+
+Commit and push only after explicit publication authorization. The complete-run generator is
+the next separate bounded engineering milestone: it will assemble the existing dynamics,
+allocation, motor lag, sensors, deterministic randomness, schedules, configuration, manifest,
+and persistence boundaries into one reproducible run directory and settle the actuator-history
+decision against its exact replay contract.

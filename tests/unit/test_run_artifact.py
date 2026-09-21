@@ -1455,6 +1455,198 @@ def test_load_run_directory_round_trips_saved_manifest_and_data(
     assert run_artifact._encode_data_npz(loaded_data) == data_bytes
 
 
+def test_save_and_load_motorized_run_directory_round_trip(tmp_path: Path) -> None:
+    historical_manifest = _unbound_save_manifest()
+    historical_configuration = historical_manifest.run_configuration
+    motor_parameters = {
+        "minimum_rotor_omega": 100.0,
+        "maximum_rotor_omega": 1000.0,
+        "motor_time_constant_s": 0.2,
+    }
+    caller_initial_actual_rotor_omega = np.array([100.0, 300.0, 700.0, 1000.0], dtype=np.float64)
+    configuration = replace(
+        historical_configuration,
+        truth=replace(
+            historical_configuration.truth,
+            rotors=replace(historical_configuration.truth.rotors, **motor_parameters),
+        ),
+        nominal=replace(
+            historical_configuration.nominal,
+            rotors=replace(historical_configuration.nominal.rotors, **motor_parameters),
+        ),
+        initial_actual_rotor_omega=caller_initial_actual_rotor_omega,
+    )
+    input_manifest = replace(historical_manifest, run_configuration=configuration)
+    input_manifest_bytes = encode_run_manifest(input_manifest)
+    input_mapping = json.loads(input_manifest_bytes)
+    assert input_manifest.data_npz_sha256 is None
+    assert input_mapping["schema"]["version"] == 3
+
+    source_arrays = _writable_source_arrays()
+    artifact = _artifact_data(source_arrays)
+    artifact_arrays = _artifact_npz_members(artifact)
+    artifact_snapshots = {name: array.copy() for name, array in artifact_arrays.items()}
+    source_snapshots = {name: array.copy() for name, array in source_arrays.items()}
+    artifact_flags = {
+        name: (array.flags.owndata, array.flags.c_contiguous, array.flags.writeable)
+        for name, array in artifact_arrays.items()
+    }
+    source_flags = {
+        name: (array.flags.owndata, array.flags.c_contiguous, array.flags.writeable)
+        for name, array in source_arrays.items()
+    }
+    initial_vector_flags = (
+        caller_initial_actual_rotor_omega.flags.owndata,
+        caller_initial_actual_rotor_omega.flags.c_contiguous,
+        caller_initial_actual_rotor_omega.flags.writeable,
+    )
+    configuration_vector_flags = (
+        configuration.initial_actual_rotor_omega.flags.owndata,
+        configuration.initial_actual_rotor_omega.flags.c_contiguous,
+        configuration.initial_actual_rotor_omega.flags.writeable,
+    )
+    run_directory = tmp_path / "motorized-run"
+    assert not run_directory.exists()
+
+    saved_manifest = run_artifact.save_run_directory(run_directory, input_manifest, artifact)
+
+    assert type(saved_manifest) is RunManifest
+    assert saved_manifest is not input_manifest
+    assert saved_manifest.data_npz_sha256 is not None
+    assert input_manifest.data_npz_sha256 is None
+    assert encode_run_manifest(input_manifest) == input_manifest_bytes
+    assert set(run_directory.iterdir()) == {
+        run_directory / "data.npz",
+        run_directory / "manifest.json",
+    }
+    assert set(tmp_path.iterdir()) == {run_directory}
+    data_bytes = (run_directory / "data.npz").read_bytes()
+    manifest_bytes = (run_directory / "manifest.json").read_bytes()
+    data_digest = hashlib.sha256(data_bytes).hexdigest()
+    saved_mapping = json.loads(manifest_bytes)
+    assert saved_manifest.data_npz_sha256 == data_digest
+    assert saved_mapping["schema"]["version"] == 4
+    assert set(saved_mapping) == {
+        "data_artifact",
+        "randomness",
+        "run_configuration",
+        "schema",
+        "software_provenance",
+    }
+    assert saved_mapping["data_artifact"] == {"sha256": data_digest}
+    assert saved_mapping["run_configuration"] == input_mapping["run_configuration"]
+    assert saved_mapping["randomness"] == input_mapping["randomness"]
+    assert saved_mapping["software_provenance"] == input_mapping["software_provenance"]
+    assert saved_mapping["run_configuration"]["initial_actual_rotor_omega"] == [
+        100.0,
+        300.0,
+        700.0,
+        1000.0,
+    ]
+    for group_name in ("truth", "nominal"):
+        encoded_rotors = saved_mapping["run_configuration"][group_name]["rotors"]
+        for parameter_name, expected_value in motor_parameters.items():
+            assert encoded_rotors[parameter_name] == expected_value
+    assert manifest_bytes == encode_run_manifest(saved_manifest)
+
+    for rotors in (configuration.truth.rotors, configuration.nominal.rotors):
+        assert (
+            rotors.minimum_rotor_omega,
+            rotors.maximum_rotor_omega,
+            rotors.motor_time_constant_s,
+        ) == (100.0, 1000.0, 0.2)
+    np.testing.assert_array_equal(
+        configuration.initial_actual_rotor_omega,
+        np.array([100.0, 300.0, 700.0, 1000.0], dtype=np.float64),
+    )
+    np.testing.assert_array_equal(
+        caller_initial_actual_rotor_omega,
+        np.array([100.0, 300.0, 700.0, 1000.0], dtype=np.float64),
+    )
+    assert (
+        caller_initial_actual_rotor_omega.flags.owndata,
+        caller_initial_actual_rotor_omega.flags.c_contiguous,
+        caller_initial_actual_rotor_omega.flags.writeable,
+    ) == initial_vector_flags
+    assert (
+        configuration.initial_actual_rotor_omega.flags.owndata,
+        configuration.initial_actual_rotor_omega.flags.c_contiguous,
+        configuration.initial_actual_rotor_omega.flags.writeable,
+    ) == configuration_vector_flags
+    for name in _ARRAY_FIELDS:
+        np.testing.assert_array_equal(artifact_arrays[name], artifact_snapshots[name])
+        np.testing.assert_array_equal(source_arrays[name], source_snapshots[name])
+        assert (
+            artifact_arrays[name].flags.owndata,
+            artifact_arrays[name].flags.c_contiguous,
+            artifact_arrays[name].flags.writeable,
+        ) == artifact_flags[name]
+        assert (
+            source_arrays[name].flags.owndata,
+            source_arrays[name].flags.c_contiguous,
+            source_arrays[name].flags.writeable,
+        ) == source_flags[name]
+
+    caller_initial_actual_rotor_omega[...] = 200.0
+    loaded_manifest, loaded_artifact = run_artifact.load_run_directory(run_directory)
+
+    assert type(loaded_manifest) is RunManifest
+    assert json.loads(encode_run_manifest(loaded_manifest))["schema"]["version"] == 4
+    assert loaded_manifest.data_npz_sha256 == data_digest
+    loaded_configuration = loaded_manifest.run_configuration
+    for rotors in (loaded_configuration.truth.rotors, loaded_configuration.nominal.rotors):
+        assert (
+            rotors.minimum_rotor_omega,
+            rotors.maximum_rotor_omega,
+            rotors.motor_time_constant_s,
+        ) == (100.0, 1000.0, 0.2)
+    loaded_initial_actual_rotor_omega = loaded_configuration.initial_actual_rotor_omega
+    np.testing.assert_array_equal(
+        loaded_initial_actual_rotor_omega,
+        np.array([100.0, 300.0, 700.0, 1000.0], dtype=np.float64),
+    )
+    assert loaded_initial_actual_rotor_omega.dtype == np.float64
+    assert loaded_initial_actual_rotor_omega.shape == (4,)
+    assert loaded_initial_actual_rotor_omega.flags.owndata
+    assert loaded_initial_actual_rotor_omega.flags.c_contiguous
+    assert not loaded_initial_actual_rotor_omega.flags.writeable
+    assert not np.shares_memory(
+        loaded_initial_actual_rotor_omega,
+        configuration.initial_actual_rotor_omega,
+    )
+    assert not np.shares_memory(
+        loaded_initial_actual_rotor_omega,
+        caller_initial_actual_rotor_omega,
+    )
+    with pytest.raises(ValueError, match="assignment destination is read-only"):
+        loaded_initial_actual_rotor_omega[0] = 200.0
+    assert tuple(
+        (mismatch.parameter_path, mismatch.rationale)
+        for mismatch in loaded_configuration.declared_mismatches
+    ) == tuple(
+        (mismatch.parameter_path, mismatch.rationale)
+        for mismatch in configuration.declared_mismatches
+    )
+    assert loaded_manifest.software_provenance == input_manifest.software_provenance
+    assert encode_run_manifest(loaded_manifest) == manifest_bytes
+
+    assert type(loaded_artifact) is RunArtifactData
+    assert tuple(field.name for field in fields(loaded_artifact)) == _ARRAY_FIELDS
+    for name in _ARRAY_FIELDS:
+        loaded_array = getattr(loaded_artifact, name)
+        original_array = artifact_arrays[name]
+        np.testing.assert_array_equal(loaded_array, original_array)
+        assert loaded_array.dtype == original_array.dtype
+        assert loaded_array.shape == original_array.shape
+        assert loaded_array.flags.owndata
+        assert loaded_array.flags.c_contiguous
+        assert not loaded_array.flags.writeable
+        assert not np.shares_memory(loaded_array, original_array)
+    assert run_artifact._encode_data_npz(loaded_artifact) == data_bytes
+    assert input_manifest.data_npz_sha256 is None
+    assert encode_run_manifest(input_manifest) == input_manifest_bytes
+
+
 def test_load_run_directory_rejects_data_digest_mismatch_before_npz_decode(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

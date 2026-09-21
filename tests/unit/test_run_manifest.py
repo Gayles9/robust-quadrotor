@@ -1,5 +1,6 @@
 import json
 import math
+from dataclasses import replace
 from pathlib import Path
 from subprocess import CompletedProcess
 from typing import cast
@@ -370,6 +371,465 @@ def test_encode_run_manifest_produces_complete_canonical_utf8_bytes() -> None:
     assert type(encoded_bytes) is bytes
     assert encoded_bytes == expected_bytes
     assert json.loads(encoded_bytes) == expected_mapping
+
+
+def test_encode_run_manifest_persists_complete_motorized_unbound_configuration() -> None:
+    historical_configuration = _run_configuration()
+    truth_rotors = replace(
+        historical_configuration.truth.rotors,
+        minimum_rotor_omega=100.0,
+        maximum_rotor_omega=1000.0,
+        motor_time_constant_s=0.2,
+    )
+    nominal_rotors = replace(
+        historical_configuration.nominal.rotors,
+        minimum_rotor_omega=100.0,
+        maximum_rotor_omega=1000.0,
+        motor_time_constant_s=0.2,
+    )
+    configuration = replace(
+        historical_configuration,
+        truth=replace(historical_configuration.truth, rotors=truth_rotors),
+        nominal=replace(historical_configuration.nominal, rotors=nominal_rotors),
+        initial_actual_rotor_omega=np.array([100.0, 300.0, 700.0, 1000.0], dtype=np.float64),
+    )
+    manifest = RunManifest(
+        run_configuration=configuration,
+        software_provenance=_software_provenance(),
+    )
+
+    encoded_bytes = encode_run_manifest(manifest)
+    encoded_mapping = json.loads(encoded_bytes)
+
+    assert encoded_mapping["schema"] == {"name": RUN_MANIFEST_SCHEMA_NAME, "version": 3}
+    assert set(encoded_mapping) == {
+        "randomness",
+        "run_configuration",
+        "schema",
+        "software_provenance",
+    }
+    assert "data_artifact" not in encoded_mapping
+
+    encoded_configuration = encoded_mapping["run_configuration"]
+    assert set(encoded_configuration) == {
+        "declared_mismatches",
+        "initial_actual_rotor_omega",
+        "initial_truth_state",
+        "nominal",
+        "numerics",
+        "root_seed",
+        "rotor_speed_input",
+        "sensor_schedules",
+        "truth",
+    }
+    assert encoded_configuration["initial_actual_rotor_omega"] == [
+        100.0,
+        300.0,
+        700.0,
+        1000.0,
+    ]
+    assert set(encoded_configuration["initial_truth_state"]) == {
+        "omega_B",
+        "position_W",
+        "q_WB",
+        "velocity_W",
+    }
+
+    for group_name, historical_rotors in (
+        ("truth", historical_configuration.truth.rotors),
+        ("nominal", historical_configuration.nominal.rotors),
+    ):
+        encoded_rotors = encoded_configuration[group_name]["rotors"]
+        assert set(encoded_rotors) == {
+            "maximum_rotor_omega",
+            "minimum_rotor_omega",
+            "moment_coefficient",
+            "motor_time_constant_s",
+            "rotor_positions_B",
+            "rotor_spin_directions",
+            "thrust_coefficient",
+        }
+        assert encoded_rotors["minimum_rotor_omega"] == 100.0
+        assert encoded_rotors["maximum_rotor_omega"] == 1000.0
+        assert encoded_rotors["motor_time_constant_s"] == 0.2
+        assert encoded_rotors["rotor_positions_B"] == historical_rotors.rotor_positions_B.tolist()
+        assert encoded_rotors["rotor_spin_directions"] == (
+            historical_rotors.rotor_spin_directions.tolist()
+        )
+        assert encoded_rotors["thrust_coefficient"] == historical_rotors.thrust_coefficient
+        assert encoded_rotors["moment_coefficient"] == historical_rotors.moment_coefficient
+
+    assert encoded_bytes == json.dumps(
+        encoded_mapping,
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    ).encode("utf-8")
+    assert not encoded_bytes.endswith(b"\n")
+
+
+def test_encode_run_manifest_persists_complete_motorized_bound_configuration() -> None:
+    historical_configuration = _run_configuration()
+    truth_rotors = replace(
+        historical_configuration.truth.rotors,
+        minimum_rotor_omega=100.0,
+        maximum_rotor_omega=1000.0,
+        motor_time_constant_s=0.2,
+    )
+    nominal_rotors = replace(
+        historical_configuration.nominal.rotors,
+        minimum_rotor_omega=100.0,
+        maximum_rotor_omega=1000.0,
+        motor_time_constant_s=0.2,
+    )
+    initial_actual_rotor_omega = np.array([100.0, 300.0, 700.0, 1000.0], dtype=np.float64)
+    configuration = replace(
+        historical_configuration,
+        truth=replace(historical_configuration.truth, rotors=truth_rotors),
+        nominal=replace(historical_configuration.nominal, rotors=nominal_rotors),
+        initial_actual_rotor_omega=initial_actual_rotor_omega,
+    )
+    provenance = _software_provenance()
+    unbound_bytes = encode_run_manifest(RunManifest(configuration, provenance))
+    unbound_mapping = json.loads(unbound_bytes)
+    manifest = RunManifest(
+        run_configuration=configuration,
+        software_provenance=provenance,
+        data_npz_sha256=_DATA_NPZ_SHA256,
+    )
+
+    encoded_bytes = encode_run_manifest(manifest)
+    encoded_mapping = json.loads(encoded_bytes)
+
+    assert encoded_mapping["schema"] == {
+        "name": RUN_MANIFEST_SCHEMA_NAME,
+        "version": 4,
+    }
+    assert set(encoded_mapping) == {
+        "data_artifact",
+        "randomness",
+        "run_configuration",
+        "schema",
+        "software_provenance",
+    }
+    assert encoded_mapping["data_artifact"] == {"sha256": _DATA_NPZ_SHA256}
+
+    encoded_configuration = encoded_mapping["run_configuration"]
+    assert set(encoded_configuration) == {
+        "declared_mismatches",
+        "initial_actual_rotor_omega",
+        "initial_truth_state",
+        "nominal",
+        "numerics",
+        "root_seed",
+        "rotor_speed_input",
+        "sensor_schedules",
+        "truth",
+    }
+    assert encoded_configuration["initial_actual_rotor_omega"] == [
+        100.0,
+        300.0,
+        700.0,
+        1000.0,
+    ]
+    assert set(encoded_configuration["initial_truth_state"]) == {
+        "omega_B",
+        "position_W",
+        "q_WB",
+        "velocity_W",
+    }
+
+    for group_name, historical_rotors in (
+        ("truth", historical_configuration.truth.rotors),
+        ("nominal", historical_configuration.nominal.rotors),
+    ):
+        encoded_rotors = encoded_configuration[group_name]["rotors"]
+        assert set(encoded_rotors) == {
+            "maximum_rotor_omega",
+            "minimum_rotor_omega",
+            "moment_coefficient",
+            "motor_time_constant_s",
+            "rotor_positions_B",
+            "rotor_spin_directions",
+            "thrust_coefficient",
+        }
+        assert encoded_rotors["minimum_rotor_omega"] == 100.0
+        assert encoded_rotors["maximum_rotor_omega"] == 1000.0
+        assert encoded_rotors["motor_time_constant_s"] == 0.2
+        assert encoded_rotors["rotor_positions_B"] == historical_rotors.rotor_positions_B.tolist()
+        assert encoded_rotors["rotor_spin_directions"] == (
+            historical_rotors.rotor_spin_directions.tolist()
+        )
+        assert encoded_rotors["thrust_coefficient"] == historical_rotors.thrust_coefficient
+        assert encoded_rotors["moment_coefficient"] == historical_rotors.moment_coefficient
+
+    assert encoded_configuration == unbound_mapping["run_configuration"]
+    assert encoded_mapping["randomness"] == unbound_mapping["randomness"]
+    assert encoded_mapping["software_provenance"] == unbound_mapping["software_provenance"]
+    assert type(encoded_bytes) is bytes
+    assert encoded_bytes == json.dumps(
+        encoded_mapping,
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    ).encode("utf-8")
+    assert not encoded_bytes.endswith(b"\n")
+    assert encode_run_manifest(manifest) == encoded_bytes
+    assert encode_run_manifest(RunManifest(configuration, provenance)) == unbound_bytes
+    np.testing.assert_array_equal(
+        initial_actual_rotor_omega,
+        np.array([100.0, 300.0, 700.0, 1000.0], dtype=np.float64),
+    )
+    assert manifest.run_configuration is configuration
+    assert manifest.software_provenance is provenance
+    assert manifest.data_npz_sha256 == _DATA_NPZ_SHA256
+
+
+def test_decode_run_manifest_round_trips_complete_motorized_bound_configuration() -> None:
+    historical_configuration = _run_configuration()
+    motor_parameters = {
+        "minimum_rotor_omega": 100.0,
+        "maximum_rotor_omega": 1000.0,
+        "motor_time_constant_s": 0.2,
+    }
+    caller_initial_actual_rotor_omega = np.array([100.0, 300.0, 700.0, 1000.0], dtype=np.float64)
+    configuration = replace(
+        historical_configuration,
+        truth=replace(
+            historical_configuration.truth,
+            rotors=replace(historical_configuration.truth.rotors, **motor_parameters),
+        ),
+        nominal=replace(
+            historical_configuration.nominal,
+            rotors=replace(historical_configuration.nominal.rotors, **motor_parameters),
+        ),
+        initial_actual_rotor_omega=caller_initial_actual_rotor_omega,
+    )
+    manifest = RunManifest(
+        run_configuration=configuration,
+        software_provenance=_software_provenance(),
+        data_npz_sha256=_DATA_NPZ_SHA256,
+    )
+
+    encoded_bytes = encode_run_manifest(manifest)
+    encoded_mapping = json.loads(encoded_bytes)
+    encoded_configuration = encoded_mapping["run_configuration"]
+    assert encoded_mapping["schema"] == {"name": RUN_MANIFEST_SCHEMA_NAME, "version": 4}
+    assert "data_artifact" in encoded_mapping
+    assert encoded_mapping["data_artifact"] == {"sha256": _DATA_NPZ_SHA256}
+    assert encoded_configuration["initial_actual_rotor_omega"] == [
+        100.0,
+        300.0,
+        700.0,
+        1000.0,
+    ]
+    for group_name in ("truth", "nominal"):
+        encoded_rotors = encoded_configuration[group_name]["rotors"]
+        for parameter_name, expected_value in motor_parameters.items():
+            assert encoded_rotors[parameter_name] == expected_value
+
+    caller_initial_actual_rotor_omega[...] = 200.0
+    decoded_manifest = decode_run_manifest(encoded_bytes)
+    decoded_configuration = decoded_manifest.run_configuration
+
+    assert decoded_manifest.data_npz_sha256 == _DATA_NPZ_SHA256
+    for rotors in (decoded_configuration.truth.rotors, decoded_configuration.nominal.rotors):
+        assert rotors.minimum_rotor_omega == 100.0
+        assert rotors.maximum_rotor_omega == 1000.0
+        assert rotors.motor_time_constant_s == 0.2
+    decoded_initial_actual_rotor_omega = decoded_configuration.initial_actual_rotor_omega
+    assert decoded_initial_actual_rotor_omega.shape == (4,)
+    np.testing.assert_array_equal(
+        decoded_initial_actual_rotor_omega,
+        np.array([100.0, 300.0, 700.0, 1000.0], dtype=np.float64),
+    )
+    assert decoded_initial_actual_rotor_omega.dtype == np.float64
+    assert decoded_initial_actual_rotor_omega.flags.c_contiguous
+    assert decoded_initial_actual_rotor_omega.flags.owndata
+    assert not decoded_initial_actual_rotor_omega.flags.writeable
+    assert not np.shares_memory(
+        decoded_initial_actual_rotor_omega,
+        configuration.initial_actual_rotor_omega,
+    )
+    with pytest.raises(ValueError, match="assignment destination is read-only"):
+        decoded_initial_actual_rotor_omega[0] = 200.0
+
+    for source_array, decoded_array in zip(
+        _configuration_owned_arrays(configuration),
+        _configuration_owned_arrays(decoded_configuration),
+        strict=True,
+    ):
+        np.testing.assert_array_equal(decoded_array, source_array)
+    for source_group, decoded_group in (
+        (configuration.truth, decoded_configuration.truth),
+        (configuration.nominal, decoded_configuration.nominal),
+    ):
+        assert decoded_group.rotors.thrust_coefficient == source_group.rotors.thrust_coefficient
+        assert decoded_group.rotors.moment_coefficient == source_group.rotors.moment_coefficient
+    assert tuple(
+        (mismatch.parameter_path, mismatch.rationale)
+        for mismatch in decoded_configuration.declared_mismatches
+    ) == tuple(
+        (mismatch.parameter_path, mismatch.rationale)
+        for mismatch in configuration.declared_mismatches
+    )
+    assert decoded_manifest.software_provenance == manifest.software_provenance
+
+    reencoded_bytes = encode_run_manifest(decoded_manifest)
+    reencoded_mapping = json.loads(reencoded_bytes)
+    assert reencoded_mapping["schema"] == {"name": RUN_MANIFEST_SCHEMA_NAME, "version": 4}
+    assert reencoded_mapping["data_artifact"] == encoded_mapping["data_artifact"]
+    assert reencoded_mapping["randomness"] == encoded_mapping["randomness"]
+    assert reencoded_bytes == encoded_bytes
+
+
+def test_decode_run_manifest_round_trips_complete_motorized_unbound_configuration() -> None:
+    historical_configuration = _run_configuration()
+    motor_parameters = {
+        "minimum_rotor_omega": 100.0,
+        "maximum_rotor_omega": 1000.0,
+        "motor_time_constant_s": 0.2,
+    }
+    caller_initial_actual_rotor_omega = np.array(
+        [100.0, 300.0, 700.0, 1000.0],
+        dtype=np.float64,
+    )
+    configuration = replace(
+        historical_configuration,
+        truth=replace(
+            historical_configuration.truth,
+            rotors=replace(historical_configuration.truth.rotors, **motor_parameters),
+        ),
+        nominal=replace(
+            historical_configuration.nominal,
+            rotors=replace(historical_configuration.nominal.rotors, **motor_parameters),
+        ),
+        initial_actual_rotor_omega=caller_initial_actual_rotor_omega,
+    )
+    manifest = RunManifest(
+        run_configuration=configuration,
+        software_provenance=_software_provenance(),
+    )
+
+    encoded_bytes = encode_run_manifest(manifest)
+    encoded_mapping = json.loads(encoded_bytes)
+
+    assert encoded_mapping["schema"] == {
+        "name": RUN_MANIFEST_SCHEMA_NAME,
+        "version": 3,
+    }
+    assert "data_artifact" not in encoded_mapping
+    assert encoded_bytes == json.dumps(
+        encoded_mapping,
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    ).encode("utf-8")
+
+    caller_initial_actual_rotor_omega[...] = 200.0
+    decoded_manifest = decode_run_manifest(encoded_bytes)
+    decoded_configuration = decoded_manifest.run_configuration
+
+    assert decoded_manifest.data_npz_sha256 is None
+    assert decoded_configuration.truth.rotors.minimum_rotor_omega == 100.0
+    assert decoded_configuration.truth.rotors.maximum_rotor_omega == 1000.0
+    assert decoded_configuration.truth.rotors.motor_time_constant_s == 0.2
+    assert decoded_configuration.nominal.rotors.minimum_rotor_omega == 100.0
+    assert decoded_configuration.nominal.rotors.maximum_rotor_omega == 1000.0
+    assert decoded_configuration.nominal.rotors.motor_time_constant_s == 0.2
+
+    decoded_initial_actual_rotor_omega = decoded_configuration.initial_actual_rotor_omega
+    assert decoded_initial_actual_rotor_omega.shape == (4,)
+    np.testing.assert_array_equal(
+        decoded_initial_actual_rotor_omega,
+        np.array([100.0, 300.0, 700.0, 1000.0], dtype=np.float64),
+    )
+    assert decoded_initial_actual_rotor_omega.dtype == np.float64
+    assert decoded_initial_actual_rotor_omega.flags.c_contiguous
+    assert decoded_initial_actual_rotor_omega.flags.owndata
+    assert not decoded_initial_actual_rotor_omega.flags.writeable
+    assert not np.shares_memory(
+        decoded_initial_actual_rotor_omega,
+        configuration.initial_actual_rotor_omega,
+    )
+    with pytest.raises(ValueError, match="assignment destination is read-only"):
+        decoded_initial_actual_rotor_omega[0] = 200.0
+
+    reencoded_bytes = encode_run_manifest(decoded_manifest)
+    assert json.loads(reencoded_bytes)["schema"] == {
+        "name": RUN_MANIFEST_SCHEMA_NAME,
+        "version": 3,
+    }
+    assert reencoded_bytes == encoded_bytes
+
+
+@pytest.mark.parametrize(
+    "missing_component",
+    [
+        pytest.param("initial-state", id="missing-initial-state"),
+        pytest.param("nominal-motor-model", id="missing-nominal-motor-model"),
+        pytest.param("truth-motor-model", id="missing-truth-motor-model"),
+    ],
+)
+def test_encode_run_manifest_rejects_incomplete_motor_configuration(
+    missing_component: str,
+) -> None:
+    historical_configuration = _run_configuration()
+    truth_rotors = historical_configuration.truth.rotors
+    nominal_rotors = historical_configuration.nominal.rotors
+    if missing_component != "truth-motor-model":
+        truth_rotors = replace(
+            truth_rotors,
+            minimum_rotor_omega=100.0,
+            maximum_rotor_omega=1000.0,
+            motor_time_constant_s=0.2,
+        )
+    if missing_component != "nominal-motor-model":
+        nominal_rotors = replace(
+            nominal_rotors,
+            minimum_rotor_omega=100.0,
+            maximum_rotor_omega=1000.0,
+            motor_time_constant_s=0.2,
+        )
+
+    declared_mismatches = historical_configuration.declared_mismatches
+    if missing_component != "initial-state":
+        declared_mismatches += tuple(
+            DeclaredMismatch(
+                parameter_path=parameter_path,
+                rationale="Exercise an intentional motor-model mismatch.",
+            )
+            for parameter_path in (
+                "rotors.minimum_rotor_omega",
+                "rotors.maximum_rotor_omega",
+                "rotors.motor_time_constant_s",
+            )
+        )
+
+    initial_actual_rotor_omega = (
+        np.array([100.0, 300.0, 700.0, 1000.0], dtype=np.float64)
+        if missing_component == "nominal-motor-model"
+        else None
+    )
+    configuration = replace(
+        historical_configuration,
+        truth=replace(historical_configuration.truth, rotors=truth_rotors),
+        nominal=replace(historical_configuration.nominal, rotors=nominal_rotors),
+        initial_actual_rotor_omega=initial_actual_rotor_omega,
+        declared_mismatches=declared_mismatches,
+    )
+    assert type(configuration) is RunConfiguration
+    manifest = RunManifest(
+        run_configuration=configuration,
+        software_provenance=_software_provenance(),
+    )
+
+    with pytest.raises(ValueError) as error:
+        encode_run_manifest(manifest)
+
+    assert str(error.value) == (
+        "manifest motor configuration must be either entirely omitted or complete"
+    )
 
 
 def test_encode_run_manifest_binds_data_npz_digest_with_schema_version_two() -> None:
@@ -760,9 +1220,16 @@ def test_decode_run_manifest_requires_fixed_schema_name(invalid_name: object) ->
     )
 
 
-@pytest.mark.parametrize("invalid_version", [True, 3])
+@pytest.mark.parametrize(
+    ("invalid_version", "expected_message"),
+    [
+        (True, "schema.version must be 1, 2, 3, or 4"),
+        (5, "schema.version must be 1, 2, 3, or 4"),
+    ],
+)
 def test_decode_run_manifest_requires_fixed_integer_schema_version(
     invalid_version: object,
+    expected_message: str,
 ) -> None:
     mapping = _valid_manifest_mapping()
     schema = cast(dict[str, object], mapping["schema"])
@@ -770,7 +1237,7 @@ def test_decode_run_manifest_requires_fixed_integer_schema_version(
 
     _assert_manifest_decode_error(
         _canonical_manifest_bytes(mapping),
-        "schema.version must be 1 or 2",
+        expected_message,
     )
 
 
@@ -858,6 +1325,224 @@ def test_decode_run_manifest_requires_lowercase_sha256_digest(
     _assert_manifest_decode_error(
         _canonical_manifest_bytes(mapping),
         "data_artifact.sha256 must be 64 lowercase hexadecimal characters",
+    )
+
+
+@pytest.mark.parametrize(
+    ("schema_version", "mutation"),
+    [
+        pytest.param(3, "top-level-missing", id="v3-top-level-missing"),
+        pytest.param(3, "top-level-extra", id="v3-top-level-extra"),
+        pytest.param(
+            3,
+            "run-configuration-missing-initial-speed",
+            id="v3-run-configuration-missing-initial-speed",
+        ),
+        pytest.param(3, "run-configuration-extra", id="v3-run-configuration-extra"),
+        pytest.param(
+            3,
+            "truth-rotors-missing-motor-field",
+            id="v3-truth-rotors-missing-motor-field",
+        ),
+        pytest.param(3, "truth-rotors-extra", id="v3-truth-rotors-extra"),
+        pytest.param(
+            3,
+            "nominal-rotors-missing-motor-field",
+            id="v3-nominal-rotors-missing-motor-field",
+        ),
+        pytest.param(3, "nominal-rotors-extra", id="v3-nominal-rotors-extra"),
+        pytest.param(4, "top-level-missing", id="v4-top-level-missing"),
+        pytest.param(4, "top-level-extra", id="v4-top-level-extra"),
+        pytest.param(
+            4,
+            "run-configuration-missing-initial-speed",
+            id="v4-run-configuration-missing-initial-speed",
+        ),
+        pytest.param(4, "run-configuration-extra", id="v4-run-configuration-extra"),
+        pytest.param(
+            4,
+            "truth-rotors-missing-motor-field",
+            id="v4-truth-rotors-missing-motor-field",
+        ),
+        pytest.param(4, "truth-rotors-extra", id="v4-truth-rotors-extra"),
+        pytest.param(
+            4,
+            "nominal-rotors-missing-motor-field",
+            id="v4-nominal-rotors-missing-motor-field",
+        ),
+        pytest.param(4, "nominal-rotors-extra", id="v4-nominal-rotors-extra"),
+        pytest.param(3, "unexpected-data-artifact", id="v3-unexpected-data-artifact"),
+        pytest.param(4, "missing-data-artifact", id="v4-missing-data-artifact"),
+        pytest.param(4, "malformed-digest", id="v4-malformed-digest"),
+        pytest.param(
+            3,
+            "initial-speed-outside-truth-but-inside-nominal",
+            id="initial-speed-outside-truth-but-inside-nominal",
+        ),
+    ],
+)
+def test_decode_run_manifest_rejects_invalid_motorized_schema(
+    schema_version: int,
+    mutation: str,
+) -> None:
+    historical_configuration = _run_configuration()
+    truth_rotors = replace(
+        historical_configuration.truth.rotors,
+        minimum_rotor_omega=100.0,
+        maximum_rotor_omega=1000.0,
+        motor_time_constant_s=0.2,
+    )
+    nominal_minimum = 0.0 if mutation == "initial-speed-outside-truth-but-inside-nominal" else 100.0
+    nominal_rotors = replace(
+        historical_configuration.nominal.rotors,
+        minimum_rotor_omega=nominal_minimum,
+        maximum_rotor_omega=1000.0,
+        motor_time_constant_s=0.2,
+    )
+    declared_mismatches = historical_configuration.declared_mismatches
+    if nominal_minimum != 100.0:
+        declared_mismatches += (
+            DeclaredMismatch(
+                parameter_path="rotors.minimum_rotor_omega",
+                rationale="Exercise truth rather than nominal initial-speed limits.",
+            ),
+        )
+    configuration = replace(
+        historical_configuration,
+        truth=replace(historical_configuration.truth, rotors=truth_rotors),
+        nominal=replace(historical_configuration.nominal, rotors=nominal_rotors),
+        declared_mismatches=declared_mismatches,
+        initial_actual_rotor_omega=np.array([100.0, 300.0, 700.0, 1000.0], dtype=np.float64),
+    )
+    manifest = RunManifest(
+        run_configuration=configuration,
+        software_provenance=_software_provenance(),
+        data_npz_sha256=_DATA_NPZ_SHA256 if schema_version == 4 else None,
+    )
+    starting_bytes = encode_run_manifest(manifest)
+    starting_mapping = cast(dict[str, object], json.loads(starting_bytes))
+    schema = cast(dict[str, object], starting_mapping["schema"])
+    assert schema["version"] == schema_version
+    assert encode_run_manifest(decode_run_manifest(starting_bytes)) == starting_bytes
+
+    mutation_plan: dict[str, tuple[tuple[str, ...], str, str, object]] = {
+        "top-level-missing": ((), "remove", "software_provenance", None),
+        "top-level-extra": ((), "add", "unexpected", None),
+        "run-configuration-missing-initial-speed": (
+            ("run_configuration",),
+            "remove",
+            "initial_actual_rotor_omega",
+            None,
+        ),
+        "run-configuration-extra": (("run_configuration",), "add", "unexpected", None),
+        "truth-rotors-missing-motor-field": (
+            ("run_configuration", "truth", "rotors"),
+            "remove",
+            "minimum_rotor_omega",
+            None,
+        ),
+        "truth-rotors-extra": (
+            ("run_configuration", "truth", "rotors"),
+            "add",
+            "unexpected",
+            None,
+        ),
+        "nominal-rotors-missing-motor-field": (
+            ("run_configuration", "nominal", "rotors"),
+            "remove",
+            "motor_time_constant_s",
+            None,
+        ),
+        "nominal-rotors-extra": (
+            ("run_configuration", "nominal", "rotors"),
+            "add",
+            "unexpected",
+            None,
+        ),
+        "unexpected-data-artifact": ((), "add", "data_artifact", {"sha256": _DATA_NPZ_SHA256}),
+        "missing-data-artifact": ((), "remove", "data_artifact", None),
+        "malformed-digest": (("data_artifact",), "replace", "sha256", "A" + _DATA_NPZ_SHA256[1:]),
+        "initial-speed-outside-truth-but-inside-nominal": (
+            ("run_configuration",),
+            "replace",
+            "initial_actual_rotor_omega",
+            [50.0, 300.0, 700.0, 1000.0],
+        ),
+    }
+    path, action, member, replacement = mutation_plan[mutation]
+    mutated_mapping = cast(dict[str, object], json.loads(starting_bytes))
+    target = mutated_mapping
+    for path_member in path:
+        target = cast(dict[str, object], target[path_member])
+
+    if action == "remove":
+        assert member in target
+        original_value = target.pop(member)
+    elif action == "add":
+        assert member not in target
+        original_value = None
+        target[member] = replacement
+    else:
+        assert action == "replace"
+        original_value = target[member]
+        assert original_value != replacement
+        if mutation == "initial-speed-outside-truth-but-inside-nominal":
+            assert original_value == [100.0, 300.0, 700.0, 1000.0]
+            assert replacement == [50.0, *cast(list[float], original_value)[1:]]
+        target[member] = replacement
+
+    assert mutated_mapping != starting_mapping
+    if action == "add":
+        target.pop(member)
+    else:
+        target[member] = original_value
+    assert mutated_mapping == starting_mapping
+    if action == "remove":
+        target.pop(member)
+    else:
+        target[member] = replacement
+
+    ordinary_top_level_keys = "randomness, run_configuration, schema, software_provenance"
+    bound_top_level_keys = "data_artifact, " + ordinary_top_level_keys
+    top_level_keys = bound_top_level_keys if schema_version == 4 else ordinary_top_level_keys
+    run_configuration_keys = (
+        "declared_mismatches, initial_actual_rotor_omega, initial_truth_state, "
+        "nominal, numerics, root_seed, rotor_speed_input, sensor_schedules, truth"
+    )
+    rotor_keys = (
+        "maximum_rotor_omega, minimum_rotor_omega, moment_coefficient, "
+        "motor_time_constant_s, rotor_positions_B, rotor_spin_directions, thrust_coefficient"
+    )
+    expected_messages = {
+        "top-level-missing": f"manifest keys must be exactly: {top_level_keys}",
+        "top-level-extra": f"manifest keys must be exactly: {top_level_keys}",
+        "run-configuration-missing-initial-speed": (
+            f"run_configuration keys must be exactly: {run_configuration_keys}"
+        ),
+        "run-configuration-extra": (
+            f"run_configuration keys must be exactly: {run_configuration_keys}"
+        ),
+        "truth-rotors-missing-motor-field": (
+            f"run_configuration.truth.rotors keys must be exactly: {rotor_keys}"
+        ),
+        "truth-rotors-extra": f"run_configuration.truth.rotors keys must be exactly: {rotor_keys}",
+        "nominal-rotors-missing-motor-field": (
+            f"run_configuration.nominal.rotors keys must be exactly: {rotor_keys}"
+        ),
+        "nominal-rotors-extra": (
+            f"run_configuration.nominal.rotors keys must be exactly: {rotor_keys}"
+        ),
+        "unexpected-data-artifact": (
+            f"run manifest keys must be exactly: {ordinary_top_level_keys}"
+        ),
+        "missing-data-artifact": f"run manifest keys must be exactly: {bound_top_level_keys}",
+        "malformed-digest": "data_artifact.sha256 must be 64 lowercase hexadecimal characters",
+        "initial-speed-outside-truth-but-inside-nominal": (
+            "initial_actual_rotor_omega must be within truth rotor speed limits"
+        ),
+    }
+    _assert_manifest_decode_error(
+        _canonical_manifest_bytes(mutated_mapping), expected_messages[mutation]
     )
 
 
