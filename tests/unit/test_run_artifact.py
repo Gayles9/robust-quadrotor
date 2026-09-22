@@ -1647,6 +1647,136 @@ def test_save_and_load_motorized_run_directory_round_trip(tmp_path: Path) -> Non
     assert encode_run_manifest(input_manifest) == input_manifest_bytes
 
 
+def _environmental_save_manifest(*, motorized: bool) -> RunManifest:
+    """Extend the valid save fixture with declared nonzero environmental models."""
+    manifest = _unbound_save_manifest()
+    configuration = manifest.run_configuration
+    motor_parameters = (
+        {
+            "minimum_rotor_omega": 100.0,
+            "maximum_rotor_omega": 1000.0,
+            "motor_time_constant_s": 0.2,
+        }
+        if motorized
+        else {}
+    )
+    truth = replace(
+        configuration.truth,
+        rigid_body=replace(
+            configuration.truth.rigid_body,
+            quadratic_drag_coefficient_B=np.array([0.3, 0.2, 0.1]),
+        ),
+        rotors=replace(configuration.truth.rotors, **motor_parameters),
+        world=replace(
+            configuration.truth.world,
+            wind_velocity_W=np.array([1.0, -0.5, 0.25]),
+        ),
+    )
+    nominal = replace(
+        configuration.nominal,
+        rigid_body=replace(
+            configuration.nominal.rigid_body,
+            quadratic_drag_coefficient_B=np.array([0.25, 0.15, 0.05]),
+        ),
+        rotors=replace(configuration.nominal.rotors, **motor_parameters),
+        world=replace(
+            configuration.nominal.world,
+            wind_velocity_W=np.array([0.8, -0.4, 0.2]),
+        ),
+    )
+    environmental_configuration = replace(
+        configuration,
+        truth=truth,
+        nominal=nominal,
+        initial_actual_rotor_omega=(np.array([100.0, 300.0, 700.0, 1000.0]) if motorized else None),
+        declared_mismatches=(
+            *configuration.declared_mismatches,
+            DeclaredMismatch(
+                "rigid_body.quadratic_drag_coefficient_B",
+                "Environmental persistence drag mismatch.",
+            ),
+            DeclaredMismatch(
+                "world.wind_velocity_W",
+                "Environmental persistence wind mismatch.",
+            ),
+        ),
+    )
+    return replace(manifest, run_configuration=environmental_configuration)
+
+
+@pytest.mark.parametrize("motorized", [False, True], ids=["historical", "motorized"])
+def test_environmental_save_load_preserves_authenticated_artifact_schema(
+    tmp_path: Path, motorized: bool
+) -> None:
+    manifest = _environmental_save_manifest(motorized=motorized)
+    unbound_manifest_bytes = encode_run_manifest(manifest)
+    assert json.loads(unbound_manifest_bytes)["schema"]["version"] == 5
+    sources = _writable_source_arrays()
+    source_snapshots = {name: array.copy() for name, array in sources.items()}
+    data = _artifact_data(sources)
+    data_snapshots = {name: getattr(data, name).copy() for name in _ARRAY_FIELDS}
+
+    run_directory = tmp_path / "environmental-run"
+    bound_manifest = run_artifact.save_run_directory(run_directory, manifest, data)
+    manifest_bytes = (run_directory / "manifest.json").read_bytes()
+    data_bytes = (run_directory / "data.npz").read_bytes()
+    assert bound_manifest is not manifest
+    assert json.loads(manifest_bytes)["schema"]["version"] == 6
+    assert set(run_directory.iterdir()) == {
+        run_directory / "manifest.json",
+        run_directory / "data.npz",
+    }
+    assert bound_manifest.data_npz_sha256 == hashlib.sha256(data_bytes).hexdigest()
+
+    loaded_manifest, loaded_data = run_artifact.load_run_directory(run_directory)
+    assert encode_run_manifest(loaded_manifest) == manifest_bytes
+    loaded_configuration = loaded_manifest.run_configuration
+    for loaded_model, source_model in (
+        (loaded_configuration.truth, manifest.run_configuration.truth),
+        (loaded_configuration.nominal, manifest.run_configuration.nominal),
+    ):
+        for loaded_array, source_array in (
+            (
+                loaded_model.rigid_body.quadratic_drag_coefficient_B,
+                source_model.rigid_body.quadratic_drag_coefficient_B,
+            ),
+            (loaded_model.world.wind_velocity_W, source_model.world.wind_velocity_W),
+        ):
+            np.testing.assert_array_equal(loaded_array, source_array)
+            assert loaded_array.flags.owndata
+            assert loaded_array.flags.c_contiguous
+            assert not loaded_array.flags.writeable
+            assert not np.shares_memory(loaded_array, source_array)
+
+    assert tuple(field.name for field in fields(RunArtifactData)) == _ARRAY_FIELDS
+    assert len(_ARRAY_FIELDS) == 35
+    assert all("actual_rotor" not in name for name in _ARRAY_FIELDS)
+    with np.load(io.BytesIO(data_bytes), allow_pickle=False) as archive:
+        assert archive.files == list(_ARRAY_FIELDS)
+        assert all("actual_rotor" not in name for name in archive.files)
+    for name in _ARRAY_FIELDS:
+        loaded_array = getattr(loaded_data, name)
+        original_array = getattr(data, name)
+        np.testing.assert_array_equal(loaded_array, original_array)
+        assert loaded_array.flags.owndata
+        assert loaded_array.flags.c_contiguous
+        assert not loaded_array.flags.writeable
+        assert not np.shares_memory(loaded_array, original_array)
+
+    replay_directory = tmp_path / "environmental-replay"
+    replay_manifest = run_artifact.save_run_directory(
+        replay_directory, loaded_manifest, loaded_data
+    )
+    assert encode_run_manifest(replay_manifest) == manifest_bytes
+    assert (replay_directory / "manifest.json").read_bytes() == manifest_bytes
+    assert (replay_directory / "data.npz").read_bytes() == data_bytes
+    assert encode_run_manifest(manifest) == unbound_manifest_bytes
+    assert manifest.data_npz_sha256 is None
+    for name in _ARRAY_FIELDS:
+        np.testing.assert_array_equal(sources[name], source_snapshots[name])
+        np.testing.assert_array_equal(getattr(data, name), data_snapshots[name])
+
+
 def test_load_run_directory_rejects_data_digest_mismatch_before_npz_decode(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

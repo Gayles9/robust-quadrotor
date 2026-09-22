@@ -2155,3 +2155,217 @@ def test_run_configuration_accepts_complete_mismatch_set_in_any_declaration_orde
         "world.gravity_acceleration",
         "rigid_body.mass",
     )
+
+
+def test_environmental_parameter_defaults_preserve_historical_construction() -> None:
+    first_body = RigidBodyParameters(1.5, np.eye(3))
+    second_body = RigidBodyParameters(1.5, np.eye(3))
+    first_world = WorldParameters(9.81)
+    second_world = WorldParameters(9.81)
+
+    for values in (
+        first_body.quadratic_drag_coefficient_B,
+        second_body.quadratic_drag_coefficient_B,
+        first_world.wind_velocity_W,
+        second_world.wind_velocity_W,
+    ):
+        np.testing.assert_array_equal(values, np.zeros(3))
+        assert values.dtype == np.float64
+        assert values.flags.owndata and values.flags.c_contiguous
+        assert not values.flags.writeable
+    assert not np.shares_memory(
+        first_body.quadratic_drag_coefficient_B, second_body.quadratic_drag_coefficient_B
+    )
+    assert not np.shares_memory(first_world.wind_velocity_W, second_world.wind_velocity_W)
+
+
+@pytest.mark.parametrize(
+    ("parameter_type", "field_name", "required_arguments", "supplied_values"),
+    [
+        (
+            RigidBodyParameters,
+            "quadratic_drag_coefficient_B",
+            {"mass": 1.5, "inertia_B": np.eye(3)},
+            np.array([0.5, 1.0, 1.5]),
+        ),
+        (
+            WorldParameters,
+            "wind_velocity_W",
+            {"gravity_acceleration": 9.81},
+            np.array([2.0, -1.0, 0.5]),
+        ),
+    ],
+)
+def test_environmental_parameters_take_owned_read_only_float64_copies(
+    parameter_type: type[RigidBodyParameters] | type[WorldParameters],
+    field_name: str,
+    required_arguments: dict[str, object],
+    supplied_values: np.ndarray,
+) -> None:
+    expected = supplied_values.copy()
+    parameters = parameter_type(**required_arguments, **{field_name: supplied_values})
+    stored = getattr(parameters, field_name)
+    supplied_values[0] = 99.0
+
+    np.testing.assert_array_equal(stored, expected)
+    assert stored.shape == (3,) and stored.dtype == np.float64
+    assert stored.flags.owndata and stored.flags.c_contiguous and not stored.flags.writeable
+    assert not np.shares_memory(stored, supplied_values)
+    with pytest.raises(ValueError):
+        stored[0] = 0.0
+
+
+@pytest.mark.parametrize(
+    ("coefficient_B", "expected_message"),
+    [
+        (np.zeros(2), "quadratic_drag_coefficient_B must have shape (3,)"),
+        (
+            np.array([np.nan, 0.0, 0.0]),
+            "quadratic_drag_coefficient_B must contain only finite values",
+        ),
+        (
+            np.array([0.0, np.inf, 0.0]),
+            "quadratic_drag_coefficient_B must contain only finite values",
+        ),
+        (np.array([0.0, -0.1, 0.0]), "quadratic_drag_coefficient_B must be nonnegative"),
+    ],
+)
+def test_rigid_body_parameters_validate_quadratic_drag_coefficient(
+    coefficient_B: np.ndarray, expected_message: str
+) -> None:
+    with pytest.raises(ValueError, match=rf"^{re.escape(expected_message)}$"):
+        RigidBodyParameters(
+            mass=1.5,
+            inertia_B=np.eye(3),
+            quadratic_drag_coefficient_B=coefficient_B,
+        )
+
+
+@pytest.mark.parametrize(
+    ("wind_velocity_W", "expected_message"),
+    [
+        (np.zeros(2), "wind_velocity_W must have shape (3,)"),
+        (np.array([np.nan, 0.0, 0.0]), "wind_velocity_W must contain only finite values"),
+        (np.array([0.0, -np.inf, 0.0]), "wind_velocity_W must contain only finite values"),
+    ],
+)
+def test_world_parameters_validate_wind_velocity(
+    wind_velocity_W: np.ndarray, expected_message: str
+) -> None:
+    with pytest.raises(ValueError, match=rf"^{re.escape(expected_message)}$"):
+        WorldParameters(gravity_acceleration=9.81, wind_velocity_W=wind_velocity_W)
+
+
+def test_environmental_validation_follows_existing_parameter_validation() -> None:
+    with pytest.raises(ValueError, match="^mass must be positive$"):
+        RigidBodyParameters(0.0, np.eye(3), np.zeros(2))
+    with pytest.raises(ValueError, match=r"^inertia_B must have shape \(3, 3\)$"):
+        RigidBodyParameters(1.5, np.eye(2), np.zeros(2))
+    with pytest.raises(ValueError, match="^gravity_acceleration must be nonnegative$"):
+        WorldParameters(-1.0, np.zeros(2))
+
+
+def _environmental_mismatch_arguments(
+    *, drag: bool = False, wind: bool = False
+) -> dict[str, object]:
+    arguments = _matching_run_configuration_arguments()
+    nominal = arguments["nominal"]
+    assert isinstance(nominal, NominalConfiguration)
+    if drag:
+        nominal = replace(
+            nominal,
+            rigid_body=replace(
+                nominal.rigid_body,
+                quadratic_drag_coefficient_B=np.array([0.5, 0.0, 0.0]),
+            ),
+        )
+    if wind:
+        nominal = replace(
+            nominal,
+            world=replace(nominal.world, wind_velocity_W=np.array([1.0, 0.0, 0.0])),
+        )
+    arguments["nominal"] = nominal
+    return arguments
+
+
+@pytest.mark.parametrize(
+    ("parameter_path", "which_difference"),
+    [
+        ("rigid_body.quadratic_drag_coefficient_B", "drag"),
+        ("world.wind_velocity_W", "wind"),
+    ],
+)
+@pytest.mark.parametrize("declaration_mode", ["undeclared", "declared", "declared_equal"])
+def test_environmental_mismatches_require_exact_declarations(
+    parameter_path: str, which_difference: str, declaration_mode: str
+) -> None:
+    arguments = _environmental_mismatch_arguments(
+        drag=which_difference == "drag" and declaration_mode != "declared_equal",
+        wind=which_difference == "wind" and declaration_mode != "declared_equal",
+    )
+    if declaration_mode != "undeclared":
+        arguments["declared_mismatches"] = [
+            DeclaredMismatch(parameter_path, "Intentional environmental difference")
+        ]
+
+    if declaration_mode == "declared":
+        configuration = RunConfiguration(**arguments)
+        assert configuration.declared_mismatches[0].parameter_path == parameter_path
+        return
+
+    expected_prefix = (
+        "truth and nominal differ without a declared mismatch"
+        if declaration_mode == "undeclared"
+        else "declared mismatch has equal truth and nominal values"
+    )
+    with pytest.raises(
+        ValueError, match=rf"^{re.escape(expected_prefix + ': ' + parameter_path)}$"
+    ):
+        RunConfiguration(**arguments)
+
+
+def test_environmental_mismatch_registry_order_and_caller_declaration_order() -> None:
+    arguments = _environmental_mismatch_arguments(drag=True, wind=True)
+    drag_path = "rigid_body.quadratic_drag_coefficient_B"
+    wind_path = "world.wind_velocity_W"
+    with pytest.raises(
+        ValueError,
+        match=rf"^truth and nominal differ without a declared mismatch: {re.escape(drag_path)}$",
+    ):
+        RunConfiguration(**arguments)
+
+    arguments["declared_mismatches"] = [DeclaredMismatch(drag_path, "Drag differs")]
+    with pytest.raises(
+        ValueError,
+        match=rf"^truth and nominal differ without a declared mismatch: {re.escape(wind_path)}$",
+    ):
+        RunConfiguration(**arguments)
+
+    arguments["declared_mismatches"] = [
+        DeclaredMismatch(wind_path, "Wind first"),
+        DeclaredMismatch(drag_path, "Drag second"),
+    ]
+    configuration = RunConfiguration(**arguments)
+    assert tuple(item.parameter_path for item in configuration.declared_mismatches) == (
+        wind_path,
+        drag_path,
+    )
+
+
+def test_environmental_mismatch_unsupported_and_duplicate_precedence() -> None:
+    arguments = _environmental_mismatch_arguments(drag=True, wind=True)
+    drag_path = "rigid_body.quadratic_drag_coefficient_B"
+    arguments["declared_mismatches"] = [DeclaredMismatch("world.wind_W", "Unknown path")]
+    with pytest.raises(
+        ValueError, match=r"^declared mismatch parameter_path is not supported: world\.wind_W$"
+    ):
+        RunConfiguration(**arguments)
+
+    arguments["declared_mismatches"] = [
+        DeclaredMismatch(drag_path, "First"),
+        DeclaredMismatch(drag_path, "Second"),
+    ]
+    with pytest.raises(
+        ValueError, match="^declared_mismatches must not contain duplicate parameter_path values$"
+    ):
+        RunConfiguration(**arguments)

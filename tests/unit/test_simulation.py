@@ -1,11 +1,45 @@
 import numpy as np
 import pytest
 
+from quadrotor_math.integration import (
+    rigid_body_state_euler_step_from_rotor_speeds,
+    rigid_body_state_rk4_step_from_rotor_speeds,
+)
 from quadrotor_math.rotations import rotation_matrix_body_to_world
 from quadrotor_math.simulation import (
     simulate_rigid_body_euler_from_rotor_speeds,
     simulate_rigid_body_rk4_from_rotor_speeds,
 )
+
+
+def _level_hover_simulation(simulator, *, environment: dict[str, np.ndarray] | None = None):
+    if environment is None:
+        environment = {}
+    return simulator(
+        np.zeros(3, dtype=np.float64),
+        np.array([2.0, 0.0, 0.0], dtype=np.float64),
+        np.array([1.0, 0.0, 0.0, 0.0], dtype=np.float64),
+        np.zeros(3, dtype=np.float64),
+        np.full(4, 500.0, dtype=np.float64),
+        np.array(
+            [
+                [0.5, 0.0, 0.0],
+                [0.0, 0.5, 0.0],
+                [-0.5, 0.0, 0.0],
+                [0.0, -0.5, 0.0],
+            ],
+            dtype=np.float64,
+        ),
+        np.array([1.0, -1.0, 1.0, -1.0], dtype=np.float64),
+        1.0,
+        np.eye(3, dtype=np.float64),
+        10.0,
+        1.0e-5,
+        1.0e-6,
+        0.1,
+        3,
+        **environment,
+    )
 
 
 def test_simulate_rigid_body_rk4_from_rotor_speeds_returns_complete_history() -> None:
@@ -843,6 +877,100 @@ def test_simulators_preserve_balanced_hover_equilibrium(
         rtol=0.0,
         atol=1e-12,
     )
+
+
+@pytest.mark.parametrize(
+    ("simulator", "stepper"),
+    [
+        (
+            simulate_rigid_body_euler_from_rotor_speeds,
+            rigid_body_state_euler_step_from_rotor_speeds,
+        ),
+        (
+            simulate_rigid_body_rk4_from_rotor_speeds,
+            rigid_body_state_rk4_step_from_rotor_speeds,
+        ),
+    ],
+)
+def test_environmental_history_matches_repeated_public_steps(simulator, stepper) -> None:
+    wind_velocity_W = np.array([1.0, 0.0, 0.0])
+    coefficient_B = np.array([0.5, 0.0, 0.0])
+    environment = {
+        "wind_velocity_W": wind_velocity_W,
+        "quadratic_drag_coefficient_B": coefficient_B,
+    }
+    actual = _level_hover_simulation(simulator, environment=environment)
+
+    state = (
+        np.zeros(3, dtype=np.float64),
+        np.array([2.0, 0.0, 0.0], dtype=np.float64),
+        np.array([1.0, 0.0, 0.0, 0.0], dtype=np.float64),
+        np.zeros(3, dtype=np.float64),
+    )
+    expected_states = [[value.copy()] for value in state]
+    for _ in range(3):
+        state = stepper(
+            *state,
+            np.full(4, 500.0, dtype=np.float64),
+            np.array(
+                [
+                    [0.5, 0.0, 0.0],
+                    [0.0, 0.5, 0.0],
+                    [-0.5, 0.0, 0.0],
+                    [0.0, -0.5, 0.0],
+                ]
+            ),
+            np.array([1.0, -1.0, 1.0, -1.0]),
+            1.0,
+            np.eye(3),
+            10.0,
+            1.0e-5,
+            1.0e-6,
+            0.1,
+            **environment,
+        )
+        for expected_component, state_component in zip(expected_states, state, strict=True):
+            expected_component.append(state_component.copy())
+
+    np.testing.assert_array_equal(actual[0], np.arange(4, dtype=np.float64) * 0.1)
+    for actual_history, expected_history in zip(actual[1:], expected_states, strict=True):
+        np.testing.assert_array_equal(actual_history, np.asarray(expected_history))
+
+
+@pytest.mark.parametrize(
+    "simulator",
+    [
+        simulate_rigid_body_euler_from_rotor_speeds,
+        simulate_rigid_body_rk4_from_rotor_speeds,
+    ],
+)
+def test_environmental_history_preserves_zero_regression_and_array_contracts(simulator) -> None:
+    omitted = _level_hover_simulation(simulator)
+    explicit_zero = _level_hover_simulation(
+        simulator,
+        environment={
+            "wind_velocity_W": np.zeros(3),
+            "quadratic_drag_coefficient_B": np.zeros(3),
+        },
+    )
+    with_drag = _level_hover_simulation(
+        simulator,
+        environment={
+            "wind_velocity_W": np.zeros(3),
+            "quadratic_drag_coefficient_B": np.array([0.5, 0.0, 0.0]),
+        },
+    )
+
+    expected_shapes = ((4,), (4, 3), (4, 3), (4, 4), (4, 3))
+    for omitted_array, explicit_array, shape in zip(
+        omitted, explicit_zero, expected_shapes, strict=True
+    ):
+        np.testing.assert_array_equal(explicit_array, omitted_array)
+        assert omitted_array.dtype == np.float64
+        assert omitted_array.shape == shape
+        assert omitted_array.flags.owndata
+        assert omitted_array.flags.writeable
+    assert not np.array_equal(with_drag[2], omitted[2])
 
 
 @pytest.mark.parametrize(

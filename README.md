@@ -85,11 +85,27 @@ artifact schema. Published in commit `4cc132af291f9352b8145e6397482e8a632e76fd`,
 `generate_run_artifact_data` composes motor response, truth propagation, bias evolution,
 scheduled sensors, and named randomness into a complete in-memory run.
 
+Gate G1 is locally complete and publication-ready, but it has not been published. The local
+implementation adds constant NED wind and anisotropic FRD quadratic drag, including validated
+truth/nominal configuration and declared environmental mismatches. Drag is recomputed from
+the current velocity and projected attitude at every derivative evaluation, including all
+four projected-RK4 stages. Truth environmental changes alter trajectories and accelerometer
+truth, while properly declared nominal-only environmental changes leave all 35 artifact
+arrays exactly unchanged, including with sensor noise and bias random walks enabled.
+
+Environmental manifests use versions 5 and 6 for unbound and SHA-256-bound runs,
+respectively, with either historical ideal or complete motorized actuation. Versions 1/2
+remain the historical zero-environment unbound/bound pair, and versions 3/4 remain the
+motorized zero-environment pair. The 35-array artifact schema is unchanged. In the tested
+environment, environmental v5-save/v6-load replay reproduces all arrays and both canonical
+files exactly. The final local gate passes all 1,362 tests, Ruff lint and formatting, and
+mypy. Publication still requires explicit authorization.
+
 The repository does not yet contain a reusable physically conditional invariant-monitoring
 API, a closed-loop controller, a state estimator, adaptive integration, robustness campaigns,
-or a completed ROS 2/PX4 integration layer. Structural validation and test-local physical
-characterization are foundations for later reference scenarios, but this milestone does not
-complete Gate G1.
+or a completed ROS 2/PX4 integration layer. The next bounded milestone is state-estimation
+design, beginning with the 15-state error-state Kalman filter conventions, process/noise
+model, propagation equations, and Jacobian verification.
 
 ## Current end-to-end pipeline
 
@@ -98,13 +114,15 @@ flowchart TD
     A[Constant rotor-speed command] --> B{Motor mode}
     B -->|Historical ideal actuation| C[Actual rotor speed]
     B -->|Truth motor response| C
-    C --> D[FRD actuation and Euler or projected RK4 truth step]
-    D --> E[Truth and bias histories]
+    C --> D[FRD rotor force plus per-evaluation quadratic drag]
+    J[Truth NED wind and FRD drag coefficients] --> D
+    D --> K[Euler or projected RK4 truth step]
+    K --> E[Truth and bias histories]
     E --> F[Scheduled acquisition and delivery]
     G[Six named RNG streams] --> E
     G --> F
     F --> H[35-array RunArtifactData]
-    H -->|Explicit save| I[Bound v2 or v4 run directory]
+    H -->|Explicit save| I[Bound v2, v4, or v6 run directory]
 ```
 
 The actuation model converts four nonnegative rotor angular speeds into static thrust
@@ -124,9 +142,12 @@ that validator without modification.
 `generate_run_artifact_data(configuration)` uses the configured rotor-speed command directly
 in historical ideal-actuator mode. Complete motorized configurations advance a private actual
 rotor-speed history with truth motor parameters before each state transition. The generator
-then advances accelerometer and gyroscope biases, samples four scheduled sensors from the
-completed truth row, and records acquisitions and deliveries in the unchanged 35-array
-artifact. Actual rotor-speed history is reconstructed during generation but is not persisted.
+combines rotor force with truth environmental drag at every derivative evaluation, then
+advances accelerometer and gyroscope biases, samples four scheduled sensors from the completed
+truth row, and records acquisitions and deliveries in the unchanged 35-array artifact. The
+accelerometer truth calculation uses the same environmental derivative as propagation.
+Properly declared nominal-only wind or drag changes do not affect physical or stochastic
+artifact data. Actual rotor-speed history is reconstructed during generation but is not persisted.
 The allocator is not invoked because the configuration already supplies rotor-speed commands;
 allocation is upstream of this boundary when a future controller supplies thrust and moment
 demands. Saving a run directory remains an explicit separate call.
@@ -163,11 +184,35 @@ velocity_derivative_W =
 ```
 
 Here `gravity_W = [0, 0, gravity_acceleration]` in m/s², `force_B` is the net rotor force in
-the FRD body frame in newtons, `R_WB` maps body-coordinate vectors into NED world
+the historical zero-environment case and the combined rotor-plus-drag force otherwise, in the
+FRD body frame in newtons. `R_WB` maps body-coordinate vectors into NED world
 coordinates, and `mass` is in kilograms.
 
 **Practical interpretation.** Gravity and the rotated rotor force determine how world-frame
 velocity changes. Position changes at the current world-frame velocity.
+
+### Constant wind and anisotropic quadratic drag
+
+The environmental model uses one constant wind vector in NED world coordinates and one
+nonnegative coefficient per FRD body axis:
+
+```text
+velocity_air_W = velocity_W - wind_velocity_W
+velocity_air_B = R_WB.T @ velocity_air_W
+force_drag_B = (
+    -quadratic_drag_coefficient_B
+    * abs(velocity_air_B)
+    * velocity_air_B
+)
+```
+
+Both velocity vectors use m/s, `quadratic_drag_coefficient_B` uses kg/m, and
+`force_drag_B` uses newtons. The force is dissipative relative to the air:
+`force_drag_B @ velocity_air_B <= 0`. It acts at the modelled centre of mass, so this
+milestone introduces no aerodynamic moment. Euler evaluates it once at the current state;
+projected RK4 evaluates it independently at all four stage velocities and projected
+attitudes. The model contains no gust, turbulence, air-density decomposition, aerodynamic
+moment, clipping, saturation, CFD, or blade-element approximation.
 
 ### Rotational dynamics
 
@@ -790,22 +835,28 @@ Version 2 adds only this binding object:
 }
 ```
 
-The published Run 3 extension selects the manifest version from configuration completeness and
-binding presence:
+The manifest version is selected from environmental state, motor completeness, and binding
+presence:
 
-| Configuration | Unbound | SHA-256 bound |
-| --- | ---: | ---: |
-| Historical | Version 1 | Version 2 |
-| Complete motorized | Version 3 | Version 4 |
+| Environment | Motor mode | Unbound | SHA-256 bound |
+| --- | --- | ---: | ---: |
+| All environmental arrays zero | Historical | Version 1 | Version 2 |
+| All environmental arrays zero | Complete motorized | Version 3 | Version 4 |
+| Any environmental element nonzero | Historical | Version 5 | Version 6 |
+| Any environmental element nonzero | Complete motorized | Version 5 | Version 6 |
 
 Versions 1 and 2 retain their historical canonical representation. Versions 3 and 4 persist
 the three motor fields in both truth and nominal rotor objects, plus
-`initial_actual_rotor_omega`. Partial motor configurations are rejected rather than
-silently downgraded. Decoding requires exact version-specific top-level, run-configuration,
-and truth/nominal rotor-object member sets. Duplicate JSON keys, nonstandard numeric
-constants, malformed versions or bindings, inconsistent derived duration, and invalid
-configuration values are rejected. Canonical encoding is deterministic, compact, sorted,
-finite UTF-8 JSON with no trailing newline.
+`initial_actual_rotor_omega`. Versions 5 and 6 add truth and nominal
+`quadratic_drag_coefficient_B` and `wind_velocity_W`, while retaining the version-3/4 motor
+field layout. Historical environmental manifests encode all six rotor motor scalars and the
+initial actual speed as JSON `null`; motorized environmental manifests require every value.
+Partial motor configurations are rejected rather than silently downgraded. Decoding requires
+exact version-specific top-level, run-configuration, and parameter-object member sets, and a
+manually labelled v5/v6 document with four all-zero environmental arrays is rejected.
+Duplicate JSON keys, nonstandard numeric constants, malformed versions or bindings,
+inconsistent derived duration, and invalid configuration values are rejected. Canonical
+encoding is deterministic, compact, sorted, finite UTF-8 JSON with no trailing newline.
 
 Invalid keys, types, versions, and digests are rejected rather than normalized. Run 2B saves
 one run directory with exactly two entries:
@@ -817,8 +868,8 @@ run-directory/
 ```
 
 `manifest.json` is canonical UTF-8 JSON. `data.npz` is a deterministic, uncompressed NumPy
-archive. Versions 2 and 4 bind the exact archive bytes by SHA-256; unbound versions 1 and 3
-cannot be loaded as run directories.
+archive. Versions 2, 4, and 6 bind the exact archive bytes by SHA-256; unbound versions 1, 3,
+and 5 cannot be loaded as run directories.
 
 `RunArtifactData` is frozen, slotted, and identity-equal. Its 35 explicitly ordered NumPy
 arrays comprise truth and command histories; six aligned arrays for each of four sensor
@@ -838,8 +889,9 @@ tolerance of `1.0e-12` seconds; this is not a general simulation tolerance.
 `save_run_directory` requires an absent destination and checks compatibility before NPZ
 encoding or filesystem staging. It encodes the NPZ in memory, hashes those exact bytes, and
 returns a distinct bound manifest without changing the caller's manifest: historical v1
-input becomes v2, and complete motorized v3 input becomes v4. In the destination's parent
-directory, it writes and individually fsyncs `data.npz` and
+input becomes v2, complete motorized v3 input becomes v4, and environmental v5 input becomes
+v6 for either actuator mode. In the destination's parent directory, it writes and
+individually fsyncs `data.npz` and
 `manifest.json`, fsyncs their staging directory, publishes with one Linux `renameat2` call
 using `RENAME_NOREPLACE`, and fsyncs the parent. Failures before publication clean staging;
 a racing destination is never replaced. There is no overwrite mode. If the final parent
@@ -851,7 +903,8 @@ SHA-256 before NPZ parsing, decodes with `allow_pickle=False`, requires exactly 
 expected logical members, and validates the decoded artifact against the manifest before
 returning the bound manifest and immutable data.
 
-The existing 35-array artifact schema did not change for motorization. It stores
+The existing 35-array artifact schema did not change for motorization or the environmental
+model. It stores
 `commanded_rotor_omega`, but not an actual rotor-speed trajectory. The persisted initial
 actual speed, truth motor parameters, command history, truth step, and fixed motor update
 policy suffice to reconstruct that trajectory under the current deterministic model;
@@ -1204,11 +1257,13 @@ The full convention, state shapes, signs, and hover sanity check are defined in 
   groups, initial truth state, fixed truth numerics, four sensor schedules, constant rotor
   input, root seed, and declared mismatch ownership.
 - Exact cross-field truth-grid schedule validation and exact array-aware mismatch-set
-  validation over 21 supported parameter paths, including three motor parameters.
+  validation over 23 supported parameter paths, including motor, NED wind, and FRD
+  quadratic-drag parameters.
 - Six persistent named random generators derived through versioned explicit stream IDs,
   `SeedSequence(..., pool_size=4)`, and explicit `PCG64` construction.
-- Canonical historical version-1/2 and motorized version-3/4 run manifests with exact
-  version-specific schemas and SHA-256 binding in versions 2 and 4.
+- Canonical manifest versions 1–6 with exact version-specific schemas: historical
+  zero-environment v1/v2, motorized zero-environment v3/v4, and environmental v5/v6 for
+  either actuator mode, with SHA-256 binding in versions 2, 4, and 6.
 - An immutable 35-array NPZ run artifact with shared configuration validation, authenticated
   loading, and durable Linux no-replace directory publication.
 - A complete in-memory run generator combining truth motor response, Euler or projected-RK4
@@ -1222,12 +1277,16 @@ The full convention, state shapes, signs, and hover sanity check are defined in 
   collective-thrust/body-moment allocation to ordered rotor-speed commands.
 - FRD collective thrust force, offset thrust moment, and yaw reaction moment.
 - Combined FRD body force and moment from rotor speeds.
+- Constant NED wind and nonnegative anisotropic FRD quadratic-drag coefficients, with a pure
+  dissipative centre-of-mass drag-force boundary and no aerodynamic moment.
 - NED translational acceleration from body force and uniform gravity.
 - FRD rotational acceleration with gyroscopic coupling.
 - Complete rigid-body state derivative from an applied body wrench.
-- Complete rigid-body state derivative directly from rotor speeds.
+- Complete rigid-body state derivative directly from rotor speeds, including optional
+  current-state quadratic drag while preserving exact historical zero-environment arithmetic.
 - Explicit-Euler state propagation with quaternion normalization as a transparent baseline.
-- Fixed-step RK4 propagation of the complete rigid-body state.
+- Fixed-step RK4 propagation of the complete rigid-body state, with environmental drag
+  recomputed from each stage velocity and projected attitude.
 - Intermediate and final quaternion normalization during RK4 propagation.
 - Finite positive RK4 time-step validation.
 - Deterministic constant-input multi-step Euler simulation with time-aligned state histories.
@@ -1351,6 +1410,15 @@ arrays exactly, as well as the canonical manifest and NPZ bytes in the tested en
 This follow-up passed 15 generator tests, 668 related tests, and 1,241 full-suite tests;
 `make check` passed with 1,241 tests, Ruff, formatting, and mypy.
 
+The final local Gate G1 environmental audit passed 865 focused dynamics, integration,
+simulation, configuration, manifest, artifact, and generation tests and all 1,362 repository
+tests. Ruff lint passed, Ruff format verification reported 69 files already formatted,
+and mypy found no issues in 18 source files. An independent fixed-seed probe checked 4,096
+finite anisotropic drag cases and found no positive relative-air power. A separate
+fixed-final-time probe of `dv/dt = -0.5 * abs(v) * v`, `v(0) = 2`, observed RK4 orders
+3.888, 3.977, 3.995, and 3.999 under successive step halving. This is local
+publication-readiness evidence, not publication or a cross-platform reproducibility claim.
+
 ## Repository structure
 
 - `src/quadrotor_math/`: ROS/PX4-independent vector, randomness, rotation, actuation,
@@ -1361,7 +1429,7 @@ This follow-up passed 15 generator tests, 668 related tests, and 1,241 full-suit
 - `experiments/`: reproducible numerical studies built from the public mathematical core.
 - `tests/unit/`: focused unit and composition tests for the mathematical core.
 - `docs/architecture/`: architectural contracts, including frames and state conventions.
-- `docs/decisions/`: accepted workflow and frame-convention decisions.
+- `docs/decisions/`: accepted workflow, frame-convention, and environmental-model decisions.
 - `docs/environment.md`: recorded host, toolchain, ROS 2, Gazebo, and PX4 environment details.
 - `docs/progress/`: dated engineering progress records.
 
@@ -1417,15 +1485,18 @@ This follow-up passed 15 generator tests, 668 related tests, and 1,241 full-suit
   and authenticated artifacts. Published Run 3 adds motorized configuration and persistence;
   the published generator assembles one complete in-memory run. Saving remains explicit. No
   separate replay API or persisted actual rotor-speed history is provided.
-- Truth and nominal configuration are structurally separate, and a generator test confirms
-  selected nominal perturbations do not change generated data. Deliberate mismatch effects
-  in simulation, including future wind and drag parameters, are not implemented.
+- Truth and nominal configuration are structurally separate. Constant NED wind and
+  anisotropic FRD quadratic drag support declared truth/nominal differences; tested
+  truth-side changes alter physical propagation and accelerometer truth, while declared
+  nominal-only changes leave all 35 artifact arrays exactly unchanged.
 - No Monte Carlo campaign exists yet.
 - No completed ROS 2/PX4 adapter exists yet.
 - The existing multi-step rigid-body simulators represent static quadratic rotor thrust,
   thrust-offset and yaw reaction moments, uniform gravity, rigid-body inertia, gyroscopic
-  coupling, and quaternion kinematics. Published motor-transient and allocation functions
-  remain separate; aerodynamic, contact, and environmental effects are not modeled.
+  coupling, quaternion kinematics, constant NED wind, and lumped anisotropic FRD quadratic
+  drag. They do not model gusts, turbulence, aerodynamic moments, air-density/Cd/area
+  decomposition, CFD or blade-element aerodynamics, contact, or ground effect. Published
+  motor-transient and allocation functions remain separate.
 
 Explicit Euler is useful because each update is transparent and easy to verify against the
 continuous equations. Its first-order accuracy and error accumulation make it unsuitable as
@@ -1442,6 +1513,10 @@ the final high-accuracy simulation method, especially for larger time steps or l
    4, and complete-run generation are complete. Historical and motorized deterministic replay
    evidence is locally verified. Generation assembles in-memory data; callers explicitly save
    run directories. Allocation stays upstream, and actual rotor-speed history stays private.
-4. The next bounded milestone is deliberate truth/nominal mismatch evidence and environmental
-   wind/drag effects. Gate G1 remains open. Estimation, control, uncertainty campaigns, Monte
-   Carlo validation, ROS 2, PX4, and C++ integration remain future work.
+4. Gate G1 constant-wind/quadratic-drag implementation, deliberate environmental mismatch
+   evidence, manifest v5/v6 persistence, and exact tested-environment replay are locally
+   complete and publication-ready, but not yet published.
+5. The next bounded milestone is state-estimation design, beginning with 15-state error-state
+   Kalman filter conventions, process/noise model, propagation equations, and Jacobian
+   verification. Control, uncertainty campaigns, Monte Carlo validation, ROS 2, PX4, and C++
+   integration remain future work.

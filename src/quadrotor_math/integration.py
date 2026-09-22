@@ -21,6 +21,9 @@ def rigid_body_state_euler_step_from_rotor_speeds(
     thrust_coefficient: float,
     moment_coefficient: float,
     time_step: float,
+    *,
+    wind_velocity_W: NDArray[np.float64] | None = None,
+    quadratic_drag_coefficient_B: NDArray[np.float64] | None = None,
 ) -> tuple[
     NDArray[np.float64],
     NDArray[np.float64],
@@ -51,6 +54,11 @@ def rigid_body_state_euler_step_from_rotor_speeds(
         thrust_coefficient: Scalar thrust coefficient in N/(rad/s)^2.
         moment_coefficient: Scalar moment coefficient in N·m/(rad/s)^2.
         time_step: Explicit-Euler integration interval in seconds.
+        wind_velocity_W: Optional constant wind velocity with shape ``(3,)``
+            in the NED world frame in m/s. Omission means calm air.
+        quadratic_drag_coefficient_B: Optional nonnegative per-body-axis
+            quadratic drag coefficients with shape ``(3,)`` in kg/m.
+            Omission means exact zero drag.
 
     Returns:
         A tuple containing, in order, ``next_position_W`` with shape ``(3,)``
@@ -89,6 +97,8 @@ def rigid_body_state_euler_step_from_rotor_speeds(
         gravity_acceleration,
         thrust_coefficient,
         moment_coefficient,
+        wind_velocity_W=wind_velocity_W,
+        quadratic_drag_coefficient_B=quadratic_drag_coefficient_B,
     )
 
     next_position_W = position_W + time_step * position_derivative_W
@@ -120,6 +130,9 @@ def rigid_body_state_rk4_step_from_rotor_speeds(
     thrust_coefficient: float,
     moment_coefficient: float,
     time_step: float,
+    *,
+    wind_velocity_W: NDArray[np.float64] | None = None,
+    quadratic_drag_coefficient_B: NDArray[np.float64] | None = None,
 ) -> tuple[
     NDArray[np.float64],
     NDArray[np.float64],
@@ -160,6 +173,11 @@ def rigid_body_state_rk4_step_from_rotor_speeds(
         thrust_coefficient: Scalar thrust coefficient in N/(rad/s)^2.
         moment_coefficient: Scalar moment coefficient in N·m/(rad/s)^2.
         time_step: Fixed RK4 integration interval in seconds.
+        wind_velocity_W: Optional constant wind velocity with shape ``(3,)``
+            in the NED world frame in m/s. Omission means calm air.
+        quadratic_drag_coefficient_B: Optional nonnegative per-body-axis
+            quadratic drag coefficients with shape ``(3,)`` in kg/m.
+            Omission means exact zero drag.
 
     Returns:
         A tuple containing, in order, ``next_position_W`` with shape ``(3,)``
@@ -197,6 +215,8 @@ def rigid_body_state_rk4_step_from_rotor_speeds(
         gravity_acceleration,
         thrust_coefficient,
         moment_coefficient,
+        wind_velocity_W=wind_velocity_W,
+        quadratic_drag_coefficient_B=quadratic_drag_coefficient_B,
     )
 
     position_k2_W = position_W + 0.5 * time_step * k1_position_W
@@ -221,6 +241,8 @@ def rigid_body_state_rk4_step_from_rotor_speeds(
         gravity_acceleration,
         thrust_coefficient,
         moment_coefficient,
+        wind_velocity_W=wind_velocity_W,
+        quadratic_drag_coefficient_B=quadratic_drag_coefficient_B,
     )
 
     position_k3_W = position_W + 0.5 * time_step * k2_position_W
@@ -245,6 +267,8 @@ def rigid_body_state_rk4_step_from_rotor_speeds(
         gravity_acceleration,
         thrust_coefficient,
         moment_coefficient,
+        wind_velocity_W=wind_velocity_W,
+        quadratic_drag_coefficient_B=quadratic_drag_coefficient_B,
     )
 
     position_k4_W = position_W + time_step * k3_position_W
@@ -269,6 +293,8 @@ def rigid_body_state_rk4_step_from_rotor_speeds(
         gravity_acceleration,
         thrust_coefficient,
         moment_coefficient,
+        wind_velocity_W=wind_velocity_W,
+        quadratic_drag_coefficient_B=quadratic_drag_coefficient_B,
     )
 
     next_position_W = position_W + (time_step / 6.0) * (

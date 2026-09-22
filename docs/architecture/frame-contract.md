@@ -89,6 +89,55 @@ including zero yaw relative to north, `R_WB = I`. A vehicle can be level without
 collective thrust force is `[0, 0, -T]`. Force equilibrium therefore requires
 `T = mg`.
 
+## Environmental Wind and Quadratic Drag
+
+The environmental model uses constant wind in the NED world frame and lumped anisotropic
+quadratic coefficients along the FRD body axes.
+
+| Name | Meaning | Frame | Shape | Units |
+| --- | --- | --- | --- | --- |
+| `wind_velocity_W` | Velocity of the air relative to the world | `W` (NED) | `(3,)` | m/s |
+| `velocity_air_W` | Vehicle velocity relative to the air | `W` (NED) | `(3,)` | m/s |
+| `velocity_air_B` | Vehicle velocity relative to the air, resolved on body axes | `B` (FRD) | `(3,)` | m/s |
+| `quadratic_drag_coefficient_B` | Nonnegative lumped quadratic coefficient per body axis | `B` (FRD axes) | `(3,)` | kg/m |
+| `force_drag_B` | Aerodynamic drag force applied at the modelled centre of mass | `B` (FRD) | `(3,)` | N |
+
+The exact equations are
+
+$$
+velocity\_air_W = velocity_W - wind\_velocity_W,
+$$
+
+$$
+velocity\_air_B = R_{WB}^{T} velocity\_air_W,
+$$
+
+and, element by element,
+
+$$
+force\_drag_B = -quadratic\_drag\_coefficient_B
+\odot |velocity\_air_B| \odot velocity\_air_B.
+$$
+
+Here $\odot$ denotes elementwise multiplication. Because every coefficient is nonnegative,
+the force cannot add power relative to the air:
+
+$$
+force\_drag_B^{T} velocity\_air_B
+= -\sum_i c_i |v_i|^3 \le 0.
+$$
+
+For the identity attitude, a vehicle moving north at `+2 m/s` in calm air has positive
+forward relative-air velocity and therefore negative-forward drag. A stationary vehicle in
+a northward wind of `+1 m/s` has negative-forward relative-air velocity and therefore
+positive-forward drag: the wind pushes it north. These signs follow from defining relative
+air velocity as vehicle velocity minus wind velocity.
+
+The drag force acts at the modelled centre of mass and introduces no aerodynamic moment.
+It is recomputed from the current velocity and attitude at every derivative evaluation;
+projected RK4 therefore uses the separate velocity and projected attitude of each of its four
+stages.
+
 ## Boundaries and Naming
 
 ROS ENU/FLU conversions will be isolated in adapter functions when integration

@@ -138,6 +138,85 @@ def _artifact_bound_manifest() -> RunManifest:
     )
 
 
+def _with_complete_motor_configuration(configuration: RunConfiguration) -> RunConfiguration:
+    motor_parameters = {
+        "minimum_rotor_omega": 100.0,
+        "maximum_rotor_omega": 1000.0,
+        "motor_time_constant_s": 0.2,
+    }
+    return replace(
+        configuration,
+        truth=replace(
+            configuration.truth,
+            rotors=replace(configuration.truth.rotors, **motor_parameters),
+        ),
+        nominal=replace(
+            configuration.nominal,
+            rotors=replace(configuration.nominal.rotors, **motor_parameters),
+        ),
+        initial_actual_rotor_omega=np.array(
+            [100.0, 300.0, 700.0, 1000.0],
+            dtype=np.float64,
+        ),
+    )
+
+
+def _environmental_configuration(
+    *,
+    motorized: bool = False,
+    truth_drag_B: NDArray[np.float64] | None = None,
+    nominal_drag_B: NDArray[np.float64] | None = None,
+    truth_wind_W: NDArray[np.float64] | None = None,
+    nominal_wind_W: NDArray[np.float64] | None = None,
+) -> RunConfiguration:
+    configuration = _run_configuration()
+    if truth_drag_B is None:
+        truth_drag_B = np.array([0.5, 0.25, 0.0], dtype=np.float64)
+    if nominal_drag_B is None:
+        nominal_drag_B = np.array([0.4, 0.2, 0.0], dtype=np.float64)
+    if truth_wind_W is None:
+        truth_wind_W = np.array([1.0, -2.0, 0.5], dtype=np.float64)
+    if nominal_wind_W is None:
+        nominal_wind_W = np.array([0.5, -1.0, 0.0], dtype=np.float64)
+
+    mismatches = list(configuration.declared_mismatches)
+    if not np.array_equal(truth_drag_B, nominal_drag_B):
+        mismatches.append(
+            DeclaredMismatch(
+                "rigid_body.quadratic_drag_coefficient_B",
+                "Exercise an intentional quadratic-drag mismatch.",
+            )
+        )
+    if not np.array_equal(truth_wind_W, nominal_wind_W):
+        mismatches.append(
+            DeclaredMismatch(
+                "world.wind_velocity_W",
+                "Exercise an intentional wind mismatch.",
+            )
+        )
+    configuration = replace(
+        configuration,
+        truth=replace(
+            configuration.truth,
+            rigid_body=replace(
+                configuration.truth.rigid_body,
+                quadratic_drag_coefficient_B=truth_drag_B,
+            ),
+            world=replace(configuration.truth.world, wind_velocity_W=truth_wind_W),
+        ),
+        nominal=replace(
+            configuration.nominal,
+            rigid_body=replace(
+                configuration.nominal.rigid_body,
+                quadratic_drag_coefficient_B=nominal_drag_B,
+            ),
+            world=replace(configuration.nominal.world, wind_velocity_W=nominal_wind_W),
+        ),
+        declared_mismatches=tuple(mismatches),
+    )
+    return _with_complete_motor_configuration(configuration) if motorized else configuration
+
+
 @pytest.mark.parametrize(
     ("status_stdout", "expected_clean"),
     [
@@ -371,6 +450,194 @@ def test_encode_run_manifest_produces_complete_canonical_utf8_bytes() -> None:
     assert type(encoded_bytes) is bytes
     assert encoded_bytes == expected_bytes
     assert json.loads(encoded_bytes) == expected_mapping
+
+
+@pytest.mark.parametrize(
+    ("environmental", "motorized", "bound", "expected_version"),
+    [
+        (False, False, False, 1),
+        (False, False, True, 2),
+        (False, True, False, 3),
+        (False, True, True, 4),
+        (True, False, False, 5),
+        (True, False, True, 6),
+        (True, True, False, 5),
+        (True, True, True, 6),
+    ],
+)
+def test_encode_run_manifest_selects_complete_environment_motor_binding_version_matrix(
+    environmental: bool,
+    motorized: bool,
+    bound: bool,
+    expected_version: int,
+) -> None:
+    configuration = _environmental_configuration(motorized=motorized)
+    if not environmental:
+        configuration = _run_configuration()
+        if motorized:
+            configuration = _with_complete_motor_configuration(configuration)
+    manifest = RunManifest(
+        configuration,
+        _software_provenance(),
+        _DATA_NPZ_SHA256 if bound else None,
+    )
+
+    mapping = json.loads(encode_run_manifest(manifest))
+
+    assert mapping["schema"] == {
+        "name": RUN_MANIFEST_SCHEMA_NAME,
+        "version": expected_version,
+    }
+
+
+@pytest.mark.parametrize("motorized", [False, True])
+@pytest.mark.parametrize("bound", [False, True])
+def test_encode_environmental_manifest_has_exact_v5_v6_schema_and_canonical_bytes(
+    motorized: bool,
+    bound: bool,
+) -> None:
+    configuration = _environmental_configuration(motorized=motorized)
+    provenance = _software_provenance()
+    manifest = RunManifest(
+        configuration,
+        provenance,
+        _DATA_NPZ_SHA256 if bound else None,
+    )
+    source_snapshots = [
+        (array.copy(), array.flags.writeable)
+        for array in _configuration_owned_arrays(configuration)
+    ]
+
+    encoded_bytes = encode_run_manifest(manifest)
+    repeated_bytes = encode_run_manifest(manifest)
+    mapping = cast(dict[str, object], json.loads(encoded_bytes))
+
+    assert cast(dict[str, object], mapping["schema"])["version"] == (6 if bound else 5)
+    assert set(mapping) == (
+        {
+            "data_artifact",
+            "randomness",
+            "run_configuration",
+            "schema",
+            "software_provenance",
+        }
+        if bound
+        else {"randomness", "run_configuration", "schema", "software_provenance"}
+    )
+    if bound:
+        assert mapping["data_artifact"] == {"sha256": _DATA_NPZ_SHA256}
+    else:
+        assert "data_artifact" not in mapping
+
+    encoded_configuration = cast(dict[str, object], mapping["run_configuration"])
+    assert set(encoded_configuration) == {
+        "declared_mismatches",
+        "initial_actual_rotor_omega",
+        "initial_truth_state",
+        "nominal",
+        "numerics",
+        "root_seed",
+        "rotor_speed_input",
+        "sensor_schedules",
+        "truth",
+    }
+    expected_motor_values = {
+        "minimum_rotor_omega": 100.0 if motorized else None,
+        "maximum_rotor_omega": 1000.0 if motorized else None,
+        "motor_time_constant_s": 0.2 if motorized else None,
+    }
+    assert encoded_configuration["initial_actual_rotor_omega"] == (
+        [100.0, 300.0, 700.0, 1000.0] if motorized else None
+    )
+    for group_name, source_group in (
+        ("truth", configuration.truth),
+        ("nominal", configuration.nominal),
+    ):
+        encoded_group = cast(dict[str, object], encoded_configuration[group_name])
+        assert set(encoded_group) == {"imu", "position_sensors", "rigid_body", "rotors", "world"}
+        encoded_rigid_body = cast(dict[str, object], encoded_group["rigid_body"])
+        assert set(encoded_rigid_body) == {
+            "inertia_B",
+            "mass",
+            "quadratic_drag_coefficient_B",
+        }
+        assert encoded_rigid_body["mass"] == source_group.rigid_body.mass
+        assert encoded_rigid_body["inertia_B"] == source_group.rigid_body.inertia_B.tolist()
+        assert encoded_rigid_body["quadratic_drag_coefficient_B"] == (
+            source_group.rigid_body.quadratic_drag_coefficient_B.tolist()
+        )
+        encoded_world = cast(dict[str, object], encoded_group["world"])
+        assert set(encoded_world) == {"gravity_acceleration", "wind_velocity_W"}
+        assert encoded_world["gravity_acceleration"] == source_group.world.gravity_acceleration
+        assert encoded_world["wind_velocity_W"] == source_group.world.wind_velocity_W.tolist()
+        encoded_rotors = cast(dict[str, object], encoded_group["rotors"])
+        assert set(encoded_rotors) == {
+            "maximum_rotor_omega",
+            "minimum_rotor_omega",
+            "moment_coefficient",
+            "motor_time_constant_s",
+            "rotor_positions_B",
+            "rotor_spin_directions",
+            "thrust_coefficient",
+        }
+        for parameter_name, expected_value in expected_motor_values.items():
+            assert encoded_rotors[parameter_name] == expected_value
+
+    assert encoded_bytes == json.dumps(
+        mapping,
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    ).encode("utf-8")
+    assert encoded_bytes == repeated_bytes
+    assert not encoded_bytes.endswith(b"\n")
+    for source_array, (expected_values, expected_writeable) in zip(
+        _configuration_owned_arrays(configuration), source_snapshots, strict=True
+    ):
+        np.testing.assert_array_equal(source_array, expected_values)
+        assert source_array.flags.writeable is expected_writeable
+    assert manifest.run_configuration is configuration
+    assert manifest.software_provenance is provenance
+
+
+@pytest.mark.parametrize("bound", [False, True])
+@pytest.mark.parametrize(
+    "configuration",
+    [
+        _environmental_configuration(
+            truth_drag_B=np.zeros(3),
+            nominal_drag_B=np.zeros(3),
+            truth_wind_W=np.array([1.0, 0.0, 0.0]),
+            nominal_wind_W=np.array([1.0, 0.0, 0.0]),
+        ),
+        _environmental_configuration(
+            truth_drag_B=np.array([0.5, 0.0, 0.0]),
+            nominal_drag_B=np.array([0.5, 0.0, 0.0]),
+            truth_wind_W=np.zeros(3),
+            nominal_wind_W=np.zeros(3),
+        ),
+        _environmental_configuration(
+            truth_drag_B=np.zeros(3),
+            nominal_drag_B=np.array([0.5, 0.0, 0.0]),
+            truth_wind_W=np.zeros(3),
+            nominal_wind_W=np.zeros(3),
+        ),
+    ],
+    ids=["wind-only", "coefficient-only", "nominal-only"],
+)
+def test_encode_any_nonzero_environment_selects_v5_v6(
+    configuration: RunConfiguration,
+    bound: bool,
+) -> None:
+    manifest = RunManifest(
+        configuration,
+        _software_provenance(),
+        _DATA_NPZ_SHA256 if bound else None,
+    )
+
+    mapping = json.loads(encode_run_manifest(manifest))
+
+    assert mapping["schema"]["version"] == (6 if bound else 5)
 
 
 def test_encode_run_manifest_persists_complete_motorized_unbound_configuration() -> None:
@@ -771,10 +1038,14 @@ def test_decode_run_manifest_round_trips_complete_motorized_unbound_configuratio
         pytest.param("truth-motor-model", id="missing-truth-motor-model"),
     ],
 )
+@pytest.mark.parametrize("environmental", [False, True], ids=["calm", "environmental"])
 def test_encode_run_manifest_rejects_incomplete_motor_configuration(
     missing_component: str,
+    environmental: bool,
 ) -> None:
-    historical_configuration = _run_configuration()
+    historical_configuration = (
+        _environmental_configuration() if environmental else _run_configuration()
+    )
     truth_rotors = historical_configuration.truth.rotors
     nominal_rotors = historical_configuration.nominal.rotors
     if missing_component != "truth-motor-model":
@@ -861,8 +1132,10 @@ def _configuration_owned_arrays(
 ) -> tuple[NDArray[np.float64], ...]:
     return (
         configuration.truth.rigid_body.inertia_B,
+        configuration.truth.rigid_body.quadratic_drag_coefficient_B,
         configuration.truth.rotors.rotor_positions_B,
         configuration.truth.rotors.rotor_spin_directions,
+        configuration.truth.world.wind_velocity_W,
         configuration.truth.imu.initial_accelerometer_bias_B,
         configuration.truth.imu.accelerometer_noise_standard_deviation_B,
         configuration.truth.imu.accelerometer_bias_random_walk_density_B,
@@ -872,8 +1145,10 @@ def _configuration_owned_arrays(
         configuration.truth.position_sensors.local_position_bias_W,
         configuration.truth.position_sensors.local_position_noise_standard_deviation_W,
         configuration.nominal.rigid_body.inertia_B,
+        configuration.nominal.rigid_body.quadratic_drag_coefficient_B,
         configuration.nominal.rotors.rotor_positions_B,
         configuration.nominal.rotors.rotor_spin_directions,
+        configuration.nominal.world.wind_velocity_W,
         configuration.nominal.imu.initial_accelerometer_bias_B,
         configuration.nominal.imu.accelerometer_noise_standard_deviation_B,
         configuration.nominal.imu.accelerometer_bias_random_walk_density_B,
@@ -1120,7 +1395,7 @@ def test_decode_run_manifest_reconstructs_fresh_read_only_arrays() -> None:
 
     original_arrays = _configuration_owned_arrays(original_configuration)
     decoded_arrays = _configuration_owned_arrays(decoded_configuration)
-    assert len(original_arrays) == len(decoded_arrays) == 27
+    assert len(original_arrays) == len(decoded_arrays) == 31
     for original_array, decoded_array in zip(original_arrays, decoded_arrays, strict=True):
         np.testing.assert_array_equal(decoded_array, original_array)
         assert decoded_array.dtype == np.float64
@@ -1128,7 +1403,7 @@ def test_decode_run_manifest_reconstructs_fresh_read_only_arrays() -> None:
         assert not decoded_array.flags.writeable
         assert not np.shares_memory(decoded_array, original_array)
 
-    for truth_array, nominal_array in zip(decoded_arrays[:11], decoded_arrays[11:22], strict=True):
+    for truth_array, nominal_array in zip(decoded_arrays[:13], decoded_arrays[13:26], strict=True):
         assert not np.shares_memory(truth_array, nominal_array)
 
 
@@ -1156,6 +1431,334 @@ def _canonical_manifest_bytes(mapping: dict[str, object]) -> bytes:
         separators=(",", ":"),
         allow_nan=False,
     ).encode("utf-8")
+
+
+def _environmental_manifest_mapping(
+    *,
+    motorized: bool = False,
+    bound: bool = False,
+    equal_environment: bool = False,
+) -> dict[str, object]:
+    if equal_environment:
+        configuration = _environmental_configuration(
+            motorized=motorized,
+            truth_drag_B=np.array([0.5, 0.0, 0.0]),
+            nominal_drag_B=np.array([0.5, 0.0, 0.0]),
+            truth_wind_W=np.array([1.0, 0.0, 0.0]),
+            nominal_wind_W=np.array([1.0, 0.0, 0.0]),
+        )
+    else:
+        configuration = _environmental_configuration(motorized=motorized)
+    manifest = RunManifest(
+        configuration,
+        _software_provenance(),
+        _DATA_NPZ_SHA256 if bound else None,
+    )
+    return cast(dict[str, object], json.loads(encode_run_manifest(manifest)))
+
+
+@pytest.mark.parametrize("motorized", [False, True])
+@pytest.mark.parametrize("bound", [False, True])
+def test_decode_environmental_manifest_round_trips_v5_v6_byte_identically(
+    motorized: bool,
+    bound: bool,
+) -> None:
+    source_configuration = _environmental_configuration(motorized=motorized)
+    original_manifest = RunManifest(
+        source_configuration,
+        _software_provenance(),
+        _DATA_NPZ_SHA256 if bound else None,
+    )
+    encoded_bytes = encode_run_manifest(original_manifest)
+    parsed_source = cast(dict[str, object], json.loads(encoded_bytes))
+
+    decoded_manifest = decode_run_manifest(encoded_bytes)
+    decoded_configuration = decoded_manifest.run_configuration
+
+    assert encode_run_manifest(decoded_manifest) == encoded_bytes
+    assert decoded_manifest.data_npz_sha256 == (_DATA_NPZ_SHA256 if bound else None)
+    assert decoded_manifest.software_provenance == original_manifest.software_provenance
+    assert tuple(
+        (mismatch.parameter_path, mismatch.rationale)
+        for mismatch in decoded_configuration.declared_mismatches
+    ) == tuple(
+        (mismatch.parameter_path, mismatch.rationale)
+        for mismatch in source_configuration.declared_mismatches
+    )
+    for decoded_group, source_group in (
+        (decoded_configuration.truth, source_configuration.truth),
+        (decoded_configuration.nominal, source_configuration.nominal),
+    ):
+        for decoded_array, source_array in (
+            (
+                decoded_group.rigid_body.quadratic_drag_coefficient_B,
+                source_group.rigid_body.quadratic_drag_coefficient_B,
+            ),
+            (decoded_group.world.wind_velocity_W, source_group.world.wind_velocity_W),
+        ):
+            np.testing.assert_array_equal(decoded_array, source_array)
+            assert decoded_array.dtype == np.float64
+            assert decoded_array.shape == (3,)
+            assert decoded_array.flags.c_contiguous
+            assert decoded_array.flags.owndata
+            assert not decoded_array.flags.writeable
+            assert not np.shares_memory(decoded_array, source_array)
+    for decoded_rotors in (
+        decoded_configuration.truth.rotors,
+        decoded_configuration.nominal.rotors,
+    ):
+        assert decoded_rotors.minimum_rotor_omega == (100.0 if motorized else None)
+        assert decoded_rotors.maximum_rotor_omega == (1000.0 if motorized else None)
+        assert decoded_rotors.motor_time_constant_s == (0.2 if motorized else None)
+    if motorized:
+        assert decoded_configuration.initial_actual_rotor_omega is not None
+        np.testing.assert_array_equal(
+            decoded_configuration.initial_actual_rotor_omega,
+            np.array([100.0, 300.0, 700.0, 1000.0]),
+        )
+    else:
+        assert decoded_configuration.initial_actual_rotor_omega is None
+
+    parsed_configuration = cast(dict[str, object], parsed_source["run_configuration"])
+    parsed_truth = cast(dict[str, object], parsed_configuration["truth"])
+    parsed_truth_rigid_body = cast(dict[str, object], parsed_truth["rigid_body"])
+    parsed_truth_drag = cast(list[float], parsed_truth_rigid_body["quadratic_drag_coefficient_B"])
+    parsed_truth_drag[0] = 999.0
+    assert decoded_configuration.truth.rigid_body.quadratic_drag_coefficient_B[0] == 0.5
+
+
+@pytest.mark.parametrize(
+    ("motorized", "bound", "expected_version"),
+    [(False, False, 1), (False, True, 2), (True, False, 3), (True, True, 4)],
+)
+def test_decode_historical_versions_retain_zero_environment_and_canonical_bytes(
+    motorized: bool,
+    bound: bool,
+    expected_version: int,
+) -> None:
+    configuration = _run_configuration()
+    if motorized:
+        configuration = _with_complete_motor_configuration(configuration)
+    manifest = RunManifest(
+        configuration,
+        _software_provenance(),
+        _DATA_NPZ_SHA256 if bound else None,
+    )
+    encoded_bytes = encode_run_manifest(manifest)
+    assert json.loads(encoded_bytes)["schema"]["version"] == expected_version
+
+    decoded_manifest = decode_run_manifest(encoded_bytes)
+
+    for group in (
+        decoded_manifest.run_configuration.truth,
+        decoded_manifest.run_configuration.nominal,
+    ):
+        np.testing.assert_array_equal(
+            group.rigid_body.quadratic_drag_coefficient_B,
+            np.zeros(3),
+        )
+        np.testing.assert_array_equal(group.world.wind_velocity_W, np.zeros(3))
+    assert encode_run_manifest(decoded_manifest) == encoded_bytes
+
+
+@pytest.mark.parametrize(
+    ("mutation", "bound", "expected_message"),
+    [
+        (
+            "missing-truth-drag",
+            False,
+            "run_configuration.truth.rigid_body keys must be exactly: "
+            "inertia_B, mass, quadratic_drag_coefficient_B",
+        ),
+        (
+            "extra-truth-rigid-body",
+            False,
+            "run_configuration.truth.rigid_body keys must be exactly: "
+            "inertia_B, mass, quadratic_drag_coefficient_B",
+        ),
+        (
+            "missing-nominal-drag",
+            False,
+            "run_configuration.nominal.rigid_body keys must be exactly: "
+            "inertia_B, mass, quadratic_drag_coefficient_B",
+        ),
+        (
+            "extra-nominal-rigid-body",
+            False,
+            "run_configuration.nominal.rigid_body keys must be exactly: "
+            "inertia_B, mass, quadratic_drag_coefficient_B",
+        ),
+        (
+            "missing-truth-wind",
+            False,
+            "run_configuration.truth.world keys must be exactly: "
+            "gravity_acceleration, wind_velocity_W",
+        ),
+        (
+            "extra-truth-world",
+            False,
+            "run_configuration.truth.world keys must be exactly: "
+            "gravity_acceleration, wind_velocity_W",
+        ),
+        (
+            "missing-nominal-wind",
+            False,
+            "run_configuration.nominal.world keys must be exactly: "
+            "gravity_acceleration, wind_velocity_W",
+        ),
+        (
+            "extra-nominal-world",
+            False,
+            "run_configuration.nominal.world keys must be exactly: "
+            "gravity_acceleration, wind_velocity_W",
+        ),
+        (
+            "missing-motor-field",
+            False,
+            "run_configuration.truth.rotors keys must be exactly: maximum_rotor_omega, "
+            "minimum_rotor_omega, moment_coefficient, motor_time_constant_s, "
+            "rotor_positions_B, rotor_spin_directions, thrust_coefficient",
+        ),
+        (
+            "extra-rotor-field",
+            False,
+            "run_configuration.nominal.rotors keys must be exactly: maximum_rotor_omega, "
+            "minimum_rotor_omega, moment_coefficient, motor_time_constant_s, "
+            "rotor_positions_B, rotor_spin_directions, thrust_coefficient",
+        ),
+        (
+            "missing-initial-actual",
+            False,
+            "run_configuration keys must be exactly: declared_mismatches, "
+            "initial_actual_rotor_omega, initial_truth_state, nominal, numerics, root_seed, "
+            "rotor_speed_input, sensor_schedules, truth",
+        ),
+        (
+            "partial-null-motor",
+            False,
+            "manifest motor configuration must be either entirely omitted or complete",
+        ),
+        (
+            "v5-data-artifact",
+            False,
+            "run manifest keys must be exactly: randomness, run_configuration, schema, "
+            "software_provenance",
+        ),
+        (
+            "v6-missing-data-artifact",
+            True,
+            "run manifest keys must be exactly: data_artifact, randomness, run_configuration, "
+            "schema, software_provenance",
+        ),
+        (
+            "v6-malformed-digest",
+            True,
+            "data_artifact.sha256 must be 64 lowercase hexadecimal characters",
+        ),
+    ],
+)
+def test_decode_v5_v6_rejects_strict_structural_mutations(
+    mutation: str,
+    bound: bool,
+    expected_message: str,
+) -> None:
+    mapping = _environmental_manifest_mapping(bound=bound)
+    configuration = cast(dict[str, object], mapping["run_configuration"])
+    truth = cast(dict[str, object], configuration["truth"])
+    nominal = cast(dict[str, object], configuration["nominal"])
+    truth_rigid_body = cast(dict[str, object], truth["rigid_body"])
+    nominal_rigid_body = cast(dict[str, object], nominal["rigid_body"])
+    truth_world = cast(dict[str, object], truth["world"])
+    nominal_world = cast(dict[str, object], nominal["world"])
+    truth_rotors = cast(dict[str, object], truth["rotors"])
+    nominal_rotors = cast(dict[str, object], nominal["rotors"])
+
+    if mutation == "missing-truth-drag":
+        truth_rigid_body.pop("quadratic_drag_coefficient_B")
+    elif mutation == "extra-truth-rigid-body":
+        truth_rigid_body["unexpected"] = None
+    elif mutation == "missing-nominal-drag":
+        nominal_rigid_body.pop("quadratic_drag_coefficient_B")
+    elif mutation == "extra-nominal-rigid-body":
+        nominal_rigid_body["unexpected"] = None
+    elif mutation == "missing-truth-wind":
+        truth_world.pop("wind_velocity_W")
+    elif mutation == "extra-truth-world":
+        truth_world["unexpected"] = None
+    elif mutation == "missing-nominal-wind":
+        nominal_world.pop("wind_velocity_W")
+    elif mutation == "extra-nominal-world":
+        nominal_world["unexpected"] = None
+    elif mutation == "missing-motor-field":
+        truth_rotors.pop("minimum_rotor_omega")
+    elif mutation == "extra-rotor-field":
+        nominal_rotors["unexpected"] = None
+    elif mutation == "missing-initial-actual":
+        configuration.pop("initial_actual_rotor_omega")
+    elif mutation == "partial-null-motor":
+        truth_rotors["minimum_rotor_omega"] = 100.0
+    elif mutation == "v5-data-artifact":
+        mapping["data_artifact"] = {"sha256": _DATA_NPZ_SHA256}
+    elif mutation == "v6-missing-data-artifact":
+        mapping.pop("data_artifact")
+    else:
+        assert mutation == "v6-malformed-digest"
+        artifact = cast(dict[str, object], mapping["data_artifact"])
+        artifact["sha256"] = "A" + _DATA_NPZ_SHA256[1:]
+
+    _assert_manifest_decode_error(_canonical_manifest_bytes(mapping), expected_message)
+
+
+@pytest.mark.parametrize("schema_version", [1, 2, 3, 4])
+@pytest.mark.parametrize("environment_member", ["drag", "wind"])
+def test_decode_v1_v4_reject_environmental_keys(
+    schema_version: int,
+    environment_member: str,
+) -> None:
+    configuration = _run_configuration()
+    if schema_version in (3, 4):
+        configuration = _with_complete_motor_configuration(configuration)
+    manifest = RunManifest(
+        configuration,
+        _software_provenance(),
+        _DATA_NPZ_SHA256 if schema_version in (2, 4) else None,
+    )
+    mapping = cast(dict[str, object], json.loads(encode_run_manifest(manifest)))
+    run_configuration = cast(dict[str, object], mapping["run_configuration"])
+    truth = cast(dict[str, object], run_configuration["truth"])
+    if environment_member == "drag":
+        rigid_body = cast(dict[str, object], truth["rigid_body"])
+        rigid_body["quadratic_drag_coefficient_B"] = [0.0, 0.0, 0.0]
+        expected_message = (
+            "run_configuration.truth.rigid_body keys must be exactly: inertia_B, mass"
+        )
+    else:
+        world = cast(dict[str, object], truth["world"])
+        world["wind_velocity_W"] = [0.0, 0.0, 0.0]
+        expected_message = (
+            "run_configuration.truth.world keys must be exactly: gravity_acceleration"
+        )
+
+    _assert_manifest_decode_error(_canonical_manifest_bytes(mapping), expected_message)
+
+
+@pytest.mark.parametrize("bound", [False, True])
+def test_decode_v5_v6_rejects_all_zero_environment_after_constructor_validation(
+    bound: bool,
+) -> None:
+    mapping = _environmental_manifest_mapping(bound=bound, equal_environment=True)
+    configuration = cast(dict[str, object], mapping["run_configuration"])
+    for group_name in ("truth", "nominal"):
+        group = cast(dict[str, object], configuration[group_name])
+        rigid_body = cast(dict[str, object], group["rigid_body"])
+        rigid_body["quadratic_drag_coefficient_B"] = [0.0, -0.0, 0.0]
+        world = cast(dict[str, object], group["world"])
+        world["wind_velocity_W"] = [-0.0, 0.0, 0.0]
+
+    _assert_manifest_decode_error(
+        _canonical_manifest_bytes(mapping),
+        "manifest environmental configuration must contain at least one nonzero value",
+    )
 
 
 def _assert_manifest_decode_error(manifest_bytes: bytes, expected_message: str) -> None:
@@ -1223,8 +1826,8 @@ def test_decode_run_manifest_requires_fixed_schema_name(invalid_name: object) ->
 @pytest.mark.parametrize(
     ("invalid_version", "expected_message"),
     [
-        (True, "schema.version must be 1, 2, 3, or 4"),
-        (5, "schema.version must be 1, 2, 3, or 4"),
+        (True, "schema.version must be 1, 2, 3, 4, 5, or 6"),
+        (7, "schema.version must be 1, 2, 3, 4, 5, or 6"),
     ],
 )
 def test_decode_run_manifest_requires_fixed_integer_schema_version(

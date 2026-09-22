@@ -162,6 +162,8 @@ def generate_run_artifact_data(configuration: RunConfiguration) -> RunArtifactDa
             truth.world.gravity_acceleration,
             truth.rotors.thrust_coefficient,
             truth.rotors.moment_coefficient,
+            wind_velocity_W=truth.world.wind_velocity_W,
+            quadratic_drag_coefficient_B=truth.rigid_body.quadratic_drag_coefficient_B,
         )[1]
         ideal_B = ideal_accelerometer_specific_force_body(
             acceleration_W,
@@ -268,6 +270,8 @@ def generate_run_artifact_data(configuration: RunConfiguration) -> RunArtifactDa
             truth.rotors.thrust_coefficient,
             truth.rotors.moment_coefficient,
             time_step_s,
+            wind_velocity_W=truth.world.wind_velocity_W,
+            quadratic_drag_coefficient_B=truth.rigid_body.quadratic_drag_coefficient_B,
         )
         accelerometer_bias_B[index] = accelerometer_bias_random_walk_step_body(
             accelerometer_bias_B[step],

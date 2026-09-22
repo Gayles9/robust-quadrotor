@@ -8,6 +8,66 @@ from quadrotor_math.rotations import (
 )
 
 
+def quadratic_drag_force_body(
+    velocity_W: NDArray[np.float64],
+    R_WB: NDArray[np.float64],
+    wind_velocity_W: NDArray[np.float64],
+    quadratic_drag_coefficient_B: NDArray[np.float64],
+) -> NDArray[np.float64]:
+    """Return anisotropic quadratic aerodynamic force in the FRD body frame.
+
+    Vehicle and constant wind velocities are NED vectors in m/s. ``R_WB``
+    maps FRD body vectors into NED world coordinates. The per-body-axis
+    coefficients have units kg/m, and the returned force has units N.
+    The force opposes air-relative motion and is applied at the centre of mass.
+
+    Inputs are checked in shape, finiteness, then coefficient-domain order.
+    Finite inputs that overflow the calculation raise ``ValueError``.
+    """
+    if velocity_W.shape != (3,):
+        raise ValueError("velocity_W must have shape (3,)")
+    if R_WB.shape != (3, 3):
+        raise ValueError("R_WB must have shape (3, 3)")
+    if wind_velocity_W.shape != (3,):
+        raise ValueError("wind_velocity_W must have shape (3,)")
+    if quadratic_drag_coefficient_B.shape != (3,):
+        raise ValueError("quadratic_drag_coefficient_B must have shape (3,)")
+
+    if not np.all(np.isfinite(velocity_W)):
+        raise ValueError("velocity_W must contain only finite values")
+    if not np.all(np.isfinite(R_WB)):
+        raise ValueError("R_WB must contain only finite values")
+    if not np.all(np.isfinite(wind_velocity_W)):
+        raise ValueError("wind_velocity_W must contain only finite values")
+    if not np.all(np.isfinite(quadratic_drag_coefficient_B)):
+        raise ValueError("quadratic_drag_coefficient_B must contain only finite values")
+    if np.any(quadratic_drag_coefficient_B < 0.0):
+        raise ValueError("quadratic_drag_coefficient_B must be nonnegative")
+
+    force_drag_B = np.zeros(3, dtype=np.float64)
+    active_axes = quadratic_drag_coefficient_B > 0.0
+    if not np.any(active_axes):
+        return force_drag_B
+
+    try:
+        with np.errstate(over="raise", invalid="raise"):
+            velocity_air_W = velocity_W - wind_velocity_W
+            velocity_air_B = R_WB.T @ velocity_air_W
+            force_drag_B[active_axes] = (
+                -quadratic_drag_coefficient_B[active_axes]
+                * np.abs(velocity_air_B[active_axes])
+                * velocity_air_B[active_axes]
+            )
+    except FloatingPointError:
+        raise ValueError("quadratic drag calculation must remain finite") from None
+
+    if not np.all(np.isfinite(velocity_air_W)) or not np.all(np.isfinite(velocity_air_B)):
+        raise ValueError("quadratic drag calculation must remain finite")
+    if not np.all(np.isfinite(force_drag_B)):
+        raise ValueError("quadratic drag calculation must remain finite")
+    return force_drag_B
+
+
 def angular_acceleration_body_from_moment(
     moment_B: NDArray[np.float64],
     omega_B: NDArray[np.float64],
@@ -256,6 +316,9 @@ def rigid_body_state_derivative_from_rotor_speeds(
     gravity_acceleration: float,
     thrust_coefficient: float,
     moment_coefficient: float,
+    *,
+    wind_velocity_W: NDArray[np.float64] | None = None,
+    quadratic_drag_coefficient_B: NDArray[np.float64] | None = None,
 ) -> tuple[
     NDArray[np.float64],
     NDArray[np.float64],
@@ -285,6 +348,11 @@ def rigid_body_state_derivative_from_rotor_speeds(
         gravity_acceleration: Scalar positive gravity magnitude in m/s².
         thrust_coefficient: Scalar thrust coefficient in N/(rad/s)^2.
         moment_coefficient: Scalar moment coefficient in N·m/(rad/s)^2.
+        wind_velocity_W: Optional constant wind velocity with shape ``(3,)``,
+            expressed in the NED world frame in m/s. Omission means calm air.
+        quadratic_drag_coefficient_B: Optional nonnegative per-body-axis
+            quadratic drag coefficients with shape ``(3,)`` in kg/m. Omission
+            means exact zero drag.
 
     Returns:
         A tuple containing, in order, ``position_derivative_W`` with shape
@@ -305,12 +373,34 @@ def rigid_body_state_derivative_from_rotor_speeds(
         thrust_coefficient,
         moment_coefficient,
     )
+    combined_force_B = force_B
+    if wind_velocity_W is not None or quadratic_drag_coefficient_B is not None:
+        if wind_velocity_W is None:
+            wind_velocity_W = np.zeros(3, dtype=np.float64)
+        if quadratic_drag_coefficient_B is None:
+            quadratic_drag_coefficient_B = np.zeros(3, dtype=np.float64)
+        force_drag_B = quadratic_drag_force_body(
+            velocity_W,
+            rotation_matrix_body_to_world(q_WB),
+            wind_velocity_W,
+            quadratic_drag_coefficient_B,
+        )
+        if np.any(force_drag_B != 0.0):
+            try:
+                with np.errstate(over="raise", invalid="raise"):
+                    combined_force_B = force_B + force_drag_B
+            except FloatingPointError:
+                raise ValueError(
+                    "combined rotor and quadratic drag force must remain finite"
+                ) from None
+            if not np.all(np.isfinite(combined_force_B)):
+                raise ValueError("combined rotor and quadratic drag force must remain finite")
     return rigid_body_state_derivative_from_body_wrench(
         position_W,
         velocity_W,
         q_WB,
         omega_B,
-        force_B,
+        combined_force_B,
         moment_B,
         mass,
         inertia_B,

@@ -39,11 +39,28 @@ RUN_MANIFEST_SCHEMA_VERSION: Final[int] = 1
 _ARTIFACT_BOUND_SCHEMA_VERSION: Final[int] = 2
 _MOTORIZED_UNBOUND_SCHEMA_VERSION: Final[int] = 3
 _MOTORIZED_BOUND_SCHEMA_VERSION: Final[int] = 4
+_ENVIRONMENTAL_UNBOUND_SCHEMA_VERSION: Final[int] = 5
+_ENVIRONMENTAL_BOUND_SCHEMA_VERSION: Final[int] = 6
 _BOUND_SCHEMA_VERSIONS: Final[frozenset[int]] = frozenset(
-    {_ARTIFACT_BOUND_SCHEMA_VERSION, _MOTORIZED_BOUND_SCHEMA_VERSION}
+    {
+        _ARTIFACT_BOUND_SCHEMA_VERSION,
+        _MOTORIZED_BOUND_SCHEMA_VERSION,
+        _ENVIRONMENTAL_BOUND_SCHEMA_VERSION,
+    }
 )
 _MOTORIZED_SCHEMA_VERSIONS: Final[frozenset[int]] = frozenset(
     {_MOTORIZED_UNBOUND_SCHEMA_VERSION, _MOTORIZED_BOUND_SCHEMA_VERSION}
+)
+_MOTOR_FIELD_SCHEMA_VERSIONS: Final[frozenset[int]] = frozenset(
+    {
+        _MOTORIZED_UNBOUND_SCHEMA_VERSION,
+        _MOTORIZED_BOUND_SCHEMA_VERSION,
+        _ENVIRONMENTAL_UNBOUND_SCHEMA_VERSION,
+        _ENVIRONMENTAL_BOUND_SCHEMA_VERSION,
+    }
+)
+_ENVIRONMENTAL_SCHEMA_VERSIONS: Final[frozenset[int]] = frozenset(
+    {_ENVIRONMENTAL_UNBOUND_SCHEMA_VERSION, _ENVIRONMENTAL_BOUND_SCHEMA_VERSION}
 )
 
 _MANIFEST_V1_KEYS: Final[frozenset[str]] = frozenset(
@@ -94,6 +111,9 @@ _SENSOR_SCHEDULES_KEYS: Final[frozenset[str]] = frozenset(
 )
 _ROTOR_SPEED_INPUT_KEYS: Final[frozenset[str]] = frozenset({"rotor_omega"})
 _RIGID_BODY_KEYS: Final[frozenset[str]] = frozenset({"inertia_B", "mass"})
+_ENVIRONMENTAL_RIGID_BODY_KEYS: Final[frozenset[str]] = _RIGID_BODY_KEYS | frozenset(
+    {"quadratic_drag_coefficient_B"}
+)
 _ROTOR_KEYS: Final[frozenset[str]] = frozenset(
     {"moment_coefficient", "rotor_positions_B", "rotor_spin_directions", "thrust_coefficient"}
 )
@@ -101,6 +121,7 @@ _ROTOR_V3_KEYS: Final[frozenset[str]] = _ROTOR_KEYS | frozenset(
     {"minimum_rotor_omega", "maximum_rotor_omega", "motor_time_constant_s"}
 )
 _WORLD_KEYS: Final[frozenset[str]] = frozenset({"gravity_acceleration"})
+_ENVIRONMENTAL_WORLD_KEYS: Final[frozenset[str]] = _WORLD_KEYS | frozenset({"wind_velocity_W"})
 _IMU_KEYS: Final[frozenset[str]] = frozenset(
     {
         "accelerometer_bias_random_walk_density_B",
@@ -185,15 +206,25 @@ class RunManifest:
     data_npz_sha256: str | None = None
 
 
-def _encode_rigid_body(parameters: RigidBodyParameters) -> dict[str, object]:
-    return {
+def _encode_rigid_body(
+    parameters: RigidBodyParameters, *, include_environmental_parameters: bool = False
+) -> dict[str, object]:
+    encoded_rigid_body: dict[str, object] = {
         "mass": parameters.mass,
         "inertia_B": parameters.inertia_B.tolist(),
     }
+    if include_environmental_parameters:
+        encoded_rigid_body["quadratic_drag_coefficient_B"] = (
+            parameters.quadratic_drag_coefficient_B.tolist()
+        )
+    return encoded_rigid_body
 
 
 def _encode_rotors(
-    parameters: RotorParameters, *, include_motor_parameters: bool = False
+    parameters: RotorParameters,
+    *,
+    include_motor_parameters: bool = False,
+    allow_omitted_motor_parameters: bool = False,
 ) -> dict[str, object]:
     encoded_rotors: dict[str, object] = {
         "rotor_positions_B": parameters.rotor_positions_B.tolist(),
@@ -209,6 +240,11 @@ def _encode_rotors(
             minimum_rotor_omega is None
             or maximum_rotor_omega is None
             or motor_time_constant_s is None
+        ) and not (
+            allow_omitted_motor_parameters
+            and minimum_rotor_omega is None
+            and maximum_rotor_omega is None
+            and motor_time_constant_s is None
         ):
             raise ValueError("version-3 rotor parameters must be complete")
         encoded_rotors.update(
@@ -221,8 +257,13 @@ def _encode_rotors(
     return encoded_rotors
 
 
-def _encode_world(parameters: WorldParameters) -> dict[str, object]:
-    return {"gravity_acceleration": parameters.gravity_acceleration}
+def _encode_world(
+    parameters: WorldParameters, *, include_environmental_parameters: bool = False
+) -> dict[str, object]:
+    encoded_world: dict[str, object] = {"gravity_acceleration": parameters.gravity_acceleration}
+    if include_environmental_parameters:
+        encoded_world["wind_velocity_W"] = parameters.wind_velocity_W.tolist()
+    return encoded_world
 
 
 def _encode_imu(parameters: ImuParameters) -> dict[str, object]:
@@ -262,13 +303,23 @@ def _encode_configuration_group(
     configuration: TruthConfiguration | NominalConfiguration,
     *,
     include_motor_parameters: bool = False,
+    allow_omitted_motor_parameters: bool = False,
+    include_environmental_parameters: bool = False,
 ) -> dict[str, object]:
     return {
-        "rigid_body": _encode_rigid_body(configuration.rigid_body),
-        "rotors": _encode_rotors(
-            configuration.rotors, include_motor_parameters=include_motor_parameters
+        "rigid_body": _encode_rigid_body(
+            configuration.rigid_body,
+            include_environmental_parameters=include_environmental_parameters,
         ),
-        "world": _encode_world(configuration.world),
+        "rotors": _encode_rotors(
+            configuration.rotors,
+            include_motor_parameters=include_motor_parameters,
+            allow_omitted_motor_parameters=allow_omitted_motor_parameters,
+        ),
+        "world": _encode_world(
+            configuration.world,
+            include_environmental_parameters=include_environmental_parameters,
+        ),
         "imu": _encode_imu(configuration.imu),
         "position_sensors": _encode_position_sensors(configuration.position_sensors),
     }
@@ -331,14 +382,24 @@ def _encode_declared_mismatch(mismatch: DeclaredMismatch) -> dict[str, object]:
 
 
 def _encode_run_configuration(
-    configuration: RunConfiguration, *, include_motor_parameters: bool = False
+    configuration: RunConfiguration,
+    *,
+    include_motor_parameters: bool = False,
+    allow_omitted_motor_parameters: bool = False,
+    include_environmental_parameters: bool = False,
 ) -> dict[str, object]:
     encoded_configuration: dict[str, object] = {
         "truth": _encode_configuration_group(
-            configuration.truth, include_motor_parameters=include_motor_parameters
+            configuration.truth,
+            include_motor_parameters=include_motor_parameters,
+            allow_omitted_motor_parameters=allow_omitted_motor_parameters,
+            include_environmental_parameters=include_environmental_parameters,
         ),
         "nominal": _encode_configuration_group(
-            configuration.nominal, include_motor_parameters=include_motor_parameters
+            configuration.nominal,
+            include_motor_parameters=include_motor_parameters,
+            allow_omitted_motor_parameters=allow_omitted_motor_parameters,
+            include_environmental_parameters=include_environmental_parameters,
         ),
         "initial_truth_state": _encode_initial_truth_state(configuration.initial_truth_state),
         "numerics": _encode_numerics(configuration.numerics),
@@ -354,9 +415,11 @@ def _encode_run_configuration(
     }
     if include_motor_parameters:
         initial_actual_rotor_omega = configuration.initial_actual_rotor_omega
-        if initial_actual_rotor_omega is None:
+        if initial_actual_rotor_omega is None and not allow_omitted_motor_parameters:
             raise ValueError("version-3 initial actual rotor speed must be present")
-        encoded_configuration["initial_actual_rotor_omega"] = initial_actual_rotor_omega.tolist()
+        encoded_configuration["initial_actual_rotor_omega"] = (
+            initial_actual_rotor_omega.tolist() if initial_actual_rotor_omega is not None else None
+        )
     return encoded_configuration
 
 
@@ -376,6 +439,17 @@ def _has_complete_motor_configuration(configuration: RunConfiguration) -> bool:
     if all(value is not None for value in motor_values):
         return True
     raise ValueError("manifest motor configuration must be either entirely omitted or complete")
+
+
+def _has_nonzero_environmental_configuration(configuration: RunConfiguration) -> bool:
+    """Return whether any validated truth or nominal environmental element is nonzero."""
+    environmental_arrays = (
+        configuration.truth.rigid_body.quadratic_drag_coefficient_B,
+        configuration.nominal.rigid_body.quadratic_drag_coefficient_B,
+        configuration.truth.world.wind_velocity_W,
+        configuration.nominal.world.wind_velocity_W,
+    )
+    return any(np.any(values != 0.0) for values in environmental_arrays)
 
 
 def _ordered_run_random_streams() -> list[tuple[RunRandomStream, int]]:
@@ -416,15 +490,25 @@ def encode_run_manifest(manifest: RunManifest) -> bytes:
     schema_version = RUN_MANIFEST_SCHEMA_VERSION
     data_npz_sha256 = manifest.data_npz_sha256
     has_complete_motor_configuration = _has_complete_motor_configuration(manifest.run_configuration)
-    include_motor_parameters = has_complete_motor_configuration
+    has_nonzero_environmental_configuration = _has_nonzero_environmental_configuration(
+        manifest.run_configuration
+    )
+    include_motor_parameters = (
+        has_complete_motor_configuration or has_nonzero_environmental_configuration
+    )
+    if has_nonzero_environmental_configuration:
+        schema_version = _ENVIRONMENTAL_UNBOUND_SCHEMA_VERSION
     if data_npz_sha256 is not None:
         data_npz_sha256 = _validate_data_npz_sha256(data_npz_sha256)
-        schema_version = (
-            _MOTORIZED_BOUND_SCHEMA_VERSION
-            if has_complete_motor_configuration
-            else _ARTIFACT_BOUND_SCHEMA_VERSION
-        )
-    elif has_complete_motor_configuration:
+        if has_nonzero_environmental_configuration:
+            schema_version = _ENVIRONMENTAL_BOUND_SCHEMA_VERSION
+        else:
+            schema_version = (
+                _MOTORIZED_BOUND_SCHEMA_VERSION
+                if has_complete_motor_configuration
+                else _ARTIFACT_BOUND_SCHEMA_VERSION
+            )
+    elif has_complete_motor_configuration and not has_nonzero_environmental_configuration:
         schema_version = _MOTORIZED_UNBOUND_SCHEMA_VERSION
 
     manifest_mapping: dict[str, object] = {
@@ -433,7 +517,10 @@ def encode_run_manifest(manifest: RunManifest) -> bytes:
             "version": schema_version,
         },
         "run_configuration": _encode_run_configuration(
-            manifest.run_configuration, include_motor_parameters=include_motor_parameters
+            manifest.run_configuration,
+            include_motor_parameters=include_motor_parameters,
+            allow_omitted_motor_parameters=has_nonzero_environmental_configuration,
+            include_environmental_parameters=has_nonzero_environmental_configuration,
         ),
         "randomness": _encode_randomness(),
         "software_provenance": _encode_software_provenance(manifest.software_provenance),
@@ -613,24 +700,27 @@ def _validate_parameter_group_objects(
     schema_version: int,
 ) -> None:
     """Require the five child parameter schemas in fixed protocol order."""
+    environmental = schema_version in _ENVIRONMENTAL_SCHEMA_VERSIONS
     _validate_parameter_object(
         group_mapping,
         group_name=group_name,
         parameter_name="rigid_body",
-        expected_keys=_RIGID_BODY_KEYS,
-        exact_keys_text="inertia_B, mass",
+        expected_keys=(_ENVIRONMENTAL_RIGID_BODY_KEYS if environmental else _RIGID_BODY_KEYS),
+        exact_keys_text=(
+            "inertia_B, mass, quadratic_drag_coefficient_B" if environmental else "inertia_B, mass"
+        ),
     )
     _validate_parameter_object(
         group_mapping,
         group_name=group_name,
         parameter_name="rotors",
         expected_keys=(
-            _ROTOR_V3_KEYS if schema_version in _MOTORIZED_SCHEMA_VERSIONS else _ROTOR_KEYS
+            _ROTOR_V3_KEYS if schema_version in _MOTOR_FIELD_SCHEMA_VERSIONS else _ROTOR_KEYS
         ),
         exact_keys_text=(
             "maximum_rotor_omega, minimum_rotor_omega, moment_coefficient, "
             "motor_time_constant_s, rotor_positions_B, rotor_spin_directions, thrust_coefficient"
-            if schema_version in _MOTORIZED_SCHEMA_VERSIONS
+            if schema_version in _MOTOR_FIELD_SCHEMA_VERSIONS
             else "moment_coefficient, rotor_positions_B, rotor_spin_directions, thrust_coefficient"
         ),
     )
@@ -638,8 +728,10 @@ def _validate_parameter_group_objects(
         group_mapping,
         group_name=group_name,
         parameter_name="world",
-        expected_keys=_WORLD_KEYS,
-        exact_keys_text="gravity_acceleration",
+        expected_keys=_ENVIRONMENTAL_WORLD_KEYS if environmental else _WORLD_KEYS,
+        exact_keys_text=(
+            "gravity_acceleration, wind_velocity_W" if environmental else "gravity_acceleration"
+        ),
     )
     _validate_parameter_object(
         group_mapping,
@@ -724,14 +816,14 @@ def _validate_run_configuration_structure(
         configuration_mapping,
         expected_keys=(
             _RUN_CONFIGURATION_V3_KEYS
-            if schema_version in _MOTORIZED_SCHEMA_VERSIONS
+            if schema_version in _MOTOR_FIELD_SCHEMA_VERSIONS
             else _RUN_CONFIGURATION_KEYS
         ),
         error_message=(
             "run_configuration keys must be exactly: "
             + (
                 "declared_mismatches, initial_actual_rotor_omega, initial_truth_state, "
-                if schema_version in _MOTORIZED_SCHEMA_VERSIONS
+                if schema_version in _MOTOR_FIELD_SCHEMA_VERSIONS
                 else "declared_mismatches, initial_truth_state, "
             )
             + "nominal, numerics, root_seed, rotor_speed_input, sensor_schedules, truth"
@@ -816,15 +908,19 @@ def _decoded_array(value: object) -> NDArray[np.float64]:
     return np.array(value, dtype=np.float64)
 
 
-def _decode_rigid_body(mapping: dict[str, object]) -> RigidBodyParameters:
+def _decode_rigid_body(mapping: dict[str, object], *, schema_version: int) -> RigidBodyParameters:
     return RigidBodyParameters(
         mass=cast(float, mapping["mass"]),
         inertia_B=_decoded_array(mapping["inertia_B"]),
+        quadratic_drag_coefficient_B=(
+            _decoded_array(mapping["quadratic_drag_coefficient_B"])
+            if schema_version in _ENVIRONMENTAL_SCHEMA_VERSIONS
+            else np.zeros(3, dtype=np.float64)
+        ),
     )
 
 
-def _decode_rotors(mapping: dict[str, object], *, schema_version: int) -> RotorParameters:
-    motorized = schema_version in _MOTORIZED_SCHEMA_VERSIONS
+def _decode_rotors(mapping: dict[str, object], *, motorized: bool) -> RotorParameters:
     return RotorParameters(
         rotor_positions_B=_decoded_array(mapping["rotor_positions_B"]),
         rotor_spin_directions=_decoded_array(mapping["rotor_spin_directions"]),
@@ -836,9 +932,14 @@ def _decode_rotors(mapping: dict[str, object], *, schema_version: int) -> RotorP
     )
 
 
-def _decode_world(mapping: dict[str, object]) -> WorldParameters:
+def _decode_world(mapping: dict[str, object], *, schema_version: int) -> WorldParameters:
     return WorldParameters(
         gravity_acceleration=cast(float, mapping["gravity_acceleration"]),
+        wind_velocity_W=(
+            _decoded_array(mapping["wind_velocity_W"])
+            if schema_version in _ENVIRONMENTAL_SCHEMA_VERSIONS
+            else np.zeros(3, dtype=np.float64)
+        ),
     )
 
 
@@ -876,24 +977,28 @@ def _decode_position_sensors(mapping: dict[str, object]) -> PositionSensorParame
 
 
 def _decode_truth_configuration(
-    mapping: dict[str, object], *, schema_version: int
+    mapping: dict[str, object], *, schema_version: int, motorized: bool
 ) -> TruthConfiguration:
     return TruthConfiguration(
-        rigid_body=_decode_rigid_body(_decoded_object(mapping["rigid_body"])),
-        rotors=_decode_rotors(_decoded_object(mapping["rotors"]), schema_version=schema_version),
-        world=_decode_world(_decoded_object(mapping["world"])),
+        rigid_body=_decode_rigid_body(
+            _decoded_object(mapping["rigid_body"]), schema_version=schema_version
+        ),
+        rotors=_decode_rotors(_decoded_object(mapping["rotors"]), motorized=motorized),
+        world=_decode_world(_decoded_object(mapping["world"]), schema_version=schema_version),
         imu=_decode_imu(_decoded_object(mapping["imu"])),
         position_sensors=_decode_position_sensors(_decoded_object(mapping["position_sensors"])),
     )
 
 
 def _decode_nominal_configuration(
-    mapping: dict[str, object], *, schema_version: int
+    mapping: dict[str, object], *, schema_version: int, motorized: bool
 ) -> NominalConfiguration:
     return NominalConfiguration(
-        rigid_body=_decode_rigid_body(_decoded_object(mapping["rigid_body"])),
-        rotors=_decode_rotors(_decoded_object(mapping["rotors"]), schema_version=schema_version),
-        world=_decode_world(_decoded_object(mapping["world"])),
+        rigid_body=_decode_rigid_body(
+            _decoded_object(mapping["rigid_body"]), schema_version=schema_version
+        ),
+        rotors=_decode_rotors(_decoded_object(mapping["rotors"]), motorized=motorized),
+        world=_decode_world(_decoded_object(mapping["world"]), schema_version=schema_version),
         imu=_decode_imu(_decoded_object(mapping["imu"])),
         position_sensors=_decode_position_sensors(_decoded_object(mapping["position_sensors"])),
     )
@@ -955,16 +1060,45 @@ def _decode_declared_mismatch(mapping: dict[str, object]) -> DeclaredMismatch:
     )
 
 
+def _environmental_manifest_has_complete_motor_configuration(
+    mapping: dict[str, object],
+) -> bool:
+    """Require the v5/v6 motor representation to be wholly null or complete."""
+    truth_rotors = _decoded_object(_decoded_object(mapping["truth"])["rotors"])
+    nominal_rotors = _decoded_object(_decoded_object(mapping["nominal"])["rotors"])
+    motor_values = (
+        truth_rotors["minimum_rotor_omega"],
+        truth_rotors["maximum_rotor_omega"],
+        truth_rotors["motor_time_constant_s"],
+        nominal_rotors["minimum_rotor_omega"],
+        nominal_rotors["maximum_rotor_omega"],
+        nominal_rotors["motor_time_constant_s"],
+        mapping["initial_actual_rotor_omega"],
+    )
+    if all(value is None for value in motor_values):
+        return False
+    if all(value is not None for value in motor_values):
+        return True
+    raise ValueError("manifest motor configuration must be either entirely omitted or complete")
+
+
 def _decode_run_configuration(
     mapping: dict[str, object], *, schema_version: int
 ) -> RunConfiguration:
     encoded_mismatches = cast(list[object], mapping["declared_mismatches"])
-    return RunConfiguration(
+    motorized = schema_version in _MOTORIZED_SCHEMA_VERSIONS
+    if schema_version in _ENVIRONMENTAL_SCHEMA_VERSIONS:
+        motorized = _environmental_manifest_has_complete_motor_configuration(mapping)
+    configuration = RunConfiguration(
         truth=_decode_truth_configuration(
-            _decoded_object(mapping["truth"]), schema_version=schema_version
+            _decoded_object(mapping["truth"]),
+            schema_version=schema_version,
+            motorized=motorized,
         ),
         nominal=_decode_nominal_configuration(
-            _decoded_object(mapping["nominal"]), schema_version=schema_version
+            _decoded_object(mapping["nominal"]),
+            schema_version=schema_version,
+            motorized=motorized,
         ),
         initial_truth_state=_decode_initial_truth_state(
             _decoded_object(mapping["initial_truth_state"])
@@ -977,11 +1111,17 @@ def _decode_run_configuration(
             _decode_declared_mismatch(_decoded_object(mismatch)) for mismatch in encoded_mismatches
         ),
         initial_actual_rotor_omega=(
-            _decoded_array(mapping["initial_actual_rotor_omega"])
-            if schema_version in _MOTORIZED_SCHEMA_VERSIONS
-            else None
+            _decoded_array(mapping["initial_actual_rotor_omega"]) if motorized else None
         ),
     )
+    if (
+        schema_version in _ENVIRONMENTAL_SCHEMA_VERSIONS
+        and not _has_nonzero_environmental_configuration(configuration)
+    ):
+        raise ValueError(
+            "manifest environmental configuration must contain at least one nonzero value"
+        )
+    return configuration
 
 
 def _decode_software_provenance(mapping: dict[str, object]) -> SoftwareProvenance:
@@ -1056,8 +1196,10 @@ def decode_run_manifest(manifest_bytes: bytes) -> RunManifest:
         _ARTIFACT_BOUND_SCHEMA_VERSION,
         _MOTORIZED_UNBOUND_SCHEMA_VERSION,
         _MOTORIZED_BOUND_SCHEMA_VERSION,
+        _ENVIRONMENTAL_UNBOUND_SCHEMA_VERSION,
+        _ENVIRONMENTAL_BOUND_SCHEMA_VERSION,
     ):
-        raise ValueError("schema.version must be 1, 2, 3, or 4")
+        raise ValueError("schema.version must be 1, 2, 3, 4, 5, or 6")
 
     data_npz_sha256: str | None = None
     if schema_version in _BOUND_SCHEMA_VERSIONS:

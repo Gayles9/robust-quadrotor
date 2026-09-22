@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import StrEnum
 
 import numpy as np
@@ -7,13 +7,16 @@ from numpy.typing import NDArray
 
 @dataclass(frozen=True, slots=True, eq=False)
 class RigidBodyParameters:
-    """Store rigid-body mass and independently owned body inertia."""
+    """Store mass, body inertia, and body-axis quadratic drag coefficients."""
 
     mass: float
     inertia_B: NDArray[np.float64]
+    quadratic_drag_coefficient_B: NDArray[np.float64] = field(
+        default_factory=lambda: np.zeros(3, dtype=np.float64)
+    )
 
     def __post_init__(self) -> None:
-        """Take a read-only float64 copy of the supplied body inertia."""
+        """Validate and own read-only float64 inertia and drag arrays."""
         if not np.isfinite(self.mass):
             raise ValueError("mass must be finite")
 
@@ -40,8 +43,29 @@ class RigidBodyParameters:
         except np.linalg.LinAlgError:
             raise ValueError("inertia_B must be positive definite") from None
 
+        if self.quadratic_drag_coefficient_B.shape != (3,):
+            raise ValueError("quadratic_drag_coefficient_B must have shape (3,)")
+
+        owned_quadratic_drag_coefficient_B = np.array(
+            self.quadratic_drag_coefficient_B,
+            dtype=np.float64,
+            order="C",
+            copy=True,
+        )
+        if not np.all(np.isfinite(owned_quadratic_drag_coefficient_B)):
+            raise ValueError("quadratic_drag_coefficient_B must contain only finite values")
+
+        if np.any(owned_quadratic_drag_coefficient_B < 0.0):
+            raise ValueError("quadratic_drag_coefficient_B must be nonnegative")
+
         owned_inertia_B.flags.writeable = False
         object.__setattr__(self, "inertia_B", owned_inertia_B)
+        owned_quadratic_drag_coefficient_B.flags.writeable = False
+        object.__setattr__(
+            self,
+            "quadratic_drag_coefficient_B",
+            owned_quadratic_drag_coefficient_B,
+        )
 
 
 def _take_read_only_float64_array(
@@ -156,14 +180,32 @@ class WorldParameters:
     """Store world-model parameters."""
 
     gravity_acceleration: float
+    wind_velocity_W: NDArray[np.float64] = field(
+        default_factory=lambda: np.zeros(3, dtype=np.float64)
+    )
 
     def __post_init__(self) -> None:
-        """Validate the world-model parameters."""
+        """Validate gravity and own a read-only float64 wind vector."""
         if not np.isfinite(self.gravity_acceleration):
             raise ValueError("gravity_acceleration must be finite")
 
         if self.gravity_acceleration < 0.0:
             raise ValueError("gravity_acceleration must be nonnegative")
+
+        if self.wind_velocity_W.shape != (3,):
+            raise ValueError("wind_velocity_W must have shape (3,)")
+
+        owned_wind_velocity_W = np.array(
+            self.wind_velocity_W,
+            dtype=np.float64,
+            order="C",
+            copy=True,
+        )
+        if not np.all(np.isfinite(owned_wind_velocity_W)):
+            raise ValueError("wind_velocity_W must contain only finite values")
+
+        owned_wind_velocity_W.flags.writeable = False
+        object.__setattr__(self, "wind_velocity_W", owned_wind_velocity_W)
 
 
 @dataclass(frozen=True, slots=True, eq=False)
@@ -354,6 +396,12 @@ def _truth_nominal_parameter_equalities(
         "rigid_body.inertia_B": bool(
             np.array_equal(truth.rigid_body.inertia_B, nominal.rigid_body.inertia_B)
         ),
+        "rigid_body.quadratic_drag_coefficient_B": bool(
+            np.array_equal(
+                truth.rigid_body.quadratic_drag_coefficient_B,
+                nominal.rigid_body.quadratic_drag_coefficient_B,
+            )
+        ),
         "rotors.rotor_positions_B": bool(
             np.array_equal(
                 truth.rotors.rotor_positions_B,
@@ -383,6 +431,9 @@ def _truth_nominal_parameter_equalities(
         ),
         "world.gravity_acceleration": bool(
             truth.world.gravity_acceleration == nominal.world.gravity_acceleration
+        ),
+        "world.wind_velocity_W": bool(
+            np.array_equal(truth.world.wind_velocity_W, nominal.world.wind_velocity_W)
         ),
         "imu.initial_accelerometer_bias_B": bool(
             np.array_equal(

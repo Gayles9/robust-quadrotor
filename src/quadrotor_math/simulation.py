@@ -22,6 +22,9 @@ def simulate_rigid_body_euler_from_rotor_speeds(
     moment_coefficient: float,
     time_step: float,
     number_of_steps: int,
+    *,
+    wind_velocity_W: NDArray[np.float64] | None = None,
+    quadratic_drag_coefficient_B: NDArray[np.float64] | None = None,
 ) -> tuple[
     NDArray[np.float64],
     NDArray[np.float64],
@@ -65,6 +68,11 @@ def simulate_rigid_body_euler_from_rotor_speeds(
         number_of_steps: Positive non-Boolean integer number of explicit-Euler
             state transitions. The returned histories contain one additional
             row for the initial state.
+        wind_velocity_W: Optional constant wind velocity with shape ``(3,)``
+            in the NED world frame in m/s. Omission means calm air.
+        quadratic_drag_coefficient_B: Optional nonnegative per-body-axis
+            quadratic drag coefficients with shape ``(3,)`` in kg/m.
+            Omission means exact zero drag.
 
     Returns:
         A tuple containing, in order, ``time_s`` with shape ``(N + 1,)`` in
@@ -109,6 +117,8 @@ def simulate_rigid_body_euler_from_rotor_speeds(
         thrust_coefficient,
         moment_coefficient,
         time_step,
+        wind_velocity_W=wind_velocity_W,
+        quadratic_drag_coefficient_B=quadratic_drag_coefficient_B,
     )
 
     time_s = np.arange(number_of_steps + 1, dtype=np.float64) * time_step
@@ -147,6 +157,8 @@ def simulate_rigid_body_euler_from_rotor_speeds(
             thrust_coefficient,
             moment_coefficient,
             time_step,
+            wind_velocity_W=wind_velocity_W,
+            quadratic_drag_coefficient_B=quadratic_drag_coefficient_B,
         )
         position_history_W[history_index] = next_position_W
         velocity_history_W[history_index] = next_velocity_W
@@ -177,6 +189,9 @@ def simulate_rigid_body_rk4_from_rotor_speeds(
     moment_coefficient: float,
     time_step: float,
     number_of_steps: int,
+    *,
+    wind_velocity_W: NDArray[np.float64] | None = None,
+    quadratic_drag_coefficient_B: NDArray[np.float64] | None = None,
 ) -> tuple[
     NDArray[np.float64],
     NDArray[np.float64],
@@ -220,6 +235,11 @@ def simulate_rigid_body_rk4_from_rotor_speeds(
         number_of_steps: Number of positive-time RK4 state transitions. The
             returned histories contain one additional row for the initial
             state.
+        wind_velocity_W: Optional constant wind velocity with shape ``(3,)``
+            in the NED world frame in m/s. Omission means calm air.
+        quadratic_drag_coefficient_B: Optional nonnegative per-body-axis
+            quadratic drag coefficients with shape ``(3,)`` in kg/m.
+            Omission means exact zero drag.
 
     Returns:
         A tuple containing, in order, ``time_s`` with shape ``(N + 1,)`` in
@@ -264,6 +284,8 @@ def simulate_rigid_body_rk4_from_rotor_speeds(
         thrust_coefficient,
         moment_coefficient,
         time_step,
+        wind_velocity_W=wind_velocity_W,
+        quadratic_drag_coefficient_B=quadratic_drag_coefficient_B,
     )
 
     time_s = np.arange(number_of_steps + 1, dtype=np.float64) * time_step
@@ -302,6 +324,8 @@ def simulate_rigid_body_rk4_from_rotor_speeds(
             thrust_coefficient,
             moment_coefficient,
             time_step,
+            wind_velocity_W=wind_velocity_W,
+            quadratic_drag_coefficient_B=quadratic_drag_coefficient_B,
         )
         position_history_W[history_index] = next_position_W
         velocity_history_W[history_index] = next_velocity_W
