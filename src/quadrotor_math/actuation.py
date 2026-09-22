@@ -14,8 +14,8 @@ def commanded_rotor_speeds_from_collective_thrust_and_body_moment(
 ) -> NDArray[np.float64]:
     """Compute commanded rotor speeds for a feasible collective-thrust and FRD moment demand.
 
-    Roundoff-sized solved-square excursions at feasible rotor-speed boundaries
-    are repaired before conversion to rotor speeds.
+    Roundoff-sized solved-square errors on either side of feasible rotor-speed
+    boundaries are repaired before conversion to rotor speeds.
 
     Raises:
         ValueError: If collective thrust is non-finite or negative, or if the
@@ -120,8 +120,20 @@ def commanded_rotor_speeds_from_collective_thrust_and_body_moment(
             "requested collective thrust and body moment are infeasible within rotor speed limits"
         )
 
+    with np.errstate(over="ignore"):
+        distance_from_minimum = np.abs(squared_rotor_omega - minimum_squared_rotor_omega)
+        distance_from_maximum = np.abs(squared_rotor_omega - maximum_squared_rotor_omega)
+    near_minimum = distance_from_minimum <= squared_speed_tolerance
+    nearer_maximum = (distance_from_maximum <= squared_speed_tolerance) & (
+        distance_from_maximum < distance_from_minimum
+    )
+    snapped_squared_rotor_omega = np.where(
+        nearer_maximum,
+        maximum_squared_rotor_omega,
+        np.where(near_minimum, minimum_squared_rotor_omega, squared_rotor_omega),
+    )
     bounded_squared_rotor_omega = np.clip(
-        squared_rotor_omega,
+        snapped_squared_rotor_omega,
         minimum_squared_rotor_omega,
         maximum_squared_rotor_omega,
     )
