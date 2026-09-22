@@ -512,6 +512,62 @@ def _provenance() -> SoftwareProvenance:
     return SoftwareProvenance("0.1.0", "3.12.3", "2.1.0", "a" * 40, True)
 
 
+@pytest.mark.parametrize(
+    (
+        "truth_motor",
+        "nominal_motor",
+        "initial_actual",
+        "unbound_version",
+        "bound_version",
+    ),
+    [
+        pytest.param(False, False, False, 1, 2, id="historical-v2"),
+        pytest.param(True, True, True, 3, 4, id="motorized-v4"),
+    ],
+)
+def test_loaded_run_configuration_replays_all_artifact_arrays_exactly(
+    tmp_path: Path,
+    truth_motor: bool,
+    nominal_motor: bool,
+    initial_actual: bool,
+    unbound_version: int,
+    bound_version: int,
+) -> None:
+    configuration = _configuration(
+        truth_motor=truth_motor,
+        nominal_motor=nominal_motor,
+        initial_actual=initial_actual,
+        noise=True,
+    )
+    original_data = generate_run_artifact_data(configuration)
+    assert np.any(np.diff(original_data.accelerometer_bias_history_B, axis=0) != 0)
+    assert np.any(np.diff(original_data.gyroscope_bias_history_B, axis=0) != 0)
+    manifest = RunManifest(configuration, _provenance())
+    assert json.loads(encode_run_manifest(manifest))["schema"]["version"] == unbound_version
+
+    original_directory = tmp_path / "original"
+    bound_manifest = save_run_directory(original_directory, manifest, original_data)
+    assert json.loads(encode_run_manifest(bound_manifest))["schema"]["version"] == bound_version
+    loaded_manifest, loaded_data = load_run_directory(original_directory)
+    assert json.loads(encode_run_manifest(loaded_manifest))["schema"]["version"] == bound_version
+    regenerated_data = generate_run_artifact_data(loaded_manifest.run_configuration)
+
+    assert len(fields(RunArtifactData)) == 35
+    for field in fields(RunArtifactData):
+        original_array = getattr(original_data, field.name)
+        np.testing.assert_array_equal(original_array, getattr(loaded_data, field.name))
+        np.testing.assert_array_equal(original_array, getattr(regenerated_data, field.name))
+
+    replayed_directory = tmp_path / "replayed"
+    replayed_manifest = save_run_directory(replayed_directory, loaded_manifest, regenerated_data)
+    original_manifest_bytes = (original_directory / "manifest.json").read_bytes()
+    assert encode_run_manifest(replayed_manifest) == original_manifest_bytes
+    assert (replayed_directory / "manifest.json").read_bytes() == original_manifest_bytes
+    assert (replayed_directory / "data.npz").read_bytes() == (
+        original_directory / "data.npz"
+    ).read_bytes()
+
+
 def test_motorized_persistence_round_trip_is_byte_identical(tmp_path: Path) -> None:
     configuration = _configuration(noise=True)
     data = generate_run_artifact_data(configuration)

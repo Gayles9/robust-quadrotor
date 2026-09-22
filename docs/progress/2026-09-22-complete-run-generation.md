@@ -118,3 +118,39 @@ complete-run boundary.
 
 This generator and documentation closeout have **not** been staged, committed, pushed, or
 published.
+
+## Publication and replay closeout — 2026-09-22
+
+The generator was published in commit `4cc132af291f9352b8145e6397482e8a632e76fd`,
+whose parent is `9579bb920ab528bb6e78ba29e4568844d9e7f508`. That commit contained exactly
+`README.md`, `docs/progress/2026-09-22-complete-run-generation.md`,
+`src/quadrotor_math/run_generation.py`, and `tests/unit/test_run_generation.py`.
+[GitHub Actions run 35674673151](https://github.com/Gayles9/robust-quadrotor/actions/runs/35674673151)
+concluded successfully for that commit. The hosted environment reported Python 3.12.14,
+NumPy 2.5.2, and pytest 9.1.1. Ruff passed, Ruff format reported 67 files already formatted,
+mypy passed for 18 source files, and all 1,239 tests passed.
+
+The follow-up characterization loads a saved historical version-2 or motorized version-4
+manifest and regenerates from its decoded `run_configuration` through the public generator.
+Both fixtures have nonzero sensor noise and bias random walks. In each case, all 35 original,
+loaded, and regenerated artifact arrays are exactly equal. Saving the regenerated data with
+the loaded bound manifest reproduces the canonical `manifest.json` and `data.npz` bytes
+exactly. The historical unbound/bound versions are 1/2; the motorized versions are 3/4.
+This is deterministic replay in the tested environment, without a new replay API.
+
+The follow-up verification used `UV_CACHE_DIR=/tmp/robust-quadrotor-uv-cache`:
+
+| Command | Result |
+| --- | --- |
+| `uv run pytest -q tests/unit/test_run_generation.py` | 15 passed |
+| `uv run pytest -q tests/unit/test_run_configuration.py tests/unit/test_run_manifest.py tests/unit/test_run_artifact.py tests/unit/test_run_generation.py` | 668 passed |
+| `uv run pytest -q` | 1,241 passed |
+| `uv run ruff check .` | Passed |
+| `uv run ruff format --check .` | 67 files already formatted |
+| `uv run mypy src experiments` | No issues in 18 source files |
+| `make check` | Passed with 1,241 tests |
+
+No production code or artifact schema changed. Generation remains an in-memory boundary,
+with explicit saving and upstream allocation; actual rotor-speed history remains private and
+reconstructable. Gate G1 remains open for deliberate truth/nominal mismatch effects, wind and
+drag evidence, and the remaining planned work.
