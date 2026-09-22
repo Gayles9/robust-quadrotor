@@ -227,3 +227,21 @@ pushed, or published.
 The exact next bounded milestone is state-estimation design, beginning with the 15-state
 error-state Kalman filter conventions, process/noise model, propagation equations, and
 Jacobian verification.
+
+## Publication closeout
+
+Luke explicitly authorized publication. Commit
+[`32e4886c63b38b62f41aa236b4439ca22560f5b7`](https://github.com/Gayles9/robust-quadrotor/commit/32e4886c63b38b62f41aa236b4439ca22560f5b7)
+was created with parent `65a48da9ddd64bd98e4b2faf473c33cd514c3485` and exact subject
+`feat: add environmental wind and drag`. It contained exactly the audited 17 paths.
+
+The local publication gate passed 865 focused tests, 1,362 full-suite tests, Ruff,
+formatting over 69 Python files, mypy over 18 source files, and `make check`. The normal push
+succeeded and synchronized `HEAD` with `origin/main`. GitHub Actions push
+[run 35793062927](https://github.com/Gayles9/robust-quadrotor/actions/runs/35793062927)
+completed successfully, including `uv sync --locked` and `make check` in the hosted `check`
+job.
+
+Gate G1 is now closed and published. The next bounded milestone remains the 15-state
+error-state Kalman-filter design: conventions, process and noise model, propagation
+equations, and Jacobian verification.

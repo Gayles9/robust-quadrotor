@@ -85,21 +85,25 @@ artifact schema. Published in commit `4cc132af291f9352b8145e6397482e8a632e76fd`,
 `generate_run_artifact_data` composes motor response, truth propagation, bias evolution,
 scheduled sensors, and named randomness into a complete in-memory run.
 
-Gate G1 is locally complete and publication-ready, but it has not been published. The local
-implementation adds constant NED wind and anisotropic FRD quadratic drag, including validated
-truth/nominal configuration and declared environmental mismatches. Drag is recomputed from
-the current velocity and projected attitude at every derivative evaluation, including all
-four projected-RK4 stages. Truth environmental changes alter trajectories and accelerometer
-truth, while properly declared nominal-only environmental changes leave all 35 artifact
-arrays exactly unchanged, including with sensor noise and bias random walks enabled.
+Gate G1 is complete and published. It was published in
+[commit `32e4886c63b38b62f41aa236b4439ca22560f5b7`](https://github.com/Gayles9/robust-quadrotor/commit/32e4886c63b38b62f41aa236b4439ca22560f5b7)
+with subject `feat: add environmental wind and drag`. The implementation provides constant
+NED wind, anisotropic FRD quadratic drag, validated truth/nominal configuration and declared
+environmental mismatches, and drag recomputation from the current velocity and projected
+attitude at every derivative evaluation, including all four projected-RK4 stages. Truth
+environmental changes alter trajectories and accelerometer truth, while properly declared
+nominal-only environmental changes leave all 35 artifact arrays exactly unchanged, including
+with sensor noise and bias random walks enabled.
 
 Environmental manifests use versions 5 and 6 for unbound and SHA-256-bound runs,
 respectively, with either historical ideal or complete motorized actuation. Versions 1/2
 remain the historical zero-environment unbound/bound pair, and versions 3/4 remain the
 motorized zero-environment pair. The 35-array artifact schema is unchanged. In the tested
 environment, environmental v5-save/v6-load replay reproduces all arrays and both canonical
-files exactly. The final local gate passes all 1,362 tests, Ruff lint and formatting, and
-mypy. Publication still requires explicit authorization.
+files exactly. The local publication gate passed all 1,362 tests, Ruff lint and formatting,
+and mypy. Hosted push CI
+[run 35793062927](https://github.com/Gayles9/robust-quadrotor/actions/runs/35793062927)
+subsequently succeeded.
 
 The repository does not yet contain a reusable physically conditional invariant-monitoring
 API, a closed-loop controller, a state estimator, adaptive integration, robustness campaigns,
@@ -1410,14 +1414,18 @@ arrays exactly, as well as the canonical manifest and NPZ bytes in the tested en
 This follow-up passed 15 generator tests, 668 related tests, and 1,241 full-suite tests;
 `make check` passed with 1,241 tests, Ruff, formatting, and mypy.
 
-The final local Gate G1 environmental audit passed 865 focused dynamics, integration,
+The pre-publication Gate G1 environmental audit passed 865 focused dynamics, integration,
 simulation, configuration, manifest, artifact, and generation tests and all 1,362 repository
 tests. Ruff lint passed, Ruff format verification reported 69 files already formatted,
 and mypy found no issues in 18 source files. An independent fixed-seed probe checked 4,096
 finite anisotropic drag cases and found no positive relative-air power. A separate
 fixed-final-time probe of `dv/dt = -0.5 * abs(v) * v`, `v(0) = 2`, observed RK4 orders
-3.888, 3.977, 3.995, and 3.999 under successive step halving. This is local
-publication-readiness evidence, not publication or a cross-platform reproducibility claim.
+3.888, 3.977, 3.995, and 3.999 under successive step halving. The audited work was published
+in [commit `32e4886c63b38b62f41aa236b4439ca22560f5b7`](https://github.com/Gayles9/robust-quadrotor/commit/32e4886c63b38b62f41aa236b4439ca22560f5b7),
+and hosted push CI
+[run 35793062927](https://github.com/Gayles9/robust-quadrotor/actions/runs/35793062927)
+succeeded. The evidence remains specific to the tested environment and is not a
+cross-platform reproducibility claim.
 
 ## Repository structure
 
@@ -1514,8 +1522,8 @@ the final high-accuracy simulation method, especially for larger time steps or l
    evidence is locally verified. Generation assembles in-memory data; callers explicitly save
    run directories. Allocation stays upstream, and actual rotor-speed history stays private.
 4. Gate G1 constant-wind/quadratic-drag implementation, deliberate environmental mismatch
-   evidence, manifest v5/v6 persistence, and exact tested-environment replay are locally
-   complete and publication-ready, but not yet published.
+   evidence, manifest v5/v6 persistence, and exact tested-environment replay are published
+   and complete in commit `32e4886c63b38b62f41aa236b4439ca22560f5b7`.
 5. The next bounded milestone is state-estimation design, beginning with 15-state error-state
    Kalman filter conventions, process/noise model, propagation equations, and Jacobian
    verification. Control, uncertainty campaigns, Monte Carlo validation, ROS 2, PX4, and C++
