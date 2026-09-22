@@ -79,10 +79,11 @@ validation, digest authentication, and durable no-replace publication on Linux. 
 manifest-decoder validation is also complete.
 
 First-order motor response and rotor control allocation are published actuation boundaries.
-The current local, uncommitted Run 3 work extends configuration and manifests with motor
-parameters and an initial actual rotor speed, and characterizes motorized save/load without
-changing the 35-array artifact schema. A complete-run generator has not yet assembled these
-boundaries into one end-to-end run.
+The published Run 3 motorized configuration and manifest work adds motor parameters, an
+initial actual rotor speed, and manifest versions 3 and 4 without changing the 35-array
+artifact schema. The locally implemented `generate_run_artifact_data` now composes motor
+response, truth propagation, bias evolution, scheduled sensors, and named randomness into a
+complete in-memory run. This generator milestone has not yet been published.
 
 The repository does not yet contain a reusable physically conditional invariant-monitoring
 API, a closed-loop controller, a state estimator, adaptive integration, robustness campaigns,
@@ -94,15 +95,16 @@ complete Gate G1.
 
 ```mermaid
 flowchart TD
-    A[Constant rotor speeds] --> B[FRD rotor actuation]
-    B --> C[Complete rigid-body state derivative]
-    C --> D[Explicit Euler or projected RK4 state step]
-    D --> E[Sequential NED and FRD state histories]
-    E --> F[Reusable structural validation]
-    E --> G[Physically meaningful trajectory errors]
-    G --> H[Observed convergence orders]
-    F --> I[Validated history contract]
-    H --> J[Reviewed numerical evidence]
+    A[Constant rotor-speed command] --> B{Motor mode}
+    B -->|Historical ideal actuation| C[Actual rotor speed]
+    B -->|Truth motor response| C
+    C --> D[FRD actuation and Euler or projected RK4 truth step]
+    D --> E[Truth and bias histories]
+    E --> F[Scheduled acquisition and delivery]
+    G[Six named RNG streams] --> E
+    G --> F
+    F --> H[35-array RunArtifactData]
+    H -->|Explicit save| I[Bound v2 or v4 run directory]
 ```
 
 The actuation model converts four nonnegative rotor angular speeds into static thrust
@@ -119,6 +121,16 @@ The reusable history validator independently rejects malformed or numerically in
 histories. The existing Euler and projected-RK4 simulators both produce histories accepted by
 that validator without modification.
 
+`generate_run_artifact_data(configuration)` uses the configured rotor-speed command directly
+in historical ideal-actuator mode. Complete motorized configurations advance a private actual
+rotor-speed history with truth motor parameters before each state transition. The generator
+then advances accelerometer and gyroscope biases, samples four scheduled sensors from the
+completed truth row, and records acquisitions and deliveries in the unchanged 35-array
+artifact. Actual rotor-speed history is reconstructed during generation but is not persisted.
+The allocator is not invoked because the configuration already supplies rotor-speed commands;
+allocation is upstream of this boundary when a future controller supplies thrust and moment
+demands. Saving a run directory remains an explicit separate call.
+
 **Practical interpretation.** Rotor speeds determine the force and turning effect on the
 vehicle; the dynamics convert those effects into rates of motion; integration turns those
 rates into a new state.
@@ -132,8 +144,9 @@ collective thrust and FRD body moment into commanded speeds in the supplied roto
 force and moment signs follow the existing FRD/NED conventions. It validates demand, geometry,
 spin directions, coefficients, speed limits, allocation-matrix rank, numerical bounds, and
 feasibility. Materially infeasible demands are rejected, not silently saturated; only
-roundoff-sized solved-square excursions at feasible boundaries are repaired. These functions
-are not yet composed into the existing multi-step rigid-body simulators.
+roundoff-sized solved-square errors on either side of feasible boundaries are repaired. The
+existing multi-step rigid-body simulators still take rotor speeds directly. The complete-run
+generator uses motor response, while allocation remains upstream.
 
 ## Mathematical model
 
@@ -756,10 +769,10 @@ is: the same configuration, root seed, stream protocol, NumPy environment, and c
 order reproduce the same stochastic sequences. This is not a promise across arbitrary NumPy
 or Python versions, platforms, or future distribution implementations.
 
-Run 1 establishes structural truth/nominal separation, but full truth isolation is not proven
-until the Run 3 nominal-perturbation composition test. Run-level replay, simulation
-composition, wind, drag, estimation, and control do not exist yet. Gate G1 remains open. The
-complete Run 1 contract and historical TDD evidence are in the
+Run 1 establishes structural truth/nominal separation. The local complete-run generator
+test now confirms that selected nominal perturbations leave all 35 generated arrays exactly
+unchanged. Wind, drag, deliberate mismatch effects, estimation, and control remain future
+work, and Gate G1 remains open. The Run 1 contract and historical TDD evidence are in the
 [run-configuration and named-stream progress record](docs/progress/2026-09-14-run-configuration-and-random-streams.md).
 
 ### Reproducible run manifests and authenticated artifacts
@@ -777,7 +790,7 @@ Version 2 adds only this binding object:
 }
 ```
 
-The local Run 3 extension selects the manifest version from configuration completeness and
+The published Run 3 extension selects the manifest version from configuration completeness and
 binding presence:
 
 | Configuration | Unbound | SHA-256 bound |
@@ -842,9 +855,9 @@ The existing 35-array artifact schema did not change for motorization. It stores
 `commanded_rotor_omega`, but not an actual rotor-speed trajectory. The persisted initial
 actual speed, truth motor parameters, command history, truth step, and fixed motor update
 policy suffice to reconstruct that trajectory under the current deterministic model;
-`actual_rotor_omega_history` was therefore not added prematurely. The complete-run generator
-will revisit explicit history storage if replay, reporting, or independent actuator-history
-verification needs it. Loaded arrays remain owned, C-contiguous, and read-only; valid
+`actual_rotor_omega_history` was therefore not added. The local complete-run generator
+reconstructs this private history while running and leaves it out of the artifact. Loaded
+arrays remain owned, C-contiguous, and read-only; valid
 manifest and NPZ re-encoding is byte-identical in the tested environment.
 
 Manifest decoding rejects duplicate JSON keys in the top-level or any nested object before
@@ -853,7 +866,7 @@ constants `NaN`, `Infinity`, and `-Infinity`, and requires
 `run_configuration.numerics.duration_s` to equal exactly `truth_time_step_s * number_of_steps`.
 These invalid manifests raise `ValueError`. The public APIs, manifest versions, and
 deterministic canonical encoding were unchanged by the Run 2C decoder increment; the later
-Run 3 work adds versions 3 and 4 without changing the public save/load APIs.
+published Run 3 work added versions 3 and 4 without changing the public save/load APIs.
 
 Given an already valid `manifest` and `data`, the public calls are:
 
@@ -873,7 +886,9 @@ The digest binds data to the supplied manifest; it is not a signature protecting
 maliciously replaced manifest.
 
 The [run-architecture progress record](docs/progress/2026-09-14-run-configuration-and-random-streams.md)
-records the Run 2B, Run 2C, and local Run 3 implementation and verification history.
+records the Run 2B, Run 2C, and published Run 3 implementation and verification history.
+The [complete-run generation progress record](docs/progress/2026-09-22-complete-run-generation.md)
+records the local generator audit and publication-ready evidence.
 
 ### Explicit-Euler propagation
 
@@ -1196,6 +1211,9 @@ The full convention, state shapes, signs, and hover sanity check are defined in 
   version-specific schemas and SHA-256 binding in versions 2 and 4.
 - An immutable 35-array NPZ run artifact with shared configuration validation, authenticated
   loading, and durable Linux no-replace directory publication.
+- A complete in-memory run generator combining truth motor response, Euler or projected-RK4
+  propagation, IMU bias random walks, four scheduled sensor streams, named RNGs, and the
+  unchanged 35-array artifact.
 - A squared-norm vector primitive.
 - Skew-symmetric matrices, quaternion normalization and differentiation, and active
   body-to-world rotation matrices.
@@ -1314,21 +1332,27 @@ and no warnings. Ruff lint passed, Ruff format verification found 64 files alrea
 and mypy found no issues in 16 source files. These counts record the verified working-tree
 snapshot before this documentation update.
 
-The locally completed motorized Run 3 checkpoint passed the 20-case exact modern-schema
+The published motorized Run 3 checkpoint passed the 20-case exact modern-schema
 characterization, 165 manifest tests, 653 configuration/manifest/artifact tests, 810 tests
 with actuation included, and the full suite of 1,226 tests. There were no failures, errors,
 skips, xfails, or warnings. Ruff lint passed, Ruff format verification reported 64 files
 already formatted, mypy found no issues in 17 source files, and `make check` passed with all
-1,226 tests. These are local verification results; the five-file implementation/test
-milestone has not been committed or pushed.
+1,226 tests. These counts are the historical local verification snapshot for the now
+published motorized milestone.
+
+The local complete-run generator audit passed 13 generator tests, 1,082 related tests, and
+1,239 full-suite tests. Ruff lint passed, Ruff format verification found 66 files already
+formatted, mypy found no issues in 18 source files, and `make check` passed with all 1,239
+tests. The audit added regression coverage for empty acquisition streams and runs whose
+observations all remain pending. This generator milestone has not been committed or pushed.
 
 ## Repository structure
 
 - `src/quadrotor_math/`: ROS/PX4-independent vector, randomness, rotation, actuation,
   dynamics, integration, deterministic simulation, ideal IMU mathematics, state-history
   validation, sensor measurement, fixed-rate sensor scheduling, immutable run configuration,
-  named run-random-stream ownership, canonical run manifests, immutable run artifacts, and
-  trajectory-error algorithms.
+  named run-random-stream ownership, canonical run manifests, immutable run artifacts,
+  complete-run generation, and trajectory-error algorithms.
 - `experiments/`: reproducible numerical studies built from the public mathematical core.
 - `tests/unit/`: focused unit and composition tests for the mathematical core.
 - `docs/architecture/`: architectural contracts, including frames and state conventions.
@@ -1339,8 +1363,9 @@ milestone has not been committed or pushed.
 ## Current limitations
 
 - Both simulators support constant rotor input and a fixed positive time step only.
-- Motor response and allocation are separate published boundaries, not yet composed into a
-  complete-run generator or the existing multi-step simulators.
+- Motor response is composed by the complete-run generator, while allocation remains a
+  separate upstream boundary. The existing multi-step simulators still take rotor speeds
+  directly and do not propagate motor state.
 - The convergence study covers one deterministic asymmetric scenario over 1 second and uses a
   fine numerical reference rather than an exact solution.
 - Structural history validation does not establish dynamic accuracy or scenario-specific
@@ -1384,11 +1409,12 @@ milestone has not been committed or pushed.
   deliveries automatically at termination, or integrate with an estimator, controller,
   ROS 2, or PX4.
 - Runs 1, 2A, 2B, and 2C established reproducible configuration, named streams, manifests,
-  and authenticated artifacts. The local Run 3 extension adds motorized configuration and
-  persistence, but not a complete simulator runner or run-level replay.
-- Truth and nominal configuration are structurally separate, but full truth isolation remains
-  unproven until the planned Run 3 nominal-perturbation composition test. Deliberate mismatch
-  effects in simulation, including future wind and drag parameters, are not implemented.
+  and authenticated artifacts. The published Run 3 extension adds motorized configuration and
+  persistence; the local generator assembles one complete in-memory run. It does not provide
+  a separate replay API or persist actual rotor-speed history.
+- Truth and nominal configuration are structurally separate, and a generator test confirms
+  selected nominal perturbations do not change generated data. Deliberate mismatch effects
+  in simulation, including future wind and drag parameters, are not implemented.
 - No Monte Carlo campaign exists yet.
 - No completed ROS 2/PX4 adapter exists yet.
 - The existing multi-step rigid-body simulators represent static quadratic rotor thrust,
@@ -1407,11 +1433,9 @@ the final high-accuracy simulation method, especially for larger time steps or l
    established.
 2. Runs 2A, 2B, and the bounded Run 2C manifest-validation increment are complete: canonical
    manifests, a durable authenticated NPZ artifact, and manifest-decoder checks are implemented.
-3. Published first-order motor response and rotor allocation are complete, and the local
-   motorized configuration/manifest/persistence increment is verified but unpublished. The
-   complete-run generator is next: it will assemble the existing dynamics, allocation,
-   motor lag, sensors, named randomness, schedules, configuration, manifests, and artifact
-   persistence into one deterministic run directory. It will also decide whether explicit
-   persisted actual rotor-speed history is needed for its replay and reporting contract.
+3. Published first-order motor response, rotor allocation, and motorized manifest versions 3
+   and 4 are complete. The complete-run generator is implemented and locally verified, with
+   publication pending. It assembles in-memory data; callers explicitly save run directories.
+   Allocation stays upstream, and actual rotor-speed history stays private.
 4. Gate G1 remains open. Estimation, control, uncertainty campaigns, Monte Carlo validation,
    ROS 2, and PX4 integration remain future work.
