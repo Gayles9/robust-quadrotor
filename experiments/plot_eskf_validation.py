@@ -14,6 +14,9 @@ import matplotlib
 import numpy as np
 from matplotlib.backends.backend_agg import FigureCanvasAgg
 from matplotlib.figure import Figure
+from matplotlib.patches import Patch
+
+from experiments.eskf_validation import validate_validation_report
 
 
 def _figure(rows: int, columns: int, width: float, height: float) -> tuple[Figure, Any]:
@@ -24,10 +27,9 @@ def _figure(rows: int, columns: int, width: float, height: float) -> tuple[Figur
 
 def render_validation_report(report: dict[str, Any], output: Path) -> list[str]:
     """Write new plots only; incomplete groups are visibly omitted, never replaced by zeros."""
-    if report.get("report_schema") != {"name": "eskf_completion_evaluation", "version": 1}:
-        raise ValueError("unsupported estimator completion report schema")
-    # Reject nonfinite values rather than letting a plotting backend hide them.
-    json.dumps(report, allow_nan=False)
+    # Validate the complete trial ledger and recompute the stored summaries before
+    # creating output. Legacy v1 evidence gets its verified fixed clock restored.
+    report = validate_validation_report(report)
     output.mkdir(parents=True, exist_ok=False)
     names: list[str] = []
     groups = report["groups"]
@@ -160,8 +162,20 @@ def render_validation_report(report: dict[str, Any], output: Path) -> list[str]:
             axes[0, 0].plot(times, ensemble["mean_horizontal_position_variance_m2"], label=name)
             axes[0, 1].plot(times, np.array(ensemble["mean_error_block_norms"])[:, 0], label=name)
         for axis in axes[0]:
-            axis.axvspan(8, 10, alpha=0.12, color="orange", label="Position dropout")
-            axis.axvspan(15, 17, alpha=0.1, color="gray", label="Stale delivery window")
+            for interval, color, label in (
+                ("position_dropout_s", "orange", "Position dropout"),
+                ("delay_window_s", "gray", "Delayed acquisition window"),
+            ):
+                start, end = report["protocol"]["faults"][interval]
+                # Do not stretch a short smoke plot out to absent fault windows.
+                if times[0] < end and times[-1] > start:
+                    axis.axvspan(
+                        max(start, times[0]),
+                        min(end, times[-1]),
+                        alpha=0.12,
+                        color=color,
+                        label=label,
+                    )
             axis.set(xlabel="Time [s]")
             axis.legend(fontsize=8)
         axes[0, 0].set(ylabel="P_NN + P_EE [m²]", title="Mean horizontal uncertainty")
@@ -175,30 +189,50 @@ def render_validation_report(report: dict[str, Any], output: Path) -> list[str]:
                 [values[i] for i in available],
                 width=0.3,
                 label=key,
+                color=("tab:blue", "tab:orange")[index],
             )
+            for sensor, value in enumerate(values):
+                if value is None:
+                    axes[1, 0].text(sensor + index * 0.3, 0.04, "N/A", ha="center", fontsize=8)
         axes[1, 0].set(
             xticks=[0.15, 1.15],
             xticklabels=["Position", "Altitude"],
             ylim=(0, 1.05),
+            xlim=(-0.35, 1.65),
             ylabel="Fraction",
-            title="Eligible fresh observations only",
+            title="Eligible fresh observations only (N/A: undefined)",
         )
-        axes[1, 0].legend(fontsize=8)
+        # Empty BarContainers otherwise get backend-default legend colors.
+        axes[1, 0].legend(
+            handles=[
+                Patch(facecolor="tab:blue", label="precision"),
+                Patch(facecolor="tab:orange", label="recall"),
+            ],
+            fontsize=8,
+        )
         trial = next(t for t in report["trials"] if "fault_gated" in t["variants"])
+        event_times = trial["variants"]["fault_gated"]["time_s"]
         events = [
             e
             for e in trial["variants"]["fault_gated"]["fault_events"]
             if e["kind"] == "local_position" and e["nis"] is not None
         ]
         for faulted, label in ((False, "Clean"), (True, "Injected outlier")):
-            chosen = [e for e in events if (e["offset"] is not None) == faulted]
+            chosen = [
+                e for e in events if (e["offset"] is not None and any(e["offset"])) == faulted
+            ]
             axes[1, 1].scatter(
-                [e["acquisition_index"] * 0.01 for e in chosen],
+                [event_times[e["acquisition_index"]] for e in chosen],
                 [e["nis"] for e in chosen],
                 s=10,
                 label=label,
             )
-        axes[1, 1].axhline(11.345, color="black", linestyle="--", label="Fixed gate")
+        axes[1, 1].axhline(
+            report["protocol"]["gate"]["local_position_nis_threshold"],
+            color="black",
+            linestyle="--",
+            label="Fixed gate",
+        )
         axes[1, 1].set(
             xlabel="Acquisition time [s]",
             ylabel="Position NIS",

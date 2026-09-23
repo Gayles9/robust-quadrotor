@@ -11,6 +11,9 @@ Date: 2026-09-23 (UTC).
 - Design fixed before implementation: [ADR 0009](../decisions/0009-eskf-completion-validation.md).
 - Mathematics, interfaces and reproduction: [estimator guide](../estimation.md).
 
+The subsequent [post-merge audit](2026-09-23-eskf-post-merge-audit.md) strengthens experiment
+and report validation while preserving this historical campaign and its NEES qualification.
+
 ## Outcome and qualification
 
 The known-prior measurement-driven basic ESKF and the scoped Week 10–12 engineering

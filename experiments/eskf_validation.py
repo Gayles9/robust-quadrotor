@@ -7,6 +7,7 @@ Generated JSON is an analysis report, not a persisted estimator/run-artifact sch
 import argparse
 import sys
 from concurrent.futures import ProcessPoolExecutor
+from copy import deepcopy
 from dataclasses import asdict, replace
 from datetime import UTC, datetime
 from pathlib import Path
@@ -35,6 +36,7 @@ from quadrotor_math.eskf_replay import (
     EskfReplayInput,
     EskfReplayResult,
     EskfReplayStatus,
+    _time_vector,
     replay_eskf,
 )
 from quadrotor_math.eskf_synthetic import (
@@ -153,7 +155,7 @@ def validation_protocol(partition: str) -> dict[str, Any]:
             "final_acquisitions_delayed": True,
             "interval_convention": "left closed, right open",
         },
-        "sensitivity_covariance_multipliers": SENSITIVITY,
+        "sensitivity_covariance_multipliers": SENSITIVITY.copy(),
         "targets": {
             "position_rmse_reduction": 0.5,
             "bias_final_to_initial_mean_norm_max": 0.5,
@@ -301,13 +303,15 @@ def fault_detection_metrics(
 def _evaluate_variant(
     case: EskfSyntheticCase, variant: str, injected: EskfFaultInjection, keep_history: bool
 ) -> dict[str, Any]:
+    if variant not in ("nominal", "dead_reckoning", "fault_gated", "fault_ungated", *SENSITIVITY):
+        raise ValueError(f"unknown variant {variant}")
     configuration = case.configuration
     data = case.measurements
     if variant == "dead_reckoning":
         configuration = replace(
             configuration, fuse_local_position=False, fuse_barometric_altitude=False
         )
-    elif variant.startswith("fault_"):
+    elif variant in ("fault_gated", "fault_ungated"):
         data = injected.measurements
         if variant == "fault_gated":
             configuration = replace(
@@ -323,8 +327,6 @@ def _evaluate_variant(
             barometric_altitude_noise_variance=configuration.barometric_altitude_noise_variance
             * r_scale,
         )
-    elif variant != "nominal":
-        raise ValueError(f"unknown variant {variant}")
     # Only measured data and nominal assumptions cross the estimator boundary.
     result = replay_eskf(data, configuration)
     consistency = evaluate_eskf_replay(result, case.reference)
@@ -336,6 +338,7 @@ def _evaluate_variant(
     norms = np.linalg.norm(consistency.error_states.reshape(-1, 5, 3), axis=2)
     report: dict[str, Any] = {
         "status": "completed",
+        "time_s": result.time_s.tolist(),
         "metrics": metrics,
         "nees": consistency.nees.tolist(),
         "nis": {name: series.to_mapping() for name, series in innovation_series(result).items()},
@@ -351,8 +354,11 @@ def _evaluate_variant(
             result.covariances[sample, 0, 0] + result.covariances[sample, 1, 1]
         ).tolist(),
     }
-    if result.time_s[-1] >= 11.0:
-        epochs = np.array([790, 999, 1100])
+    if result.time_s[0] <= 7.9 and result.time_s[-1] >= 11.0:
+        # Use actual epochs, including on the step-refinement diagnostic clocks.
+        # If a requested instant is absent, report the last epoch at/before it.
+        epochs = np.searchsorted(result.time_s, [7.9, 9.99, 11.0], side="right") - 1
+        report["dropout_time_s"] = result.time_s[epochs].tolist()
         report["dropout_horizontal_variance_m2"] = (
             result.covariances[epochs, 0, 0] + result.covariances[epochs, 1, 1]
         ).tolist()
@@ -443,8 +449,61 @@ def run_validation_trial(job: tuple[str, int, int, tuple[str, ...], bool]) -> di
     return report
 
 
-def summarize_validation(trials: list[dict[str, Any]]) -> dict[str, Any]:
+def _validate_trial_plan(
+    trials: list[dict[str, Any]], protocol: dict[str, Any] | None = None
+) -> None:
+    """Reject duplicate replicates, unknown variants and incomplete declared jobs."""
+    if not trials:
+        raise ValueError("trials must contain the declared jobs")
+    seen: set[tuple[str, int]] = set()
+    for trial in trials:
+        identity = (trial["family"], trial["seed"])
+        if trial["family"] not in MOTIONS or type(trial["seed"]) is not int:
+            raise ValueError("invalid trial family or seed")
+        if identity in seen:
+            raise ValueError("duplicate trial family/seed cannot represent independent replicates")
+        seen.add(identity)
+        if not trial["variants"] or any(
+            name not in ("nominal", "dead_reckoning", "fault_gated", "fault_ungated", *SENSITIVITY)
+            for name in trial["variants"]
+        ):
+            raise ValueError("unknown or empty trial variants")
+        for record in trial["variants"].values():
+            if record["status"] == "numerical_failure":
+                continue
+            if record["status"] != "completed":
+                raise ValueError("invalid variant status")
+            times = _time_vector(np.asarray(record["time_s"], dtype=np.float64))
+            scores = np.asarray(record["nees"], dtype=np.float64)
+            if scores.shape != times.shape or not np.all(np.isfinite(scores)) or np.any(scores < 0):
+                raise ValueError("NEES scores must be finite and match their epochs")
+    if protocol is None:
+        return
+    jobs = {(job["motion"], job["seed"]): job for job in protocol["jobs"]}
+    if len(jobs) != len(protocol["jobs"]) or seen != set(jobs):
+        raise ValueError("trial identities must match every declared job exactly once")
+    for trial in trials:
+        job = jobs[(trial["family"], trial["seed"])]
+        if set(trial["variants"]) != set(job["variants"]):
+            raise ValueError("trial variants must match the declared job")
+        times = np.arange(job["number_of_steps"] + 1) * protocol["time_step_s"]
+        for record in trial["variants"].values():
+            if record["status"] == "completed" and (
+                record["time_s"] != times.tolist()
+                or record["sample_time_s"] != times[::10].tolist()
+            ):
+                raise ValueError("completed variant epochs must match the declared job")
+            if record["status"] == "completed" and times[-1] >= 11.0:
+                epochs = np.searchsorted(times, protocol["dropout_epochs_s"], side="right") - 1
+                if record["dropout_time_s"] != times[epochs].tolist():
+                    raise ValueError("dropout diagnostic epochs must match the declared clock")
+
+
+def summarize_validation(
+    trials: list[dict[str, Any]], *, protocol: dict[str, Any] | None = None
+) -> dict[str, Any]:
     """Report complete per-family/variant ensembles, never survivors-only estimates."""
+    _validate_trial_plan(trials, protocol)
     groups: dict[str, Any] = {}
     identities = sorted(
         {(trial["family"], variant) for trial in trials for variant in trial["variants"]}
@@ -464,7 +523,12 @@ def summarize_validation(trials: list[dict[str, Any]]) -> dict[str, Any]:
         groups[family + "/" + variant] = group
         if failures:
             continue
-        time_s = np.arange(len(records[0]["nees"]), dtype=float) * 0.01
+        if any(
+            r["time_s"] != records[0]["time_s"] or r["sample_time_s"] != records[0]["sample_time_s"]
+            for r in records
+        ):
+            raise ValueError("ensemble NEES/sample epochs must match exactly")
+        time_s = np.asarray(records[0]["time_s"], dtype=np.float64)
         ensemble: dict[str, Any] = {
             "divergence_count": sum(r["metrics"]["diverged"] for r in records),
             "nees": _score_summary(np.array([r["nees"] for r in records]), 15, time_s),
@@ -512,8 +576,11 @@ def summarize_validation(trials: list[dict[str, Any]]) -> dict[str, Any]:
                 else None
             )
         if "dropout_horizontal_variance_m2" in records[0]:
+            if any(r["dropout_time_s"] != records[0]["dropout_time_s"] for r in records):
+                raise ValueError("ensemble dropout epochs must match exactly")
             values = np.array([r["dropout_horizontal_variance_m2"] for r in records])
             ensemble["dropout"] = {
+                "time_s": records[0]["dropout_time_s"],
                 "mean_variance_m2": values.mean(axis=0).tolist(),
                 "growth_count": int(np.sum(values[:, 1] > values[:, 0])),
                 "recovery_count": int(np.sum(values[:, 2] < values[:, 1])),
@@ -558,13 +625,18 @@ def run_validation(partition: str, workers: int = 1) -> dict[str, Any]:
     else:
         with ProcessPoolExecutor(max_workers=workers) as pool:
             trials = list(pool.map(run_validation_trial, jobs))
+    return _assemble_report(protocol, trials)
+
+
+def _assemble_report(protocol: dict[str, Any], trials: list[dict[str, Any]]) -> dict[str, Any]:
+    """Derive every summary/count/assessment from the complete declared trial ledger."""
     variants = [(name, r) for trial in trials for name, r in trial["variants"].items()]
     report = {
-        "report_schema": {"name": "eskf_completion_evaluation", "version": 1},
+        "report_schema": {"name": "eskf_completion_evaluation", "version": 2},
         "protocol": protocol,
         "protocol_sha256": protocol_sha256(protocol),
         "trials": trials,
-        "groups": summarize_validation(trials),
+        "groups": summarize_validation(trials, protocol=protocol),
         "numerical_failure_count": sum(r["status"] != "completed" for _, r in variants),
         "nominal_or_gated_divergence_count": sum(
             r["metrics"]["diverged"]
@@ -574,6 +646,64 @@ def run_validation(partition: str, workers: int = 1) -> dict[str, Any]:
     }
     report["assessment"] = assess_validation(report)
     return report
+
+
+def validate_validation_report(report: dict[str, Any]) -> dict[str, Any]:
+    """Validate stored evidence before use and return an owned schema-v2 view.
+
+    Check the frozen protocol/hash, complete unique job/variant identities and epochs,
+    then recompute groups, failure counts and assessments. This detects accidental
+    truncation/stale summaries; it cannot authenticate the underlying execution.
+    Legacy v1 reports used an implicit fixed clock. Recover that clock only from the
+    verified original protocol, preserving their numerical values and source metadata.
+    """
+    try:
+        canonical_json(report)
+        checked = deepcopy(report)
+        schema = checked["report_schema"]
+        if (
+            not isinstance(schema, dict)
+            or schema.get("name") != "eskf_completion_evaluation"
+            or type(schema.get("version")) is not int
+            or schema["version"] not in (1, 2)
+        ):
+            raise ValueError("unsupported estimator completion report schema")
+        protocol = checked["protocol"]
+        if canonical_json(protocol) != canonical_json(
+            validation_protocol(protocol["partition"])
+        ) or checked["protocol_sha256"] != protocol_sha256(protocol):
+            raise ValueError("report must match the frozen protocol and its hash")
+        if schema["version"] == 1:
+            jobs = {(job["motion"], job["seed"]): job for job in protocol["jobs"]}
+            for trial in checked["trials"]:
+                job = jobs[(trial["family"], trial["seed"])]
+                times = (np.arange(job["number_of_steps"] + 1) * protocol["time_step_s"]).tolist()
+                for record in trial["variants"].values():
+                    if record["status"] == "completed":
+                        record.setdefault("time_s", times.copy())
+                        if "dropout_horizontal_variance_m2" in record:
+                            record.setdefault("dropout_time_s", list(protocol["dropout_epochs_s"]))
+            for group in checked["groups"].values():
+                ensemble = group["ensemble"]
+                if ensemble is not None and "dropout" in ensemble:
+                    ensemble["dropout"].setdefault("time_s", list(protocol["dropout_epochs_s"]))
+            # The v1 assessment also embeds the dropout summary.
+            fault_targets = checked["assessment"]["fault_targets"]
+            if fault_targets is not None and fault_targets["dropout"] is not None:
+                fault_targets["dropout"].setdefault("time_s", list(protocol["dropout_epochs_s"]))
+            schema["version"] = 2
+        expected = _assemble_report(protocol, checked["trials"])
+        for key in (
+            "groups",
+            "numerical_failure_count",
+            "nominal_or_gated_divergence_count",
+            "assessment",
+        ):
+            if canonical_json(checked[key]) != canonical_json(expected[key]):
+                raise ValueError(f"report {key} does not match its declared trials")
+        return checked
+    except (KeyError, TypeError, OverflowError) as error:
+        raise ValueError("malformed estimator completion evidence") from error
 
 
 def assess_validation(report: dict[str, Any]) -> dict[str, Any]:

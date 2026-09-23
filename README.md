@@ -1673,6 +1673,12 @@ passed local lint/format/type checks and all 2,427 tests, including a warnings-a
 also passed 2,427 tests. Its clean-checkout smoke source digest matches the held-out campaign.
 Existing production modules, tests, run schemas and numerical defaults are unchanged.
 
+The [post-merge audit](docs/progress/2026-09-23-eskf-post-merge-audit.md) adds strict
+trial/protocol accounting and validates stored evidence before plotting. Reports now
+record actual diagnostic epochs, reject duplicate seeds and unknown variants, and retain
+compatibility with the original report format. Existing campaign values and the NEES
+qualification remain unchanged.
+
 ## Frame and attitude conventions
 
 - World frame `W` is north-east-down (NED): `+x` north, `+y` east, and `+z` down.
@@ -1943,11 +1949,17 @@ Descriptive NEES coverage was 96.2% and 95.5%; position/altitude NIS coverage wa
 These are short nominal-case results. Development's higher NEES coverage is retained in
 the record; no gates, noise assumptions or seed selections were fitted to validation.
 
-The completion increment adds **69 tests**, bringing the current suite to **2,427 passing
+The completion increment adds **69 tests**, bringing that revision to **2,427 passing
 tests** in the full gate and warnings-as-errors run. Hosted code CI also passes, with
 31 source files checked by mypy. Its 100-trajectory held-out evaluation and explicitly
 missed NEES investigation target are documented in the
 [completion record](docs/progress/2026-09-23-eskf-completion.md).
+
+The subsequent [post-merge audit](docs/progress/2026-09-23-eskf-post-merge-audit.md) adds
+22 regression cases. The current suite has **2,449 passing tests**, including the full
+warnings-as-errors run; lint, formatting and strict typing pass. Report validation and
+diagnostic timing are strengthened without changing the estimator or its measured NEES
+qualification.
 
 ## Repository structure
 

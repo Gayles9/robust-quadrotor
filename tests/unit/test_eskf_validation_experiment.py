@@ -241,8 +241,11 @@ def test_headless_figures_have_input_identity_and_refuse_overwrite(tmp_path, smo
 
 
 def test_incomplete_ensembles_are_omitted_visibly(tmp_path, smoke):
-    report = deepcopy(smoke)
-    for group in report["groups"].values():
-        group["ensemble"] = None
-    report["assessment"]["paired_sensitivity"] = {}
+    trials = deepcopy(smoke["trials"])
+    for trial in trials:
+        trial["variants"] = {
+            name: {"status": "numerical_failure", "stage": "generation", "error": "fixture"}
+            for name in trial["variants"]
+        }
+    report = experiment._assemble_report(smoke["protocol"], trials)
     assert render_validation_report(report, tmp_path / "incomplete") == []
