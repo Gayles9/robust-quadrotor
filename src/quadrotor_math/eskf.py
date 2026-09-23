@@ -13,6 +13,25 @@ from .rotations import (
 )
 
 
+def _symmetrized_float64_matrix(values: NDArray[np.float64]) -> NDArray[np.float64]:
+    """Return a bit-symmetric copy while preserving equal entries exactly."""
+    symmetric_values = np.array(values, dtype=np.float64, order="C", copy=True)
+    upper_rows, upper_columns = np.triu_indices(values.shape[0], k=1)
+    upper_values = values[upper_rows, upper_columns]
+    lower_values = values[upper_columns, upper_rows]
+    unequal_entries = upper_values != lower_values
+    symmetric_values[upper_columns, upper_rows] = upper_values
+    if not np.any(unequal_entries):
+        return symmetric_values
+
+    unequal_upper_rows = upper_rows[unequal_entries]
+    unequal_upper_columns = upper_columns[unequal_entries]
+    averaged_values = 0.5 * upper_values[unequal_entries] + 0.5 * lower_values[unequal_entries]
+    symmetric_values[unequal_upper_rows, unequal_upper_columns] = averaged_values
+    symmetric_values[unequal_upper_columns, unequal_upper_rows] = averaged_values
+    return symmetric_values
+
+
 def _validated_float64_matrix(
     name: str,
     values: NDArray[np.float64],
@@ -29,14 +48,23 @@ def _validated_float64_matrix(
     if not symmetric_positive_semidefinite:
         return owned_values
 
-    transposed_values = owned_values.T
-    mirrored_scale = np.maximum(np.abs(owned_values), np.abs(transposed_values))
-    symmetry_roundoff_tolerance = (
-        8.0 * float(owned_values.shape[0]) * np.finfo(np.float64).eps * mirrored_scale
-    )
-    mirrored_half_difference = np.abs(0.5 * owned_values - 0.5 * transposed_values)
-    if np.any(mirrored_half_difference > symmetry_roundoff_tolerance):
-        raise ValueError(f"{name} must be symmetric")
+    upper_rows, upper_columns = np.triu_indices(owned_values.shape[0], k=1)
+    upper_values = owned_values[upper_rows, upper_columns]
+    lower_values = owned_values[upper_columns, upper_rows]
+    unequal_entries = upper_values != lower_values
+    if np.any(unequal_entries):
+        unequal_upper_values = upper_values[unequal_entries]
+        unequal_lower_values = lower_values[unequal_entries]
+        mirrored_scale = np.maximum(np.abs(unequal_upper_values), np.abs(unequal_lower_values))
+        with np.errstate(over="raise", divide="raise", invalid="raise"):
+            normalized_difference = np.abs(
+                unequal_upper_values / mirrored_scale - unequal_lower_values / mirrored_scale
+            )
+        symmetry_roundoff_relative_tolerance = (
+            16.0 * float(owned_values.shape[0]) * np.finfo(np.float64).eps
+        )
+        if np.any(normalized_difference > symmetry_roundoff_relative_tolerance):
+            raise ValueError(f"{name} must be symmetric")
     input_diagonal = np.diag(owned_values)
     if np.any(input_diagonal < 0.0):
         raise ValueError(f"{name} must be positive semidefinite")
@@ -46,7 +74,7 @@ def _validated_float64_matrix(
     ):
         raise ValueError(f"{name} must be positive semidefinite")
 
-    owned_values = 0.5 * owned_values + 0.5 * transposed_values
+    owned_values = _symmetrized_float64_matrix(owned_values)
     diagonal = np.diag(owned_values)
     positive_diagonal = ~zero_diagonal
     if not np.any(positive_diagonal):
@@ -164,8 +192,13 @@ class EskfNominalState:
                 raise ValueError(f"{field_name} must contain only finite values")
             owned_arrays[field_name] = owned_values
 
+        try:
+            with np.errstate(over="raise", invalid="raise"):
+                quaternion_norm = np.linalg.norm(owned_arrays["q_WB"])
+        except FloatingPointError:
+            raise ValueError("q_WB must have unit norm") from None
         if not np.isclose(
-            np.linalg.norm(owned_arrays["q_WB"]),
+            quaternion_norm,
             1.0,
             rtol=1.0e-12,
             atol=1.0e-12,
@@ -385,9 +418,8 @@ def discretize_eskf_error_dynamics_first_order(
                 @ owned_continuous_noise_input_matrix.T
                 * time_step_s
             )
-            discrete_process_noise_covariance = (
-                0.5 * raw_discrete_process_noise_covariance
-                + 0.5 * raw_discrete_process_noise_covariance.T
+            discrete_process_noise_covariance = _symmetrized_float64_matrix(
+                raw_discrete_process_noise_covariance
             )
             if not np.all(np.isfinite(transition_matrix)) or not np.all(
                 np.isfinite(discrete_process_noise_covariance)
@@ -452,7 +484,7 @@ def propagate_eskf_covariance(
                 owned_transition_matrix @ owned_covariance @ owned_transition_matrix.T
                 + owned_discrete_process_noise_covariance
             )
-            propagated_covariance = 0.5 * propagated_covariance + 0.5 * propagated_covariance.T
+            propagated_covariance = _symmetrized_float64_matrix(propagated_covariance)
             if not np.all(np.isfinite(propagated_covariance)):
                 raise FloatingPointError
     except FloatingPointError:
@@ -476,6 +508,29 @@ def predict_eskf(
     time_step_s: float,
 ) -> tuple[EskfNominalState, NDArray[np.float64]]:
     """Predict the nominal ESKF state and covariance over one IMU interval."""
+    if time_step_s == 0.0:
+        propagated_nominal_state = propagate_eskf_nominal_state(
+            nominal_state,
+            specific_force_measurement_B,
+            angular_velocity_measurement_B,
+            gravity_acceleration,
+            time_step_s,
+        )
+        transition_matrix, discrete_process_noise_covariance = (
+            discretize_eskf_error_dynamics_first_order(
+                np.zeros((15, 15), dtype=np.float64),
+                np.zeros((15, 12), dtype=np.float64),
+                continuous_noise_covariance,
+                time_step_s,
+            )
+        )
+        propagated_covariance = propagate_eskf_covariance(
+            covariance,
+            transition_matrix,
+            discrete_process_noise_covariance,
+        )
+        return propagated_nominal_state, propagated_covariance
+
     continuous_state_matrix, continuous_noise_input_matrix = (
         eskf_continuous_error_dynamics_matrices(
             nominal_state,

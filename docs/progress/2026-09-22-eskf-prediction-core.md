@@ -1,8 +1,10 @@
 # 15-State ESKF Prediction Core
 
 - Date: 2026-09-22
-- Status: Complete; ready for publication review
-- Recommended subject: `feat: add ESKF prediction core`
+- Status: Published; post-publication numerical correction complete locally and pending review
+- Published commit: `104fdfc1902e968de283ec76e720220fba577320`
+- Published subject: `feat: add ESKF prediction core`
+- Recommended correction subject: `fix: harden ESKF numerical edge cases`
 
 ## Scope
 
@@ -284,6 +286,56 @@ The completed closeout passed:
 - the aggregate `make check` gate.
 
 There were no failures, errors, skips, xfails, or warnings.
+
+## Post-publication numerical-edge audit (2026-09-22)
+
+The milestone was published in commit
+`104fdfc1902e968de283ec76e720220fba577320`, whose parent is
+`967c77ed551650e3914cccbc77af5779dfadb924`. Hosted push CI
+[run 35802813457](https://github.com/Gayles9/robust-quadrotor/actions/runs/35802813457)
+completed successfully.
+
+A bounded post-publication warning-as-error audit then found four related numerical-contract
+gaps:
+
+1. finite non-unit quaternions near the `float64` maximum leaked an overflow warning while
+   computing their norm instead of raising only the established unit-norm error;
+2. half-sum symmetrization erased exact positive-subnormal diagonals and mirrored entries;
+3. half-difference symmetry checking could underflow both the difference and local tolerance
+   to zero, misclassifying unequal smallest-subnormal entries; and
+4. zero-duration composed prediction built `F/G` before reaching lower-level zero-time
+   branches, so extreme finite measurement-minus-bias subtraction failed unnecessarily.
+
+The first focused RED run produced six intended failures, five passing validation controls,
+and 96 deselected existing tests. Those failures independently exposed the warning, symmetry
+classification, positive-subnormal input, covariance-output, process-noise-output, and
+zero-duration composition defects through public APIs. A follow-up bit-symmetry regression
+then produced one intended failure with 107 tests deselected for unequal signed-zero bits.
+
+The narrow GREEN correction guards quaternion norm arithmetic, scale-normalizes each unequal
+mirrored pair for local symmetry comparison, and uses one exact-entry-preserving symmetrizer
+for validated PSD inputs, `Q_d`, and propagated covariance. The helper leaves diagonals
+untouched, copies exactly equal mirrored entries to both positions, and averages only unequal
+pairs with overflow-safe half sums. The zero-duration composed path reuses nominal
+propagation, zero-matrix discretization, and covariance propagation to validate every public
+input without constructing `F/G` or subtracting biases. Positive-time pre-step linearization
+is unchanged.
+
+All 12 targeted edge and validation regressions then passed with 96 existing tests
+deselected. The required adversarial review passed 30 tests with 78 deselected, including
+masked local asymmetry and indefiniteness, negative diagonals, zero-diagonal nonzero rows,
+correlated process noise, maximum-float overflow, zero process noise, all zero-duration paths,
+and the 750-step sequence.
+
+Final verification passed 108 focused ESKF tests, 397 related rotation/IMU/dynamics/
+integration/simulation/run-generation/ESKF tests, and all 1,470 repository tests. Ruff lint
+passed, Ruff format verification reported 73 files already formatted, mypy reported no issues
+in 19 source files, and `make check` passed all 1,470 tests. There were no failures, errors,
+skips, xfails, or warnings.
+
+This correction changes only the ESKF implementation, its unit tests, this progress record,
+ADR 0004, and the README. It remains local and unpublished pending separate review and
+authorization.
 
 ## Next exact milestone
 

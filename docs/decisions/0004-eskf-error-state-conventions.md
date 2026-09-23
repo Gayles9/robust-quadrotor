@@ -36,7 +36,10 @@ x_nominal = (
 ```
 
 The quaternion sign is not canonicalized. State arrays are finite, independently
-owned, C-contiguous `float64` values and are exposed read-only.
+owned, C-contiguous `float64` values and are exposed read-only. Quaternion norm evaluation
+converts finite arithmetic overflow or invalid arithmetic into the existing unit-norm
+validation error without leaking a runtime warning; the strict unit-norm tolerance is
+unchanged.
 
 ### Error state and injection
 
@@ -135,26 +138,33 @@ Q_d = 0.5 (Q_d_raw + Q_d_raw.T).
 ```
 
 The explicit final symmetrization changes only floating-point roundoff because the
-mathematical `G Q_c G.T` is symmetric. `Q_c` may contain correlations. It, the input
-covariance `P`, and discrete process noise `Q_d` must be finite, symmetric, and positive
-semidefinite. Symmetry is checked against the scale of each mirrored entry pair, so a large
-unrelated diagonal cannot hide a local asymmetry. Positive-semidefinite validation rejects
-every explicit negative diagonal and normalizes positive diagonal scales before its
-eigendecomposition, so a large eigenvalue cannot hide a small indefinite principal block.
-A scale-aware eigenvalue tolerance admits only floating-point eigensolver roundoff. The
-covariance prediction is
+mathematical `G Q_c G.T` is symmetric. The implementation preserves every diagonal and every
+exactly equal mirrored pair without arithmetic, copies one exact representation to both
+mirrored positions, and safely averages only genuinely unequal pairs. This retains exact
+subnormal entries, produces bit-symmetric output including signed zeros, and avoids overflow
+near the finite `float64` maximum. `Q_c` may contain correlations. It, the input covariance
+`P`, and discrete process noise `Q_d` must be finite, symmetric, and positive semidefinite.
+Symmetry is checked by scale-normalizing each unequal mirrored pair before comparison, so a
+large unrelated diagonal cannot hide a local asymmetry and an underflowed absolute tolerance
+cannot make unequal subnormal entries appear equal. Positive-semidefinite validation rejects
+every explicit negative diagonal, accepts valid positive-subnormal diagonals, and normalizes
+positive diagonal scales before its eigendecomposition, so a large eigenvalue cannot hide a
+small indefinite principal block. A scale-aware eigenvalue tolerance admits only
+floating-point eigensolver roundoff. The covariance prediction is
 
 ```text
 P_next = Phi P Phi.T + Q_d
 P_next = 0.5 (P_next + P_next.T).
 ```
 
-The composed prediction builds `F` and `G` at the pre-propagation nominal state,
-forms `Phi` and `Q_d`, propagates the nominal state, and then propagates `P`.
-Prediction intervals are finite and nonnegative. At exactly zero duration, nominal
-propagation returns an independently owned exact copy, discretization returns exact identity
-`Phi` and exact zero `Q_d`, and covariance propagation preserves an exactly symmetric input
-covariance without performing avoidable arithmetic.
+For positive duration, the composed prediction builds `F` and `G` at the pre-propagation
+nominal state, forms `Phi` and `Q_d`, propagates the nominal state, and then propagates `P`.
+Prediction intervals are finite and nonnegative. At exactly zero duration, composed
+prediction validates the IMU inputs and gravity through nominal propagation, validates
+`Q_c` and the time step through zero-matrix discretization, and validates `P` through
+covariance propagation without building `F/G` or subtracting biases. It returns independently
+owned exact nominal-state and covariance copies; discretization returns exact identity `Phi`
+and exact zero `Q_d` without avoidable arithmetic.
 
 ### Verification evidence
 
@@ -166,11 +176,12 @@ with `I + F dt` at `dt = 0.04, 0.02, 0.01, 0.005` seconds. The observed norm err
 decreases approximately quadratically when the step is halved, as expected for a
 first-order transition approximation.
 
-Covariance tests cover diagonal and correlated positive-semidefinite noise, scales from
-approximately `1e-24` through `1e24`, locally adversarial symmetry and definiteness cases,
-fixed-seed randomized positive-definite inputs, zero process noise, zero-duration prediction,
-and a 750-step prediction sequence. They verify finite results, unit quaternion norm,
-bit-symmetric covariance, and the absence of materially negative covariance eigenvalues.
+Covariance tests cover diagonal and correlated positive-semidefinite noise, scales from the
+smallest positive `float64` subnormal through approximately `1e24`, locally adversarial
+symmetry and definiteness cases, fixed-seed randomized positive-definite inputs, zero process
+noise, zero-duration prediction, and a 750-step prediction sequence. They verify finite
+results, unit quaternion norm, bit-symmetric covariance, exact subnormal preservation, and
+the absence of materially negative covariance eigenvalues.
 
 ## Consequences and limitations
 

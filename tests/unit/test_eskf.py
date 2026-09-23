@@ -176,6 +176,13 @@ def test_nominal_state_requires_strict_unit_quaternion(q_WB: NDArray[np.float64]
         _state(q_WB=q_WB)
 
 
+def test_nominal_state_rejects_finite_quaternion_norm_overflow_without_warning() -> None:
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", RuntimeWarning)
+        with pytest.raises(ValueError, match="^q_WB must have unit norm$"):
+            _state(q_WB=np.full(4, np.finfo(np.float64).max))
+
+
 def test_nominal_state_owns_read_only_float64_arrays_without_sign_canonicalization() -> None:
     caller_arrays = [
         np.array([1, 2, 3]),
@@ -840,6 +847,29 @@ def test_first_order_discretization_supports_correlated_psd_noise() -> None:
     assert np.linalg.eigvalsh(discrete_noise)[0] >= -1.0e-12
 
 
+def test_first_order_discretization_preserves_smallest_positive_subnormal_noise() -> None:
+    smallest_positive = np.nextafter(0.0, 1.0)
+    G = np.zeros((15, 12))
+    G[4, 0] = 1.0
+    G[5, 1] = 1.0
+    Q_c = np.zeros((12, 12))
+    Q_c[0:2, 0:2] = smallest_positive
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", RuntimeWarning)
+        _, discrete_noise = discretize_eskf_error_dynamics_first_order(
+            np.zeros((15, 15)), G, Q_c, 1.0
+        )
+
+    assert discrete_noise[4, 4] == smallest_positive
+    assert discrete_noise[4, 5] == smallest_positive
+    assert discrete_noise[5, 4] == smallest_positive
+    assert discrete_noise[5, 5] == smallest_positive
+    np.testing.assert_array_equal(discrete_noise, discrete_noise.T)
+    assert np.all(np.isfinite(discrete_noise))
+    assert np.linalg.eigvalsh(discrete_noise)[0] >= 0.0
+
+
 @pytest.mark.parametrize(
     ("argument_name", "invalid", "message"),
     [
@@ -928,6 +958,20 @@ def test_matrix_validation_rejects_local_asymmetry_masked_by_large_diagonal() ->
             locally_asymmetric,
             0.01,
         )
+
+
+def test_matrix_validation_reports_smallest_subnormal_local_asymmetry() -> None:
+    smallest_positive = np.nextafter(0.0, 1.0)
+    covariance = np.eye(15)
+    covariance[0, 0] = smallest_positive
+    covariance[1, 1] = smallest_positive
+    covariance[0, 1] = smallest_positive
+    covariance[1, 0] = 0.0
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", RuntimeWarning)
+        with pytest.raises(ValueError, match="^covariance must be symmetric$"):
+            propagate_eskf_covariance(covariance, np.eye(15), np.zeros((15, 15)))
 
 
 @pytest.mark.parametrize(
@@ -1112,6 +1156,46 @@ def test_covariance_propagation_rejects_materially_indefinite_matrices(
         propagate_eskf_covariance(**arguments)
 
 
+def test_covariance_propagation_accepts_smallest_positive_subnormal_variance() -> None:
+    smallest_positive = np.nextafter(0.0, 1.0)
+    covariance = np.eye(15)
+    covariance[0, 0] = smallest_positive
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", RuntimeWarning)
+        propagated = propagate_eskf_covariance(covariance, np.eye(15), np.zeros((15, 15)))
+
+    np.testing.assert_array_equal(propagated, covariance)
+    assert not np.shares_memory(propagated, covariance)
+
+
+def test_covariance_propagation_returns_bit_symmetric_signed_zero_entries() -> None:
+    covariance = np.eye(15)
+    covariance[0, 1] = 0.0
+    covariance[1, 0] = -0.0
+
+    propagated = propagate_eskf_covariance(covariance, np.eye(15), np.zeros((15, 15)))
+
+    np.testing.assert_array_equal(propagated.view(np.uint64), propagated.T.copy().view(np.uint64))
+
+
+def test_covariance_propagation_preserves_smallest_subnormal_after_permutation() -> None:
+    smallest_positive = np.nextafter(0.0, 1.0)
+    covariance = np.eye(15)
+    covariance[0, 0] = smallest_positive
+    transition = np.eye(15)
+    transition[[0, 1]] = transition[[1, 0]]
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", RuntimeWarning)
+        propagated = propagate_eskf_covariance(covariance, transition, np.zeros((15, 15)))
+
+    assert propagated[1, 1] == smallest_positive
+    np.testing.assert_array_equal(propagated, propagated.T)
+    assert np.all(np.isfinite(propagated))
+    assert np.linalg.eigvalsh(propagated)[0] >= 0.0
+
+
 def test_covariance_propagation_preserves_symmetry_psd_and_ownership() -> None:
     rng = np.random.default_rng(3301)
     covariance_factor = rng.normal(size=(15, 15))
@@ -1265,6 +1349,75 @@ def test_predict_zero_time_preserves_exact_values_with_independent_outputs() -> 
         assert not np.shares_memory(actual, expected)
     np.testing.assert_array_equal(predicted_covariance, covariance)
     assert not np.shares_memory(predicted_covariance, covariance)
+
+
+def test_predict_zero_time_avoids_extreme_bias_subtraction_without_warning() -> None:
+    maximum = np.finfo(np.float64).max
+    nominal = _state(
+        accelerometer_bias_B=np.full(3, maximum),
+        gyroscope_bias_B=np.full(3, maximum),
+    )
+    covariance = np.diag(np.linspace(0.1, 1.5, 15))
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", RuntimeWarning)
+        predicted_nominal, predicted_covariance = predict_eskf(
+            nominal,
+            covariance,
+            np.full(3, -maximum),
+            np.full(3, -maximum),
+            9.81,
+            np.eye(12),
+            0.0,
+        )
+
+    for field in fields(EskfNominalState):
+        actual = getattr(predicted_nominal, field.name)
+        expected = getattr(nominal, field.name)
+        np.testing.assert_array_equal(actual, expected)
+        assert not np.shares_memory(actual, expected)
+    np.testing.assert_array_equal(predicted_covariance, covariance)
+    assert not np.shares_memory(predicted_covariance, covariance)
+
+
+@pytest.mark.parametrize(
+    ("argument_name", "invalid", "message"),
+    [
+        (
+            "specific_force_measurement_B",
+            np.zeros(2),
+            "specific_force_measurement_B must have shape (3,)",
+        ),
+        (
+            "angular_velocity_measurement_B",
+            np.array([np.nan, 0.0, 0.0]),
+            "angular_velocity_measurement_B must contain only finite values",
+        ),
+        ("gravity_acceleration", -0.1, "gravity_acceleration must be finite and nonnegative"),
+        ("covariance", np.diag([-1.0, *([1.0] * 14)]), "covariance must be positive semidefinite"),
+        (
+            "continuous_noise_covariance",
+            np.diag([-1.0, *([1.0] * 11)]),
+            "continuous_noise_covariance must be positive semidefinite",
+        ),
+    ],
+)
+def test_predict_zero_time_validates_every_public_input_boundary(
+    argument_name: str, invalid: NDArray[np.float64] | float, message: str
+) -> None:
+    arguments: dict[str, NDArray[np.float64] | float | EskfNominalState] = {
+        "nominal_state": _state(),
+        "covariance": np.eye(15),
+        "specific_force_measurement_B": np.zeros(3),
+        "angular_velocity_measurement_B": np.zeros(3),
+        "gravity_acceleration": 9.81,
+        "continuous_noise_covariance": np.eye(12),
+        "time_step_s": 0.0,
+    }
+    arguments[argument_name] = invalid
+
+    with pytest.raises(ValueError, match=f"^{re.escape(message)}$"):
+        predict_eskf(**arguments)  # type: ignore[arg-type]
 
 
 def test_predict_remains_finite_symmetric_and_psd_over_long_sequence() -> None:

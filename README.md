@@ -112,6 +112,14 @@ explicitly symmetric covariance prediction, and a composed prediction boundary. 
 finite-difference Jacobians, adversarial covariance validation, empirical process-noise
 covariance, and repeated-prediction probes verify the frame/sign convention and numerical
 behavior. This milestone is prediction only and is not yet a complete state estimator.
+It was published in
+[commit `104fdfc1902e968de283ec76e720220fba577320`](https://github.com/Gayles9/robust-quadrotor/commit/104fdfc1902e968de283ec76e720220fba577320),
+and hosted push CI
+[run 35802813457](https://github.com/Gayles9/robust-quadrotor/actions/runs/35802813457)
+succeeded. A bounded post-publication audit has since hardened warning-free quaternion
+validation, subnormal covariance handling, bit-exact symmetrization, and exact zero-duration
+composed prediction. That five-file correction is complete locally but remains unpublished
+pending separate review and authorization.
 
 The repository does not yet contain a reusable physically conditional invariant-monitoring
 API, a closed-loop controller, a complete state estimator, adaptive integration, robustness
@@ -1456,6 +1464,13 @@ quadratic step-halving convergence. A 250,000-sample process-noise probe matched
 spanning approximately `1e-24` through `1e24` passed, and 750 repeated predictions retained
 unit quaternion norm, exact covariance symmetry, and positive covariance margin.
 
+A subsequent local post-publication hardening pass added warning-as-error coverage for finite
+quaternion-norm overflow, positive-subnormal PSD inputs and outputs, underflow-resistant local
+asymmetry detection, signed-zero bit symmetry, and exact zero-duration prediction with
+extreme finite biases. The corrected tree passes 108 focused ESKF tests, 397 related tests,
+and all 1,470 repository tests; Ruff, formatting, mypy, and `make check` also pass. This
+correction has not been staged, committed, pushed, or published.
+
 ## Repository structure
 
 - `src/quadrotor_math/`: ROS/PX4-independent vector, randomness, rotation, actuation,
@@ -1558,7 +1573,9 @@ the final high-accuracy simulation method, especially for larger time steps or l
 5. The 15-state ESKF prediction core is complete: immutable nominal state, right-local error
    injection, IMU nominal propagation, continuous `F` and `G`, first-order `Phi` and `Q_d`,
    symmetric covariance propagation, composed prediction, and independent Jacobian,
-   covariance, process-noise, and long-run validation are established.
+   covariance, process-noise, and long-run validation are established. The milestone is
+   published in commit `104fdfc1902e968de283ec76e720220fba577320`; its bounded numerical-edge
+   hardening correction is complete locally and remains unpublished pending separate review.
 6. The next bounded milestone is measurement-update design: local-position and
    barometric-altitude measurement models, innovation and Kalman gain, Joseph-form covariance
    update, error-state injection, and covariance-reset Jacobian. Rejection/gating and
