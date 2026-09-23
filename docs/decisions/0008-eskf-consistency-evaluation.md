@@ -266,8 +266,10 @@ change. Generated JSON/logs are not committed.
 No controller, live service, asynchronous/sparse IMU, delayed correction, fault generator,
 adaptive gate, Q/R tuning, covariance discretization change or plotting dependency is
 introduced. Confidence-band agreement is bounded nominal evidence, not proof of
-consistency, Gaussianity, robustness, observability or full Gate G3 completion. G2 and
-the broader G3 requirements remain open. Preserve this fixed protocol when extending
+consistency, Gaussianity, robustness, observability or full Gate G3 completion. This
+milestone left the broader G3 requirements open. Subsequent
+[ADR 0009](0009-eskf-completion-validation.md) adds the completion evidence and records
+its full-state NEES consistency qualification. G2 remains open. Preserve this fixed protocol when extending
 evaluation to stronger excitation, observation faults or declared model mismatch; define
 new protocols and independent seeds before evaluating them.
 

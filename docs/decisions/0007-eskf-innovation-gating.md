@@ -203,11 +203,13 @@ the linked verification record rather than inferred from the statistical referen
 
 The subsequent [ADR 0008](0008-eskf-consistency-evaluation.md) adds aligned NEES and a
 frozen 100-seed-per-case nominal NIS/NEES campaign; it preserves this gate contract.
-The full estimator consistency target, fault precision/recall, broad IMU-bias observability,
-delayed fusion, persistence and closed-loop validation remain uncompleted. Gate G2 baseline
-control and broader G3 evidence remain open. Revisit this decision when adding another
-observation dimension, correlated
-sensor noise, persistence or a different time policy; do not silently reuse these degrees
+The subsequent [ADR 0009](0009-eskf-completion-validation.md) supplies excited-motion bias
+evidence, held-out fault precision/recall and Q/R sensitivity. It records a full-state NEES
+undercoverage finding rather than asserting an unqualified consistency pass. Universal
+bias observability, delayed fusion, persistence and closed-loop validation are not claimed;
+Gate G2 baseline control remains open. Revisit this decision when adding another
+observation dimension, correlated sensor noise, persistence or a different time policy;
+do not silently reuse these degrees
 of freedom or relax the existing epoch contract.
 
 [nist-distribution]: https://www.itl.nist.gov/div898/handbook/eda/section3/eda3666.htm

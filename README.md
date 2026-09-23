@@ -166,12 +166,21 @@ includes rejected observations. See
 [ADR 0008](docs/decisions/0008-eskf-consistency-evaluation.md) and the
 [consistency verification record](docs/progress/2026-09-23-eskf-consistency-evaluation.md).
 
+The known-prior ESKF now also has independent continuously varying motion fixtures,
+immutable observation-fault injection, bias-convergence and dropout-recovery evidence,
+paired gated/ungated held-out trials, Q/R sensitivity, and reproducible headless figures.
+The frozen completion campaign ran 100 randomized 30-second trajectories and 280 paired
+replay variants without numerical failure or nominal/gated divergence. The full-state
+NEES coverage was **88.84%**, below the declared 90–98% investigation band; that measured
+calibration limitation is preserved and investigated rather than called a pass. The G3
+engineering evidence is available with this explicit consistency qualification. See the
+[estimator guide](docs/estimation.md), [ADR 0009](docs/decisions/0009-eskf-completion-validation.md)
+and [completion verification record](docs/progress/2026-09-23-eskf-completion.md).
+
 The repository does not yet contain a reusable physically conditional invariant-monitoring
-API, a closed-loop controller, a live estimator service, adaptive integration, robustness
-campaigns, or a completed ROS 2/PX4 integration layer. Delayed fusion, stronger-excitation
-consistency studies and fault campaigns remain future work. Stale rejection, optional
-statistical gating and a bounded nominal consistency study are implemented.
-Gate G2 baseline control and the broader Gate G3 estimator-validation requirements remain open.
+API, a closed-loop controller, a live estimator service, adaptive integration, or a completed
+ROS 2/PX4 integration layer. Gate G2 baseline control remains open. The implemented delay
+strategy rejects stale observations; delayed fusion/rewind remains outside this basic ESKF.
 
 ## Current end-to-end pipeline
 
@@ -1611,6 +1620,59 @@ the same source/environment reproduces its numerical content. Results are create
 exclusively and belong outside Git. This JSON is an evaluation report; the existing
 manifest/artifact formats and estimator persistence boundary are unchanged.
 
+## ESKF completion and engineering evidence
+
+The complete basic filter comprises IMU prediction, position/altitude correction, IMU-bias
+states, Joseph covariance, right-local quaternion injection/reset, measurement-only replay,
+explicit stale rejection and optional fixed NIS gates. Independent verification now covers
+changing roll/pitch/yaw and translational acceleration, with separate development and held-out
+seeds. These trajectories are estimator kinematic fixtures, not rotor-feasible flight missions.
+
+| Held-out result | Measured value |
+| --- | --- |
+| Nominal randomized trajectories | 100, each 30 seconds at 100 Hz |
+| Total paired replay variants | 280, including dead reckoning, faults and Q/R sensitivity |
+| Numerical failures; nominal/gated divergence | 0; 0 |
+| Mean nominal position RMSE | 0.069264 m |
+| Mean dead-reckoning position RMSE | 167.647204 m under the declared initial bias uncertainty |
+| Final/initial mean accelerometer bias-error norm | 0.106321 (89.37% reduction) |
+| Final/initial mean gyro bias-error norm | 0.044695 (95.53% reduction) |
+| Position / altitude outlier precision | 94.58% / 94.59% |
+| Position / altitude outlier recall | 100% / 100% on the declared 2–3 m faults |
+| Dropout uncertainty growth and recovery | 20/20 paired fault cases |
+| Position / altitude NIS central95 coverage | 94.96% / 94.77% |
+| Full-state NEES central95 coverage | **88.84%; investigation-band miss** |
+
+The NEES finding means that small estimation error alone does not establish calibrated
+full-state uncertainty. Development-only, noise-free and step-refinement probes show a
+discretization contribution. First-order integration/covariance and local Gaussian
+approximations remain explicit limits. No Q/R values or gate thresholds were changed after
+held-out evaluation. Stationary/pure-yaw cases also demonstrate weaker bias information than
+excited motion. Results are specific to these priors, trajectories, noise and fault distributions.
+
+From the repository root, choose fresh output paths:
+
+```bash
+uv sync --locked
+uv run python -m experiments.kalman_sandbox --output /tmp/kalman-sandbox
+uv run python -m experiments.eskf_validation --partition smoke --output /tmp/eskf-completion-smoke.json
+uv run python -m experiments.eskf_validation --partition validation --workers 4 --output /tmp/eskf-completion-validation.json
+uv run python -m experiments.plot_eskf_validation --input /tmp/eskf-completion-validation.json --output /tmp/eskf-completion-plots
+```
+
+The `development` partition runs stationary, translating/yaw and excited motion controls.
+Workers do not change seeds or report ordering. The CLI retains every failed/divergent seed,
+records protocol/source hashes and actual software provenance, and refuses overwrite.
+Fault labels remain outside the filter; dropped/stale/pending observations never count as
+true negatives. Plots use stored data and preserve rejected NIS and out-of-band findings.
+Matplotlib is installed only in the development group; core dependencies remain NumPy-only.
+
+Code commit [`39e27daeceef755cc1b12a54a3571e935b9d9c76`](https://github.com/Gayles9/robust-quadrotor/commit/39e27daeceef755cc1b12a54a3571e935b9d9c76)
+passed local lint/format/type checks and all 2,427 tests, including a warnings-as-errors run.
+[Hosted code CI](https://github.com/Gayles9/robust-quadrotor/actions/runs/35904707795)
+also passed 2,427 tests. Its clean-checkout smoke source digest matches the held-out campaign.
+Existing production modules, tests, run schemas and numerical defaults are unchanged.
+
 ## Frame and attitude conventions
 
 - World frame `W` is north-east-down (NED): `+x` north, `+y` east, and `+z` down.
@@ -1755,7 +1817,8 @@ The full convention, state shapes, signs, and hover sanity check are defined in 
 ## Verification and development workflow
 
 The project targets Python 3.12 and pins uv 0.12.3. Runtime code depends on NumPy; the
-development group provides Ruff, mypy, and pytest. Work proceeds in small RED/GREEN TDD
+development group provides Ruff, mypy, pytest, and Matplotlib for analysis plots. Work proceeds
+in small RED/GREEN TDD
 increments: a focused failing test establishes one behavior, the minimum implementation makes
 it pass, and the complete gate checks the repository.
 
@@ -1880,6 +1943,12 @@ Descriptive NEES coverage was 96.2% and 95.5%; position/altitude NIS coverage wa
 These are short nominal-case results. Development's higher NEES coverage is retained in
 the record; no gates, noise assumptions or seed selections were fitted to validation.
 
+The completion increment adds **69 tests**, bringing the current suite to **2,427 passing
+tests** in the full gate and warnings-as-errors run. Hosted code CI also passes, with
+31 source files checked by mypy. Its 100-trajectory held-out evaluation and explicitly
+missed NEES investigation target are documented in the
+[completion record](docs/progress/2026-09-23-eskf-completion.md).
+
 ## Repository structure
 
 - `src/quadrotor_math/`: ROS/PX4-independent vector, randomness, rotation, actuation,
@@ -1888,12 +1957,14 @@ the record; no gates, noise assumptions or seed selections were fitted to valida
   named run-random-stream ownership, canonical run manifests, immutable run artifacts,
   complete-run generation, ESKF prediction/measurement mathematics, measurement-only replay
   and run adapters, innovation diagnostics/gating, aligned consistency evaluation,
-  independent-seed statistics, and trajectory-error algorithms.
+  independent-seed statistics, analytic ESKF verification motion, immutable observation
+  faults, and trajectory-error algorithms.
 - `experiments/`: reproducible numerical studies built from the public mathematical core.
 - `tests/unit/`: focused unit and composition tests for the mathematical core.
 - `docs/architecture/`: architectural contracts, including frames and state conventions.
 - `docs/decisions/`: accepted workflow, frame, environment and ESKF mathematical/execution decisions.
 - `docs/environment.md`: recorded host, toolchain, ROS 2, Gazebo, and PX4 environment details.
+- `docs/estimation.md`: complete basic ESKF contracts, interpretation and reproduction guide.
 - `docs/progress/`: dated engineering progress records.
 
 ## Current limitations
@@ -1926,15 +1997,17 @@ the record; no gates, noise assumptions or seed selections were fitted to valida
   fusion/rewind, asynchronous IMU, live estimator service or estimator persistence schema
   exists yet. In-memory estimator configuration and a frozen nominal NIS/NEES campaign
   are implemented; evaluation JSON does not provide resumable estimator state.
-- The nominal ensemble covers two short, matched-model cases with limited excitation.
-  Its validation seeds are held out; its trajectory families are deliberately fixed.
-  It does not establish broad bias observability, robustness, long-duration stability,
-  or full G3 completion. Pointwise chi-square comparisons are not simultaneous confidence
-  guarantees; temporal coverage cannot be interpreted as independent Bernoulli trials.
+- The initial nominal ensemble covers two short matched-model cases. The completion
+  campaign adds 100 randomized 30-second excited trajectories and bounded faults, with
+  demonstrated bias convergence. It does not establish universal observability or
+  long-duration/hardware robustness. Full-state NEES coverage misses the investigation
+  band (88.84%); full uncertainty calibration is not claimed. Pointwise chi-square
+  comparisons are not simultaneous guarantees, and temporal samples are correlated.
 - Opt-in NIS diagnostics and gating require a finite, positive-definite innovation
   covariance. A gate can reject valid data under a poor prior/model and can leave the
   filter drifting during sustained rejection. It is not a fault classifier or a consistency
-  guarantee; no production outlier/dropout generator or persisted gate policy exists yet.
+  guarantee. A separate immutable observation-fault injector is implemented; the plant's
+  sensor generation and persisted run/gate schemas remain unchanged.
 - Position/altitude biases are explicit nominal assumptions rather than estimated extra
   states. The vertical-bias regression does not establish general IMU-bias observability or
   calibrated sensor performance. Covariance reset remains a local uncertainty approximation.
@@ -1969,7 +2042,8 @@ the record; no gates, noise assumptions or seed selections were fitted to valida
   anisotropic FRD quadratic drag support declared truth/nominal differences; tested
   truth-side changes alter physical propagation and accelerometer truth, while declared
   nominal-only changes leave all 35 artifact arrays exactly unchanged.
-- No Monte Carlo campaign exists yet.
+- Nominal, fault and covariance-sensitivity estimator Monte Carlo campaigns are implemented;
+  closed-loop controller/mission robustness campaigns are not.
 - No completed ROS 2/PX4 adapter exists yet.
 - The existing multi-step rigid-body simulators represent static quadratic rotor thrust,
   thrust-offset and yaw reaction moments, uniform gravity, rigid-body inertia, gyroscopic
@@ -2019,11 +2093,11 @@ the final high-accuracy simulation method, especially for larger time steps or l
    domain, explicit sampled-noise conversion, separate seed partitions, complete failure
    accounting and pointwise NIS/NEES summaries. See the
    [verification record](docs/progress/2026-09-23-eskf-consistency-evaluation.md) for results.
-10. The next bounded evaluation step is a frozen observation-fault campaign over the
-    measurement-only replay boundary: define deterministic corruption/dropout fixtures,
-    retain unmodified baselines, compare ungated and fixed-gate runs, and report recovery,
-    error, rejection and failure accounting on disjoint seeds. No covariance/gate tuning
-    against held-out data, delayed fusion or production sensor-model expansion is implied.
-    Broader bias excitation and model-mismatch evaluation remain separate requirements.
-    G2 baseline control and full G3 validation remain open; controller, ROS 2, PX4 and
-    C++ integration remain future work.
+10. The basic ESKF completion implementation and frozen engineering evaluation are complete:
+    independent excited motion, bias convergence, paired observation faults, uncertainty
+    growth/recovery, Q/R sensitivity and reproducible plots are published in code commit
+    `39e27daeceef755cc1b12a54a3571e935b9d9c76`. G3 evidence includes an explicit full-state
+    NEES undercoverage finding; it is not an unqualified statistical-consistency pass.
+    Any changed estimator/calibration must use a new protocol and new held-out seeds.
+    G2 baseline control remains separate and open. Controller, live estimator transport,
+    delayed fusion, ROS 2, PX4 and C++ integration are not part of this completion boundary.
