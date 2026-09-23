@@ -216,6 +216,31 @@ OPENBLAS_NUM_THREADS=1 uv run python -m experiments.eskf_validation --propagatio
 uv run python -m experiments.plot_eskf_validation --input "$EVIDENCE/validation.json" --output "$EVIDENCE/validation-plots"
 ```
 
+## Published-code verification
+
+Implementation commit: `e9a66101548d4bce38318f8f89b4bc25ef0c35f4`;
+tree: `2ebc37dc81d5813b4b46028c6298719f46ee3ba9`.
+[Pull request 7](https://github.com/Gayles9/robust-quadrotor/pull/7) contains the
+15 scoped files. The complete published tree's 122 file objects match the local
+tested checkout. No executable bytes changed after the held-out source freeze.
+
+[GitHub Actions run 35926981124](https://github.com/Gayles9/robust-quadrotor/actions/runs/35926981124)
+passed on 2026-09-23: `uv sync --locked`, Ruff, formatting (116 files), mypy
+(32 source files) and **2517 tests in 109.00 s**. The checks ran against the
+pull request's merge candidate with the audited main baseline.
+
+A clean checkout of the published implementation commit additionally ran:
+
+```bash
+OPENBLAS_NUM_THREADS=1 .venv/bin/python -m experiments.eskf_validation --propagation endpoint --partition smoke --workers 2 --output "$EVIDENCE/published-smoke.json"
+```
+
+All 18 replay variants completed with zero numerical failures or divergence;
+the complete report revalidated. Its provenance records the commit above,
+`git_worktree_clean=True`, and the exact frozen executable-source digest.
+Smoke is an execution/provenance check, not the 30-second calibration acceptance
+campaign. A subsequent documentation-only commit records these published checks.
+
 ## Technical limits
 
 The corrected method is a second-order discrete approximation with local Gaussian error

@@ -189,7 +189,8 @@ The [fresh calibration campaign](docs/progress/2026-09-23-eskf-endpoint-calibrat
 passed the declared targets across 100 independent 30-second trajectories and 380
 replay variants. Endpoint full-state NEES coverage was **95.29%** (mean 14.60), versus
 91.99% (mean 16.96) for the original method on the same new data. Mean position RMSE
-improved from .06809 m to .06739 m. All 2,517 tests and the local static checks pass.
+improved from .06809 m to .06739 m. All 2,517 tests and static checks pass locally
+and in [GitHub CI](https://github.com/Gayles9/robust-quadrotor/actions/runs/35926981124).
 This is evidence for the declared known-prior simulation distribution, not flight readiness.
 
 The repository does not yet contain a reusable physically conditional invariant-monitoring
