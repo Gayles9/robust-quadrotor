@@ -2,7 +2,8 @@
 
 - Date: 2026-09-23
 - Baseline: `a95fbfcc2054a9a18151cb4c7d58d3b5817d4642`
-- Status: Protocol specified before implementation and held-out execution
+- Status: Implemented; protocol specified before implementation and held-out execution
+- Evidence: [completion verification record](../progress/2026-09-23-eskf-completion.md)
 
 ## Completion boundary
 
@@ -100,3 +101,18 @@ versions, commits and results in the completion progress record after verificati
 Production behavior must not be changed just to improve reported metrics. If analytic
 checks expose a mathematical error, fix and test its cause, document the protocol revision
 and use fresh held-out seeds; do not conceal the original evaluation.
+
+## Recorded consistency qualification
+
+Protocol v1 completed without numerical failures or nominal/gated divergence. Position,
+bias-reduction, outlier precision/recall and dropout recovery targets were met. Full-state
+NEES central95 coverage was 88.8367%, below the predeclared investigation band; this
+target is **not** marked passed. NIS coverage was 94.9568% (position) and 94.7682%
+(altitude). The protocol, Q/R values and gates were retained unchanged.
+
+Development-only exact/noiseless and step-refinement probes identify a deterministic
+integration contribution. They are diagnostic evidence, not replacement held-out results
+or a proof that every contribution has been isolated. Basic ESKF implementation and the
+G3 engineering-evidence scope are complete with this documented calibration limitation;
+an unqualified statistical-consistency claim is not supported. The verification record
+contains the exact results, interpretation, commands and source identity.

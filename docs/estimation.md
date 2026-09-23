@@ -8,6 +8,12 @@ boundary and predeclared acceptance protocol are in [ADR 0009](decisions/0009-es
 Measured outcomes belong to the completion verification record; execution success alone
 does not establish statistical consistency or observability.
 
+The [completion record](progress/2026-09-23-eskf-completion.md) documents 100 held-out
+30-second nominal trajectories with no divergence and the completed fault/bias/sensitivity
+evaluation. Full-state NEES coverage is 88.84%, below the declared investigation band.
+That calibration finding remains explicit; the basic implementation and engineering
+evidence are complete, while an unqualified statistical-consistency claim is not supported.
+
 ## State, prediction and correction
 
 The nominal state is `(position_W, velocity_W, q_WB, accelerometer_bias_B,
@@ -165,8 +171,9 @@ The CLI emits the protocol hash before running, captures actual Git/installed-so
 provenance and hashes source/configuration bytes before and after execution. A changed
 source invalidates publication of the report. JSON retains all planned seeds and variants;
 any failure suppresses its complete-group ensemble rather than selecting survivors.
-Finite divergent cases remain included. Full errors, NEES/NIS, bias norms, covariance
-checks, fault event decisions and representative component uncertainty support inspection.
+Finite divergent cases remain included. Full NEES/NIS histories, physical error metrics,
+sampled error/bias norms, covariance checks, fault decisions and representative component
+uncertainty support inspection.
 Plot metadata records the exact input report hash and Matplotlib version. No generated
 result, figure or large log is committed.
 

@@ -83,3 +83,17 @@ An independently installed SciPy 1.17.0 was used only as an audit oracle for chi
 quantiles. It is not a dependency of the package, tests or experiment. Exact verification
 commands and numerical findings are in the
 [consistency record](progress/2026-09-23-eskf-consistency-evaluation.md).
+
+## ESKF Completion Evaluation Environment
+
+The completion evaluation retains the versions above and adds Matplotlib 3.11.2 to the
+development group for headless plots. Its transitive dependencies are locked; previous
+locked package versions are unchanged. Core runtime still depends only on NumPy. The
+new experiment package is tested from the repository root and is excluded from the
+runtime wheel. Existing CI continues to run `uv sync --locked` and `make check`.
+
+Use the [estimator guide](estimation.md) for smoke, development, held-out evaluation,
+plotting and small Kalman-example commands. Result paths and plot directories must be new.
+The measured environment, 2427-test gates, campaign hashes and the explicit NEES
+undercoverage finding are recorded in the
+[completion verification record](progress/2026-09-23-eskf-completion.md).
