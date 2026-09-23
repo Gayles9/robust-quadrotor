@@ -47,6 +47,33 @@ _M_G = 1
 _M_L = 2
 _M_B = 1
 _D = 5
+
+
+@pytest.mark.parametrize(
+    "field_name",
+    [
+        "truth_time_s",
+        "truth_position_history_W",
+        "truth_velocity_history_W",
+        "truth_q_history_WB",
+        "truth_omega_history_B",
+        "commanded_rotor_omega",
+        "accelerometer_measurements_B",
+        "gyroscope_measurements_B",
+        "local_position_measurements_W",
+        "barometric_altitude_measurements",
+        "accelerometer_bias_history_B",
+        "gyroscope_bias_history_B",
+    ],
+)
+@pytest.mark.parametrize("invalid_value", [np.nan, np.inf, -np.inf])
+def test_audit_artifact_rejects_nonfinite_payloads(field_name: str, invalid_value: float) -> None:
+    sources = _writable_source_arrays()
+    sources[field_name].flat[-1] = invalid_value
+    with pytest.raises(ValueError, match=rf"^{field_name} must contain only finite values$"):
+        _artifact_data(sources)
+
+
 _FLOAT_DTYPE = np.dtype("<f8")
 _INTEGER_DTYPE = np.dtype("<i8")
 
@@ -2359,7 +2386,11 @@ def _artifact_with_truth_history_mutation(mutation: str, manifest: RunManifest) 
     for name, original in unchanged_sources.items():
         assert sources[name] is original
 
-    data = _artifact_data(sources)
+    # Fault-inject after construction: the constructor now rejects nonfinite
+    # payloads, while persistence must still defend its own publication boundary.
+    data = baseline
+    changed_history.flags.writeable = False
+    object.__setattr__(data, field_name, changed_history)
     assert type(data) is RunArtifactData
     np.testing.assert_array_equal(getattr(data, field_name), changed_history)
     for name, original in unchanged_sources.items():
@@ -2413,7 +2444,7 @@ def test_load_run_directory_applies_established_truth_history_validation(tmp_pat
     manifest = _unbound_save_manifest()
     unbound_manifest_bytes = encode_run_manifest(manifest)
     data = _artifact_with_truth_history_mutation("position_nonfinite", manifest)
-    expected_message = _established_truth_history_error(data)
+    expected_message = "truth_position_history_W must contain only finite values"
     run_directory = tmp_path / "invalid-truth-history"
     bound_manifest, manifest_bytes, data_bytes = _write_directly_bound_run_directory(
         run_directory, manifest, data
@@ -2422,9 +2453,8 @@ def test_load_run_directory_applies_established_truth_history_validation(tmp_pat
     data_path = run_directory / "data.npz"
     assert bound_manifest.data_npz_sha256 == hashlib.sha256(data_bytes).hexdigest()
     assert set(run_directory.iterdir()) == {manifest_path, data_path}
-    decoded = run_artifact._decode_data_npz(data_bytes)
-    assert np.isnan(decoded.truth_position_history_W[1, 0])
-    assert _established_truth_history_error(decoded) == expected_message
+    with pytest.raises(ValueError, match=expected_message):
+        run_artifact._decode_data_npz(data_bytes)
 
     with pytest.raises(ValueError) as error:
         run_artifact.load_run_directory(run_directory)
@@ -3301,3 +3331,63 @@ def test_save_run_directory_preserves_published_artifact_when_parent_fsync_fails
     assert encode_run_manifest(manifest) == original_manifest_bytes
     for name in _ARRAY_FIELDS:
         np.testing.assert_array_equal(getattr(data, name), original_data_arrays[name])
+
+
+@pytest.mark.parametrize(
+    "field_name",
+    [
+        "accelerometer_measurements_B",
+        "gyroscope_measurements_B",
+        "local_position_measurements_W",
+        "barometric_altitude_measurements",
+        "accelerometer_bias_history_B",
+        "gyroscope_bias_history_B",
+    ],
+)
+def test_audit_persistence_rejects_nonfinite_payload_after_fault_injection(
+    tmp_path: Path, field_name: str
+) -> None:
+    manifest = _unbound_save_manifest()
+    data = _artifact_data(_writable_source_arrays())
+    corrupted = getattr(data, field_name).copy()
+    corrupted.flat[-1] = np.inf
+    object.__setattr__(data, field_name, corrupted)
+    message = f"{field_name} must contain only finite values"
+    with pytest.raises(ValueError, match=message):
+        run_artifact.save_run_directory(tmp_path / "save", manifest, data)
+    assert not list(tmp_path.iterdir())
+    _write_directly_bound_run_directory(tmp_path / "load", manifest, data)
+    with pytest.raises(ValueError, match=message):
+        run_artifact.load_run_directory(tmp_path / "load")
+
+
+@pytest.mark.parametrize(
+    ("time_step_s", "offset_s", "first_delivery_row"),
+    [
+        (0.1, 1e-13, 3),
+        (0.1, 1e-16, 2),
+        (1e6, 1e-8, 3),
+        (1e6, 2e-9, 2),
+    ],
+)
+def test_audit_persistence_and_scheduler_agree_across_time_scales(
+    time_step_s: float, offset_s: float, first_delivery_row: int
+) -> None:
+    from quadrotor_math.sensor_scheduling import FixedRateSensorScheduler
+
+    scheduler = FixedRateSensorScheduler[float](
+        sample_period_s=time_step_s,
+        truth_time_step_s=time_step_s,
+        delivery_delay_s=time_step_s + offset_s,
+    )
+    times = np.arange(4, dtype=np.float64) * time_step_s
+    deliveries = np.full(3, -1, dtype=np.int64)
+    delivery_times = np.arange(1, 4, dtype=np.float64) * time_step_s + time_step_s + offset_s
+    for row in range(1, 4):
+        records = scheduler.update(float(times[row]), lambda index, time: float(index))
+        for record in records:
+            deliveries[record.sequence_index] = row
+    assert deliveries[0] == first_delivery_row
+    run_artifact._require_configured_delivery_truth_indices(
+        "delivered_at_truth_index", deliveries, delivery_times, times
+    )

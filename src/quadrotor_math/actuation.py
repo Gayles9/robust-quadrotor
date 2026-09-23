@@ -25,7 +25,8 @@ def commanded_rotor_speeds_from_collective_thrust_and_body_moment(
             not positive; or if the rotor-speed limits are non-finite,
             negative, not strictly ordered, or too large to square safely; or
             if the allocation matrix is singular; or if the demand is
-            infeasible within the rotor-speed limits.
+            infeasible within the rotor-speed limits; or if allocation
+            arithmetic produces non-finite values.
     """
     if not np.isfinite(collective_thrust):
         raise ValueError("collective_thrust must be finite")
@@ -86,19 +87,28 @@ def commanded_rotor_speeds_from_collective_thrust_and_body_moment(
         [collective_thrust, moment_B[0], moment_B[1], moment_B[2]],
         dtype=np.float64,
     )
-    allocation_matrix = np.array(
-        [
-            np.full(4, thrust_coefficient),
-            -rotor_positions_B[:, 1] * thrust_coefficient,
-            rotor_positions_B[:, 0] * thrust_coefficient,
-            -rotor_spin_directions * moment_coefficient,
-        ],
-        dtype=np.float64,
-    )
-    if np.linalg.matrix_rank(allocation_matrix) != 4:
-        raise ValueError("allocation matrix must be nonsingular")
-
-    squared_rotor_omega = np.linalg.solve(allocation_matrix, demand)
+    try:
+        with np.errstate(over="raise", invalid="raise", divide="raise"):
+            allocation_matrix = np.array(
+                [
+                    np.full(4, thrust_coefficient),
+                    -rotor_positions_B[:, 1] * thrust_coefficient,
+                    rotor_positions_B[:, 0] * thrust_coefficient,
+                    -rotor_spin_directions * moment_coefficient,
+                ],
+                dtype=np.float64,
+            )
+            if not np.all(np.isfinite(allocation_matrix)):
+                raise FloatingPointError
+            if np.linalg.matrix_rank(allocation_matrix) != 4:
+                raise ValueError("allocation matrix must be nonsingular")
+            squared_rotor_omega = np.linalg.solve(allocation_matrix, demand)
+            if not np.all(np.isfinite(squared_rotor_omega)):
+                raise FloatingPointError
+    except FloatingPointError:
+        raise ValueError("rotor allocation must remain finite") from None
+    except np.linalg.LinAlgError:
+        raise ValueError("allocation matrix must be numerically nonsingular") from None
     minimum_squared_rotor_omega = minimum_rotor_omega**2
     maximum_squared_rotor_omega = maximum_rotor_omega**2
     squared_speed_scale = max(
@@ -238,7 +248,8 @@ def rotor_thrusts_from_speeds(
     Raises:
         ValueError: If ``rotor_omega`` does not have shape ``(4,)``, contains
             a non-finite component, or contains a negative component, or if
-            ``thrust_coefficient`` is non-finite or not positive.
+            ``thrust_coefficient`` is non-finite or not positive, or if the
+            computed thrusts are non-finite.
     """
     if rotor_omega.shape != (4,):
         raise ValueError(f"rotor_omega must have shape (4,), got {rotor_omega.shape}")
@@ -255,7 +266,14 @@ def rotor_thrusts_from_speeds(
     if thrust_coefficient <= 0.0:
         raise ValueError("thrust_coefficient must be positive")
 
-    return np.asarray(thrust_coefficient * rotor_omega**2, dtype=np.float64)
+    try:
+        with np.errstate(over="raise", invalid="raise"):
+            thrusts = np.asarray(thrust_coefficient * rotor_omega**2, dtype=np.float64)
+            if not np.all(np.isfinite(thrusts)):
+                raise FloatingPointError
+    except FloatingPointError:
+        raise ValueError("rotor thrusts must remain finite") from None
+    return thrusts
 
 
 def reaction_moment_body_from_rotor_speeds(
@@ -282,7 +300,8 @@ def reaction_moment_body_from_rotor_speeds(
             have shape ``(4,)``, either contains a non-finite component,
             ``rotor_omega`` contains a negative component,
             ``rotor_spin_directions`` contains a value other than ``-1`` or
-            ``+1``, or ``moment_coefficient`` is non-finite or not positive.
+            ``+1``, or ``moment_coefficient`` is non-finite or not positive,
+            or if reaction-moment arithmetic produces non-finite values.
     """
     if rotor_omega.shape != (4,):
         raise ValueError("rotor_omega must have shape (4,)")
@@ -308,7 +327,13 @@ def reaction_moment_body_from_rotor_speeds(
     if moment_coefficient <= 0.0:
         raise ValueError("moment_coefficient must be positive")
 
-    tau_z = -moment_coefficient * np.sum(rotor_spin_directions * rotor_omega**2)
+    try:
+        with np.errstate(over="raise", invalid="raise"):
+            tau_z = -moment_coefficient * np.sum(rotor_spin_directions * rotor_omega**2)
+            if not np.isfinite(tau_z):
+                raise FloatingPointError
+    except FloatingPointError:
+        raise ValueError("rotor reaction moment must remain finite") from None
     return np.array([0.0, 0.0, tau_z], dtype=np.float64)
 
 
@@ -322,7 +347,8 @@ def thrust_force_body_from_rotor_thrusts(
 
     Raises:
         ValueError: If ``rotor_thrusts`` does not have shape ``(4,)``, contains
-            a non-finite component, or contains a negative component.
+            a non-finite component, contains a negative component, or if
+            the thrust sum is non-finite.
     """
     if rotor_thrusts.shape != (4,):
         raise ValueError("rotor_thrusts must have shape (4,)")
@@ -333,10 +359,14 @@ def thrust_force_body_from_rotor_thrusts(
     if not np.all(rotor_thrusts >= 0.0):
         raise ValueError("rotor_thrusts must be nonnegative")
 
-    return np.array(
-        [0.0, 0.0, -np.sum(rotor_thrusts)],
-        dtype=np.float64,
-    )
+    try:
+        with np.errstate(over="raise", invalid="raise"):
+            force_B = np.array([0.0, 0.0, -np.sum(rotor_thrusts)], dtype=np.float64)
+            if not np.all(np.isfinite(force_B)):
+                raise FloatingPointError
+    except FloatingPointError:
+        raise ValueError("rotor thrust force must remain finite") from None
+    return force_B
 
 
 def thrust_moment_body_from_rotor_thrusts(
@@ -357,7 +387,7 @@ def thrust_moment_body_from_rotor_thrusts(
         ValueError: If ``rotor_positions_B`` does not have shape ``(4, 3)`` or
             contains a non-finite component, or if ``rotor_thrusts`` does not
             have shape ``(4,)``, contains a non-finite component, or contains a
-            negative component.
+            negative component, or if thrust-moment arithmetic is non-finite.
     """
     if rotor_positions_B.shape != (4, 3):
         raise ValueError("rotor_positions_B must have shape (4, 3)")
@@ -376,10 +406,16 @@ def thrust_moment_body_from_rotor_thrusts(
 
     rotor_forces_B = np.zeros((4, 3), dtype=np.float64)
     rotor_forces_B[:, 2] = -rotor_thrusts
-    return np.asarray(
-        np.sum(np.cross(rotor_positions_B, rotor_forces_B), axis=0),
-        dtype=np.float64,
-    )
+    try:
+        with np.errstate(over="raise", invalid="raise"):
+            moment_B = np.asarray(
+                np.sum(np.cross(rotor_positions_B, rotor_forces_B), axis=0), dtype=np.float64
+            )
+            if not np.all(np.isfinite(moment_B)):
+                raise FloatingPointError
+    except FloatingPointError:
+        raise ValueError("rotor thrust moment must remain finite") from None
+    return moment_B
 
 
 def force_and_moment_body_from_rotor_speeds(
@@ -420,5 +456,11 @@ def force_and_moment_body_from_rotor_speeds(
         rotor_spin_directions,
         moment_coefficient,
     )
-    moment_B = moment_thrust_B + moment_reaction_B
+    try:
+        with np.errstate(over="raise", invalid="raise"):
+            moment_B = moment_thrust_B + moment_reaction_B
+            if not np.all(np.isfinite(moment_B)):
+                raise FloatingPointError
+    except FloatingPointError:
+        raise ValueError("combined rotor moment must remain finite") from None
     return force_B, moment_B

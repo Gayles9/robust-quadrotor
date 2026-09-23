@@ -76,8 +76,27 @@ def generate_run_artifact_data(configuration: RunConfiguration) -> RunArtifactDa
     Complete motor parameters yield private lagged actual speeds. Wholly omitted
     motor parameters preserve the historical ideal-actuator mode. Sensors acquire
     at completed truth rows; pending deliveries remain marked ``-1``.
+
+    Structural configurations can represent a broader domain than this numerical
+    plant. Truth gravity and rotor coefficients must be positive; inertia symmetry
+    and initial attitude must satisfy the downstream dynamics/rotation contracts.
+    These execution checks precede history allocation and random-stream creation.
     """
     truth = configuration.truth
+    # Configurations also represent historical/nominal models. Check the narrower
+    # execution domain before allocating histories or constructing random streams.
+    for name, value in (
+        ("gravity_acceleration", truth.world.gravity_acceleration),
+        ("thrust_coefficient", truth.rotors.thrust_coefficient),
+        ("moment_coefficient", truth.rotors.moment_coefficient),
+    ):
+        if value <= 0.0:
+            raise ValueError(f"truth {name} must be positive for run generation")
+    if not np.allclose(
+        truth.rigid_body.inertia_B, truth.rigid_body.inertia_B.T, rtol=0.0, atol=1.0e-12
+    ):
+        raise ValueError("truth inertia_B must be symmetric to atol=1e-12 for run generation")
+    rotation_matrix_body_to_world(configuration.initial_truth_state.q_WB)
     numerics = configuration.numerics
     command = configuration.rotor_speed_input.rotor_omega
     minimum = truth.rotors.minimum_rotor_omega

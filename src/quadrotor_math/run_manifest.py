@@ -1121,6 +1121,21 @@ def _decode_run_configuration(
         raise ValueError(
             "manifest environmental configuration must contain at least one nonzero value"
         )
+    schedules = _decoded_object(mapping["sensor_schedules"])
+    time_step_s = configuration.numerics.truth_time_step_s
+    for channel in ("accelerometer", "gyroscope", "local_position", "barometric_altitude"):
+        encoded_schedule = _decoded_object(schedules[channel])
+        schedule = cast(SensorSchedule, getattr(configuration.sensor_schedules, channel))
+        expected_stride = int(round(schedule.sample_period_s / time_step_s))
+        stride = encoded_schedule["sample_stride"]
+        if type(stride) is not int or stride != expected_stride:
+            raise ValueError(f"manifest {channel}.sample_stride must equal the configured stride")
+        period = encoded_schedule["effective_sample_period_s"]
+        if type(period) not in (int, float) or period != expected_stride * time_step_s:
+            raise ValueError(
+                f"manifest {channel}.effective_sample_period_s must equal sample_stride "
+                "* truth_time_step_s"
+            )
     return configuration
 
 

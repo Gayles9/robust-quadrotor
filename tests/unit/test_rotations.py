@@ -10,6 +10,27 @@ from quadrotor_math.rotations import (
 )
 
 
+@pytest.mark.parametrize("scale", [np.finfo(float).max, np.nextafter(0.0, 1.0), 1.0e-200])
+@pytest.mark.filterwarnings("error")
+def test_audit_normalization_handles_extreme_finite_scales(scale: float) -> None:
+    q_WB = np.array([scale, -scale, scale, -scale])
+    normalized = normalize_quaternion_body_to_world(q_WB)
+    np.testing.assert_array_equal(normalized, np.array([0.5, -0.5, 0.5, -0.5]))
+    assert not np.shares_memory(normalized, q_WB)
+
+
+@pytest.mark.filterwarnings("error")
+def test_audit_quaternion_derivative_rejects_finite_overflow() -> None:
+    with pytest.raises(ValueError, match="finite"):
+        quaternion_derivative_body_to_world(np.full(4, np.finfo(float).max), np.full(3, 2.0))
+
+
+@pytest.mark.filterwarnings("error")
+def test_audit_rotation_validation_rejects_overflow_without_warning() -> None:
+    with pytest.raises(ValueError, match="unit norm"):
+        rotation_matrix_body_to_world(np.full(4, np.finfo(float).max))
+
+
 def test_skew_symmetric_represents_cross_product() -> None:
     vector_a = np.array([1.0, -2.0, 3.0], dtype=np.float64)
 
