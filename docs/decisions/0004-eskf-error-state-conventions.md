@@ -2,7 +2,8 @@
 
 Date: 2026-09-22
 
-Status: Accepted
+Status: Accepted; measurement correction is specified by
+[ADR 0005](0005-eskf-measurement-updates.md).
 
 ## Context
 
@@ -38,8 +39,9 @@ x_nominal = (
 The quaternion sign is not canonicalized. State arrays are finite, independently
 owned, C-contiguous `float64` values and are exposed read-only. Quaternion norm evaluation
 converts finite arithmetic overflow or invalid arithmetic into the existing unit-norm
-validation error without leaking a runtime warning; the strict unit-norm tolerance is
-unchanged.
+validation error without leaking a runtime warning. The September 23 compatibility
+amendment uses the downstream rotation utility's squared-norm check with
+`rtol=1e-12, atol=1e-12`; constructor acceptance and prediction now agree.
 
 ### Error state and injection
 
@@ -191,11 +193,10 @@ not equivalent to an exact matrix exponential. The propagation also assumes cons
 IMU measurements and biases over each interval and uses a constant scalar gravity
 magnitude.
 
-It explicitly provides none of the following:
+The prediction increment itself did not include measurement updates, a Kalman gain or
+innovation, or a covariance-reset Jacobian. Those are now implemented under ADR 0005.
+The following remain outside the implemented estimator core:
 
-- measurement updates;
-- a Kalman gain or innovation;
-- a covariance reset Jacobian after measurement injection;
 - delayed-measurement handling;
 - an estimator runner;
 - estimator configuration or a manifest schema;

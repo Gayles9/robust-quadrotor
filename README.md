@@ -111,7 +111,8 @@ nominal prediction, continuous `F` and `G` construction, first-order `Phi` and `
 explicitly symmetric covariance prediction, and a composed prediction boundary. Independent
 finite-difference Jacobians, adversarial covariance validation, empirical process-noise
 covariance, and repeated-prediction probes verify the frame/sign convention and numerical
-behavior. This milestone is prediction only and is not yet a complete state estimator.
+behavior. That initial milestone covered prediction; measurement correction is now implemented
+as described below. A complete estimator runner is not yet present.
 It was published in
 [commit `104fdfc1902e968de283ec76e720220fba577320`](https://github.com/Gayles9/robust-quadrotor/commit/104fdfc1902e968de283ec76e720220fba577320),
 and hosted push CI
@@ -124,12 +125,21 @@ and hosted push CI
 [run 35805483357](https://github.com/Gayles9/robust-quadrotor/actions/runs/35805483357)
 succeeded.
 
+The ESKF measurement-update core is also complete. It provides local-position and
+positive-up barometric-altitude models with explicit nominal sensor biases, scaled Cholesky
+gain solves, Joseph covariance updates, right-local injection, full covariance reset using
+the SO(3) right Jacobian, and immutable diagnostics. Code commit
+[`a751fe843178440e035a6ad375a3abec828a2b1a`](https://github.com/Gayles9/robust-quadrotor/commit/a751fe843178440e035a6ad375a3abec828a2b1a)
+passed local checks and [hosted CI](https://github.com/Gayles9/robust-quadrotor/actions/runs/35870476786).
+The same change closes audited generation, manifest, artifact, timing, and numerical-boundary
+gaps while preserving the tested historical run outputs. See
+[ADR 0005](docs/decisions/0005-eskf-measurement-updates.md) and the
+[verification record](docs/progress/2026-09-23-eskf-measurement-updates-and-contract-audit.md).
+
 The repository does not yet contain a reusable physically conditional invariant-monitoring
-API, a closed-loop controller, a complete state estimator, adaptive integration, robustness
-campaigns, or a completed ROS 2/PX4 integration layer. The next bounded milestone is
-measurement-update design for local position and barometric altitude, including innovation,
-Kalman gain, Joseph-form covariance update, error-state injection, and the covariance-reset
-Jacobian. Rejection/gating and consistency testing remain later explicit design decisions.
+API, a closed-loop controller, an estimator runner, adaptive integration, robustness
+campaigns, or a completed ROS 2/PX4 integration layer. Gating, delayed fusion, and consistency
+analysis remain explicit future decisions. Gate G2 baseline control remains open.
 
 ## Current end-to-end pipeline
 
@@ -753,6 +763,13 @@ finite positive sample periods, finite nonnegative delivery delays, a shape `(4,
 nonnegative constant rotor-speed input, nonempty mismatch paths and rationales, and a
 non-Boolean Python integer root seed in `[0, 2**128)`.
 
+Structural configuration retains historical zero gravity/coefficient values and its original
+inertia tolerance. Before executing a run, `generate_run_artifact_data` preflights the
+narrower truth-plant domain: positive gravity and rotor coefficients, inertia symmetry with
+`rtol=0, atol=1e-12`, and an initial quaternion accepted by the downstream rotation utility.
+These checks precede history allocation and RNG creation. Nominal-only values remain beliefs
+and do not drive truth generation.
+
 Each requested sensor period must align with the fixed truth grid. Configuration validation
 uses:
 
@@ -879,7 +896,9 @@ Partial motor configurations are rejected rather than silently downgraded. Decod
 exact version-specific top-level, run-configuration, and parameter-object member sets, and a
 manually labelled v5/v6 document with four all-zero environmental arrays is rejected.
 Duplicate JSON keys, nonstandard numeric constants, malformed versions or bindings,
-inconsistent derived duration, and invalid configuration values are rejected. Canonical
+inconsistent derived duration or sensor stride/effective period, and invalid configuration
+values are rejected. A persisted `sample_stride` must be a non-Boolean integer, and
+`effective_sample_period_s` must exactly equal that stride times the truth step. Canonical
 encoding is deterministic, compact, sorted, finite UTF-8 JSON with no trailing newline.
 
 Invalid keys, types, versions, and digests are rejected rather than normalized. Run 2B saves
@@ -899,7 +918,8 @@ and 5 cannot be loaded as run directories.
 arrays comprise truth and command histories; six aligned arrays for each of four sensor
 streams; accelerometer and gyroscope bias histories; and three columns for the global
 delivery table. Construction requires exact `np.ndarray` inputs with the specified
-little-endian float64 or int64 dtype, rank, and trailing shape. Stored arrays are owned,
+little-endian float64 or int64 dtype, rank, and trailing shape. Every floating payload must
+be finite, including measurements and all bias-history rows. Stored arrays are owned,
 C-contiguous, read-only copies. Intrinsic checks enforce aligned dimensions, stream indices,
 and exact global delivery-table membership and order.
 
@@ -907,8 +927,10 @@ Save and authenticated load share one compatibility validator. It checks configu
 command row counts, the exact truth-time grid and constant rotor commands, sensor acquisition
 counts and timestamps, delivered-at-truth rows with pending `-1` semantics, finite valid
 rigid-body histories with unit quaternions, and configured initial state and bias values.
-Artifact sensor timestamps and delivery matching use zero relative tolerance and an absolute
-tolerance of `1.0e-12` seconds; this is not a general simulation tolerance.
+Artifact timestamps use the scheduler's scale-aware tolerance
+`16 * eps_float64 * max(1, abs(t1), abs(t2))`. Delivery matching uses the same due-time
+inequality as the scheduler. Save rechecks every floating payload for finiteness; these
+checks do not reintegrate the trajectory.
 
 `save_run_directory` requires an absent destination and checks compatibility before NPZ
 encoding or filesystem staging. It encodes the NPZ in memory, hashes those exact bytes, and
@@ -1263,6 +1285,60 @@ Run the study with:
 uv run python experiments/euler_rk4_convergence.py
 ```
 
+## ESKF measurement correction
+
+The update interfaces consume measurements at the current nominal state's epoch. They
+operate on the existing `(delta_p_W, delta_v_W, delta_theta_B, delta_b_a_B, delta_b_g_B)`
+error ordering; `P` has shape `(15, 15)`. Position noise is a `(3, 3)` per-observation
+covariance in m², and altitude noise is a scalar variance in m². The caller supplies nominal
+sensor biases and the altitude reference explicitly. No function reads simulator truth.
+
+The following small synthetic example shows the interface; its numbers are illustrative,
+not calibrated vehicle or sensor parameters.
+
+```python
+import numpy as np
+from quadrotor_math.eskf import (
+    EskfNominalState,
+    update_eskf_local_position,
+    update_eskf_barometric_altitude,
+)
+
+state = EskfNominalState(
+    position_W=np.zeros(3),
+    velocity_W=np.zeros(3),
+    q_WB=np.array([1.0, 0.0, 0.0, 0.0]),
+    accelerometer_bias_B=np.zeros(3),
+    gyroscope_bias_B=np.zeros(3),
+)
+P = np.eye(15) * 0.1
+position_update = update_eskf_local_position(
+    state, P, np.array([0.1, -0.2, -0.3]), np.eye(3) * 0.01, np.zeros(3)
+)
+# This second observation is assumed independent and refers to the same epoch.
+altitude_update = update_eskf_barometric_altitude(
+    position_update.nominal_state,
+    position_update.covariance,
+    altitude_measurement=100.3,
+    measurement_noise_variance=0.04,
+    reference_altitude=100.0,
+    barometric_altitude_bias=0.0,
+)
+state, P = altitude_update.nominal_state, altitude_update.covariance
+```
+
+Each `EskfMeasurementUpdate` owns the posterior state and reset covariance, innovation,
+innovation covariance, Kalman gain, and injected correction. Arrays are read-only independent
+copies. The correction is diagnostic and must not be injected again. Zero innovation
+preserves nominal-state bytes while covariance still updates. PSD prior/noise matrices are
+accepted when the innovation covariance admits a scaled Cholesky factorization; singular
+innovation covariance raises `ValueError`, without regularization or an implicit gate.
+
+The full derivation and contracts are in
+[ADR 0005](docs/decisions/0005-eskf-measurement-updates.md). Saved sensor deliveries can be
+delayed; these timestamp-free primitives must not be called on such data without a separate
+measurement-epoch policy.
+
 ## Frame and attitude conventions
 
 - World frame `W` is north-east-down (NED): `+x` north, `+y` east, and `+z` down.
@@ -1307,6 +1383,11 @@ The full convention, state shapes, signs, and hover sanity check are defined in 
   composed pre-step-linearized ESKF prediction boundary.
 - Independent full-column finite-difference Jacobian, adversarial covariance/PSD, empirical
   process-noise, fixed-seed SPD, and long-run numerical validation for the prediction core.
+- Local-position and positive-up altitude correction with explicit assumed sensor biases,
+  discrete observation covariance, stable gain solves, Joseph covariance, error injection,
+  and exact local SO(3) reset Jacobian applied to all covariance blocks.
+- Immutable posterior diagnostics plus analytic, finite-difference, seeded covariance,
+  numerical-edge, and known-motion prediction/update composition tests.
 - Quadratic rotor thrust magnitudes from four rotor speeds.
 - First-order motor-speed response with saturated command targets, plus feasible
   collective-thrust/body-moment allocation to ordered rotor-speed commands.
@@ -1474,13 +1555,23 @@ extreme finite biases. The published correction passes 108 focused ESKF tests, 3
 tests, and all 1,470 repository tests; Ruff, formatting, mypy, and `make check` also pass.
 Hosted push CI completed successfully.
 
+The September 23 measurement-update and contract-audit revision passed **1,675 tests**,
+including a full warnings-as-errors run. Ruff passed, all 74 Python files were already
+formatted, and mypy passed over 19 source files. The focused prediction/update/generation/
+artifact audit passed 579 tests. Six original-versus-revised replay cases matched every
+artifact array and both canonical files byte for byte. Hosted code CI
+[run 35870476786](https://github.com/Gayles9/robust-quadrotor/actions/runs/35870476786)
+passed after publication. Exact commands, scope, and compatibility qualifications are in the
+[verification record](docs/progress/2026-09-23-eskf-measurement-updates-and-contract-audit.md).
+
 ## Repository structure
 
 - `src/quadrotor_math/`: ROS/PX4-independent vector, randomness, rotation, actuation,
   dynamics, integration, deterministic simulation, ideal IMU mathematics, state-history
   validation, sensor measurement, fixed-rate sensor scheduling, immutable run configuration,
   named run-random-stream ownership, canonical run manifests, immutable run artifacts,
-  complete-run generation, ESKF prediction mathematics, and trajectory-error algorithms.
+  complete-run generation, ESKF prediction and measurement-update mathematics, and
+  trajectory-error algorithms.
 - `experiments/`: reproducible numerical studies built from the public mathematical core.
 - `tests/unit/`: focused unit and composition tests for the mathematical core.
 - `docs/architecture/`: architectural contracts, including frames and state conventions.
@@ -1512,9 +1603,12 @@ Hosted push CI completed successfully.
   inertia behavior, Euler drift, or long-duration stability.
 - No controller, scheduled rotor input, integration callback, dynamics event handling, or
   adaptive step size exists.
-- The ESKF provides prediction only. No measurement model, innovation, Kalman gain,
-  Joseph-form covariance update, post-update injection/reset, rejection/gating, delayed
-  measurement handling, or estimator runner exists yet.
+- ESKF prediction and measurement correction are mathematical primitives. Observations must
+  refer to the nominal state's epoch. No gating, delayed/out-of-sequence fusion, estimator
+  runner, estimator configuration/artifact schema, or NIS/NEES campaign exists yet.
+- Position/altitude biases are explicit nominal assumptions rather than estimated extra
+  states. The vertical-bias regression does not establish general IMU-bias observability or
+  calibrated sensor performance. Covariance reset remains a local uncertainty approximation.
 - The accelerometer measurement boundary models a supplied constant additive bias and
   caller-configured per-axis, per-sample white-noise standard deviation. Accelerometer bias
   evolution is available only through the separate caller-driven random-walk step; these
@@ -1579,8 +1673,10 @@ the final high-accuracy simulation method, especially for larger time steps or l
    covariance, process-noise, and long-run validation are established. The milestone is
    published in commit `104fdfc1902e968de283ec76e720220fba577320`; its bounded numerical-edge
    hardening correction is published in commit `3afe58e91ec4bda283a81b9fe8032379582b8a4d`.
-6. The next bounded milestone is measurement-update design: local-position and
-   barometric-altitude measurement models, innovation and Kalman gain, Joseph-form covariance
-   update, error-state injection, and covariance-reset Jacobian. Rejection/gating and
-   consistency testing require later explicit decisions. Controller, broader uncertainty
-   campaigns, ROS 2, PX4, and C++ integration remain future work.
+6. The bounded measurement-update core is complete in code commit
+   `a751fe843178440e035a6ad375a3abec828a2b1a`: position/altitude models, innovation and gain,
+   Joseph covariance, injection/reset, owned diagnostics, and regression evidence.
+7. Before estimator execution is added, define filter-epoch and IMU-interval semantics,
+   observation ordering, and delayed-sample policy. Gating and consistency evaluation need
+   separate decisions. Gate G2 baseline control is still open; controller, broader
+   uncertainty campaigns, ROS 2, PX4, and C++ integration remain future work.
