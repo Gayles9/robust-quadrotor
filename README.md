@@ -105,11 +105,20 @@ and mypy. Hosted push CI
 [run 35793062927](https://github.com/Gayles9/robust-quadrotor/actions/runs/35793062927)
 subsequently succeeded.
 
+The mathematical core now also contains the first 15-state ESKF milestone. It provides an
+immutable nominal state, right-local body-frame attitude-error injection, bias-corrected IMU
+nominal prediction, continuous `F` and `G` construction, first-order `Phi` and `Q_d`,
+explicitly symmetric covariance prediction, and a composed prediction boundary. Independent
+finite-difference Jacobians, adversarial covariance validation, empirical process-noise
+covariance, and repeated-prediction probes verify the frame/sign convention and numerical
+behavior. This milestone is prediction only and is not yet a complete state estimator.
+
 The repository does not yet contain a reusable physically conditional invariant-monitoring
-API, a closed-loop controller, a state estimator, adaptive integration, robustness campaigns,
-or a completed ROS 2/PX4 integration layer. The next bounded milestone is state-estimation
-design, beginning with the 15-state error-state Kalman filter conventions, process/noise
-model, propagation equations, and Jacobian verification.
+API, a closed-loop controller, a complete state estimator, adaptive integration, robustness
+campaigns, or a completed ROS 2/PX4 integration layer. The next bounded milestone is
+measurement-update design for local position and barometric altitude, including innovation,
+Kalman gain, Joseph-form covariance update, error-state injection, and the covariance-reset
+Jacobian. Rejection/gating and consistency testing remain later explicit design decisions.
 
 ## Current end-to-end pipeline
 
@@ -1276,6 +1285,17 @@ The full convention, state shapes, signs, and hover sanity check are defined in 
 - A squared-norm vector primitive.
 - Skew-symmetric matrices, quaternion normalization and differentiation, and active
   body-to-world rotation matrices.
+- An immutable, independently owned 15-state ESKF nominal state with NED position and
+  velocity, body-to-world attitude, and FRD accelerometer and gyroscope biases.
+- Right-local body-frame ESKF error injection with stable rotation-vector exponentiation and
+  quaternion normalization.
+- Bias-corrected IMU nominal prediction under NED gravity, with exact zero-duration behavior.
+- Continuous 15-state ESKF `F` and 12-input `G` matrices in the fixed right-local error and
+  process-noise orderings.
+- First-order high-rate `Phi` and `Q_d`, explicitly symmetric covariance prediction, and a
+  composed pre-step-linearized ESKF prediction boundary.
+- Independent full-column finite-difference Jacobian, adversarial covariance/PSD, empirical
+  process-noise, fixed-seed SPD, and long-run numerical validation for the prediction core.
 - Quadratic rotor thrust magnitudes from four rotor speeds.
 - First-order motor-speed response with saturated command targets, plus feasible
   collective-thrust/body-moment allocation to ordered rotor-speed commands.
@@ -1427,13 +1447,22 @@ and hosted push CI
 succeeded. The evidence remains specific to the tested environment and is not a
 cross-platform reproducibility claim.
 
+The ESKF prediction-core closeout passed 96 focused ESKF tests and all 1,458 repository tests
+with no failures, errors, skips, xfails, or warnings. Ruff lint and formatting passed, mypy
+reported no issues in 19 source files, and `make check` agreed. An independent 32-case,
+15-column finite-difference audit confirmed the expected first-order transition with
+quadratic step-halving convergence. A 250,000-sample process-noise probe matched
+`G @ Q_c @ G.T * dt` within 0.410% relative Frobenius error. Adversarial covariance cases
+spanning approximately `1e-24` through `1e24` passed, and 750 repeated predictions retained
+unit quaternion norm, exact covariance symmetry, and positive covariance margin.
+
 ## Repository structure
 
 - `src/quadrotor_math/`: ROS/PX4-independent vector, randomness, rotation, actuation,
   dynamics, integration, deterministic simulation, ideal IMU mathematics, state-history
   validation, sensor measurement, fixed-rate sensor scheduling, immutable run configuration,
   named run-random-stream ownership, canonical run manifests, immutable run artifacts,
-  complete-run generation, and trajectory-error algorithms.
+  complete-run generation, ESKF prediction mathematics, and trajectory-error algorithms.
 - `experiments/`: reproducible numerical studies built from the public mathematical core.
 - `tests/unit/`: focused unit and composition tests for the mathematical core.
 - `docs/architecture/`: architectural contracts, including frames and state conventions.
@@ -1465,7 +1494,9 @@ cross-platform reproducibility claim.
   inertia behavior, Euler drift, or long-duration stability.
 - No controller, scheduled rotor input, integration callback, dynamics event handling, or
   adaptive step size exists.
-- No state estimator exists yet.
+- The ESKF provides prediction only. No measurement model, innovation, Kalman gain,
+  Joseph-form covariance update, post-update injection/reset, rejection/gating, delayed
+  measurement handling, or estimator runner exists yet.
 - The accelerometer measurement boundary models a supplied constant additive bias and
   caller-configured per-axis, per-sample white-noise standard deviation. Accelerometer bias
   evolution is available only through the separate caller-driven random-walk step; these
@@ -1524,7 +1555,12 @@ the final high-accuracy simulation method, especially for larger time steps or l
 4. Gate G1 constant-wind/quadratic-drag implementation, deliberate environmental mismatch
    evidence, manifest v5/v6 persistence, and exact tested-environment replay are published
    and complete in commit `32e4886c63b38b62f41aa236b4439ca22560f5b7`.
-5. The next bounded milestone is state-estimation design, beginning with 15-state error-state
-   Kalman filter conventions, process/noise model, propagation equations, and Jacobian
-   verification. Control, uncertainty campaigns, Monte Carlo validation, ROS 2, PX4, and C++
-   integration remain future work.
+5. The 15-state ESKF prediction core is complete: immutable nominal state, right-local error
+   injection, IMU nominal propagation, continuous `F` and `G`, first-order `Phi` and `Q_d`,
+   symmetric covariance propagation, composed prediction, and independent Jacobian,
+   covariance, process-noise, and long-run validation are established.
+6. The next bounded milestone is measurement-update design: local-position and
+   barometric-altitude measurement models, innovation and Kalman gain, Joseph-form covariance
+   update, error-state injection, and covariance-reset Jacobian. Rejection/gating and
+   consistency testing require later explicit decisions. Controller, broader uncertainty
+   campaigns, ROS 2, PX4, and C++ integration remain future work.
