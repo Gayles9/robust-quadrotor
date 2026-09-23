@@ -8,6 +8,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from .eskf import EskfNominalState
+from .eskf_innovation import EskfInnovationPolicy
 from .eskf_replay import (
     EskfObservationKind,
     EskfReplayConfiguration,
@@ -155,6 +156,7 @@ def eskf_replay_configuration_from_nominal(
     continuous_noise_covariance: NDArray[np.float64],
     fuse_local_position: bool = True,
     fuse_barometric_altitude: bool = True,
+    innovation_policy: EskfInnovationPolicy | None = None,
 ) -> EskfReplayConfiguration:
     """Use nominal world/position parameters, preserving explicit prior and Q_c.
 
@@ -162,6 +164,8 @@ def eskf_replay_configuration_from_nominal(
     Do not turn per-sample IMU standard deviations into continuous densities
     implicitly. Caller-supplied IMU bias estimates are not replaced by nominal
     or true initial biases. There is no access to RunConfiguration.truth.
+    An optional innovation policy is caller-supplied, never inferred or tuned
+    from nominal noise or observed data. None retains the existing unscored path.
     """
     if not isinstance(nominal, NominalConfiguration):
         raise TypeError("nominal must be a NominalConfiguration")
@@ -191,4 +195,5 @@ def eskf_replay_configuration_from_nominal(
         barometric_altitude_noise_variance=altitude_variance,
         fuse_local_position=fuse_local_position,
         fuse_barometric_altitude=fuse_barometric_altitude,
+        innovation_policy=innovation_policy,
     )

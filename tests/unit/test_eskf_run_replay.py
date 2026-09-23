@@ -7,6 +7,10 @@ import numpy as np
 import pytest
 
 from quadrotor_math.eskf import EskfNominalState
+from quadrotor_math.eskf_innovation import (
+    EskfInnovationPolicy,
+    chi_square_99_percent_eskf_innovation_policy,
+)
 from quadrotor_math.eskf_replay import EskfObservationKind, EskfReplayStatus, replay_eskf
 from quadrotor_math.eskf_run_replay import (
     eskf_replay_configuration_from_nominal,
@@ -78,7 +82,7 @@ def _run(
     )
 
 
-def _config(run: RunConfiguration):
+def _config(run: RunConfiguration, policy=None):
     # Known experiment prior at dt; never initialized from a truth-history row.
     state = EskfNominalState(
         np.array([0.3, -0.2, 0.5]), np.zeros(3), np.array([1.0, 0, 0, 0]), np.zeros(3), np.zeros(3)
@@ -89,6 +93,7 @@ def _config(run: RunConfiguration):
         initial_state=state,
         initial_covariance=np.eye(15),
         continuous_noise_covariance=np.eye(12) * 1.0e-5,
+        innovation_policy=policy,
     )
 
 
@@ -459,3 +464,176 @@ def test_nominal_variance_conversion_rejects_unrepresentable_values(
             initial_covariance=np.eye(15),
             continuous_noise_covariance=np.zeros((12, 12)),
         )
+
+
+@pytest.mark.parametrize("policy", [None, EskfInnovationPolicy(), EskfInnovationPolicy(7, 4)])
+def test_nominal_helper_preserves_explicit_policy_without_inference(policy) -> None:
+    configuration = _config(_run(noise=1), policy)
+    if policy is None:
+        assert configuration.innovation_policy is None
+    else:
+        assert configuration.innovation_policy is not policy
+        assert (
+            configuration.innovation_policy.local_position_nis_threshold
+            == policy.local_position_nis_threshold
+        )
+        assert (
+            configuration.innovation_policy.barometric_altitude_nis_threshold
+            == policy.barometric_altitude_nis_threshold
+        )
+
+
+@pytest.mark.parametrize("kind", list(EskfObservationKind))
+@pytest.mark.parametrize("burst_length", [1, 3])
+@pytest.mark.parametrize("offset", [-1000.0, 1000.0])
+def test_fixed_outlier_fixture_rejects_before_correction_and_recovers(
+    kind, burst_length, offset
+) -> None:
+    # Thresholds and corruption are fixed before running this deterministic regression.
+    # The production sensor model is unchanged; only this measurement-only fixture is edited.
+    run = _run(61, seed=713, noise=1.0, moving=True)
+    original = eskf_replay_input_from_run_artifact(generate_run_artifact_data(run))
+    policy = chi_square_99_percent_eskf_innovation_policy()
+    configuration = _config(run, policy)
+    corrupt_ids = set(range(3, 3 + burst_length))
+    observations = tuple(
+        replace(o, measurement=o.measurement + offset)
+        if o.kind is kind and o.observation_index in corrupt_ids
+        else o
+        for o in original.observations
+    )
+    changed = replace(original, observations=observations)
+    result = replay_eskf(changed, configuration)
+    reference_observations = []
+    next_id = dict.fromkeys(EskfObservationKind, 0)
+    for observation in original.observations:
+        if observation.kind is kind and observation.observation_index in corrupt_ids:
+            continue
+        reference_observations.append(
+            replace(observation, observation_index=next_id[observation.kind])
+        )
+        next_id[observation.kind] += 1
+    reference = replay_eskf(
+        replace(original, observations=tuple(reference_observations)), configuration
+    )
+    # Statistical rejection has exactly the same state effect as omitting these values.
+    assert result.covariances.tobytes() == reference.covariances.tobytes()
+    for actual, expected in zip(result.states, reference.states, strict=True):
+        for field in fields(actual):
+            assert getattr(actual, field.name).tobytes() == getattr(expected, field.name).tobytes()
+    stream = [e for e in result.events if e.observation.kind is kind]
+    assert all(stream[i].status is EskfReplayStatus.REJECTED for i in corrupt_ids)
+    assert all(stream[i].update is None for i in corrupt_ids)
+    assert stream[max(corrupt_ids) + 1].status is EskfReplayStatus.FUSED
+    # Clean input is still owned independently; no injection modifies the artifact/adapter result.
+    assert any(
+        not np.array_equal(a.measurement, b.measurement)
+        for a, b in zip(original.observations, changed.observations, strict=True)
+    )
+
+
+@pytest.mark.parametrize("diagnostics_only", [False, True])
+def test_scored_saved_loaded_run_matches_all_event_diagnostics(tmp_path, diagnostics_only) -> None:
+    run = _run(41, seed=281, noise=1.0)
+    artifact = generate_run_artifact_data(run)
+    manifest = RunManifest(run, SoftwareProvenance("0.1.0", "3.12.14", "2.5.2", "b" * 40, True))
+    save_run_directory(tmp_path / "run", manifest, artifact)
+    _, loaded = load_run_directory(tmp_path / "run")
+    policy = (
+        EskfInnovationPolicy()
+        if diagnostics_only
+        else chi_square_99_percent_eskf_innovation_policy()
+    )
+    inputs = [eskf_replay_input_from_run_artifact(a) for a in (artifact, loaded)]
+    results = []
+    for data in inputs:
+        # Same test-only corruption for the gate. Diagnostics-only leaves correction
+        # enabled and makes no guarantee of numerical viability after a gross outlier.
+        observations = tuple(
+            replace(o, measurement=o.measurement + 1000)
+            if not diagnostics_only and o.observation_index == 4
+            else o
+            for o in data.observations
+        )
+        results.append(replay_eskf(replace(data, observations=observations), _config(run, policy)))
+    first, second = results
+    assert first.covariances.tobytes() == second.covariances.tobytes()
+    for a, b in zip(first.states, second.states, strict=True):
+        assert all(getattr(a, f.name).tobytes() == getattr(b, f.name).tobytes() for f in fields(a))
+    for a, b in zip(first.events, second.events, strict=True):
+        assert a.status is b.status
+        assert a.nis_threshold == b.nis_threshold
+        for name in ("innovation", "innovation_covariance", "whitened_innovation"):
+            assert getattr(a.innovation, name).tobytes() == getattr(b.innovation, name).tobytes()
+        assert (
+            a.innovation.normalized_innovation_squared == b.innovation.normalized_innovation_squared
+        )
+    if diagnostics_only:
+        assert all(e.status is EskfReplayStatus.FUSED for e in first.events)
+    else:
+        assert sum(e.status is EskfReplayStatus.REJECTED for e in first.events) >= 2
+
+
+def test_diagnostics_only_preserves_ungated_gross_outlier_outcome() -> None:
+    run = _run(41, seed=281, noise=1.0)
+    data = eskf_replay_input_from_run_artifact(generate_run_artifact_data(run))
+    changed = replace(
+        data,
+        observations=tuple(
+            replace(o, measurement=o.measurement + 1000) if o.observation_index == 4 else o
+            for o in data.observations
+        ),
+    )
+    # Gross outliers can exceed the existing update/reset path's numerical domain.
+    # Compare outcomes; do not require roundoff-triggered failure on every BLAS/CPU.
+    outcomes = []
+    for policy in (None, EskfInnovationPolicy()):
+        try:
+            result = replay_eskf(changed, _config(run, policy))
+        except ValueError as error:
+            outcomes.append(("error", str(error)))
+        else:
+            outcomes.append(
+                (
+                    "success",
+                    result.covariances.tobytes(),
+                    tuple(getattr(s, f.name).tobytes() for s in result.states for f in fields(s)),
+                )
+            )
+    assert outcomes[0] == outcomes[1]
+
+
+def test_scored_replay_uses_no_truth_or_rng(monkeypatch) -> None:
+    run = _run(20, noise=1.0)
+    original = generate_run_artifact_data(run)
+    configuration = _config(run, chi_square_99_percent_eskf_innovation_policy())
+    allowed = {"truth_time_s"} | {
+        field.name
+        for field in fields(original)
+        if (
+            field.name.startswith(
+                (
+                    "accelerometer_",
+                    "gyroscope_",
+                    "local_position_",
+                    "barometric_altitude_",
+                    "delivery_",
+                )
+            )
+            and "bias_history" not in field.name
+        )
+    }
+
+    class OnlyMeasurements:
+        def __getattr__(self, name):
+            if name not in allowed:
+                pytest.fail(f"non-measurement access: {name}")
+            return getattr(original, name)
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("Replay requested an RNG")
+
+    monkeypatch.setattr(np.random, "default_rng", forbidden)
+    monkeypatch.setattr(np.random, "normal", forbidden)
+    result = replay_eskf(eskf_replay_input_from_run_artifact(OnlyMeasurements()), configuration)
+    assert result.events and all(e.innovation is not None for e in result.events)
