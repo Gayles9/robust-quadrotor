@@ -46,11 +46,15 @@ def normalize_quaternion_body_to_world(
     if not np.all(np.isfinite(q_WB)):
         raise ValueError("q_WB must contain only finite values")
 
-    norm = float(np.linalg.norm(q_WB))
-    if norm == 0.0:
+    scale = float(np.max(np.abs(q_WB)))
+    if scale == 0.0:
         raise ValueError("q_WB must have nonzero norm")
-
-    return q_WB / norm
+    # Preserve ordinary-input arithmetic, but avoid squared-norm overflow and
+    # underflow for finite quaternions outside the safe norm-evaluation range.
+    if np.sqrt(np.finfo(np.float64).tiny) <= scale <= np.sqrt(np.finfo(np.float64).max) / 2.0:
+        return q_WB / float(np.linalg.norm(q_WB))
+    scaled_q_WB = q_WB / scale
+    return scaled_q_WB / float(np.linalg.norm(scaled_q_WB))
 
 
 def quaternion_derivative_body_to_world(
@@ -69,7 +73,8 @@ def quaternion_derivative_body_to_world(
     Raises:
         ValueError: If ``q_WB`` does not have shape ``(4,)``, ``omega_B`` does
             not have shape ``(3,)``, or either input contains a non-finite
-            component, or ``q_WB`` has zero norm.
+            component, or ``q_WB`` has zero norm, or the derivative arithmetic
+            produces a non-finite result.
     """
     if q_WB.shape != (4,):
         raise ValueError(f"q_WB must have shape (4,), got {q_WB.shape}")
@@ -83,21 +88,27 @@ def quaternion_derivative_body_to_world(
     if not np.all(np.isfinite(omega_B)):
         raise ValueError("omega_B must contain only finite values")
 
-    q_WB_norm = float(np.linalg.norm(q_WB))
-    if q_WB_norm == 0.0:
+    if not np.any(q_WB != 0.0):
         raise ValueError("q_WB must have nonzero norm")
 
     w, x, y, z = q_WB
     omega_x, omega_y, omega_z = omega_B
-    return 0.5 * np.array(
-        [
-            -(x * omega_x + y * omega_y + z * omega_z),
-            w * omega_x + y * omega_z - z * omega_y,
-            w * omega_y + z * omega_x - x * omega_z,
-            w * omega_z + x * omega_y - y * omega_x,
-        ],
-        dtype=np.float64,
-    )
+    try:
+        with np.errstate(over="raise", invalid="raise"):
+            derivative = 0.5 * np.array(
+                [
+                    -(x * omega_x + y * omega_y + z * omega_z),
+                    w * omega_x + y * omega_z - z * omega_y,
+                    w * omega_y + z * omega_x - x * omega_z,
+                    w * omega_z + x * omega_y - y * omega_x,
+                ],
+                dtype=np.float64,
+            )
+            if not np.all(np.isfinite(derivative)):
+                raise FloatingPointError
+    except FloatingPointError:
+        raise ValueError("quaternion derivative must remain finite") from None
+    return derivative
 
 
 def rotation_matrix_body_to_world(
@@ -118,7 +129,8 @@ def rotation_matrix_body_to_world(
     if q_WB.shape != (4,):
         raise ValueError(f"q_WB must have shape (4,), got {q_WB.shape}")
 
-    squared_norm = float(np.dot(q_WB, q_WB))
+    with np.errstate(over="ignore", invalid="ignore"):
+        squared_norm = float(np.dot(q_WB, q_WB))
     if not np.isclose(
         squared_norm,
         1.0,

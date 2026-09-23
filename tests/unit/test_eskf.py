@@ -1449,3 +1449,14 @@ def test_predict_remains_finite_symmetric_and_psd_over_long_sequence() -> None:
     assert np.all(np.isfinite(covariance))
     np.testing.assert_array_equal(covariance, covariance.T)
     assert np.linalg.eigvalsh(covariance)[0] >= -1.0e-12
+
+
+@pytest.mark.parametrize("norm_error", [1.5e-12, -1.5e-12])
+def test_nominal_state_rejects_quaternion_outside_downstream_rotation_contract(
+    norm_error: float,
+) -> None:
+    q_WB = np.array([1.0 + norm_error, 0.0, 0.0, 0.0])
+    with pytest.raises(ValueError, match="unit norm"):
+        rotation_matrix_body_to_world(q_WB)
+    with pytest.raises(ValueError, match="unit norm"):
+        _state(q_WB=q_WB)

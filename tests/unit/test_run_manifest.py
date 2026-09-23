@@ -39,6 +39,31 @@ from quadrotor_math.run_manifest import (
 _DATA_NPZ_SHA256 = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 
 
+@pytest.mark.parametrize(
+    ("field_name", "invalid_value"),
+    [
+        ("sample_stride", 99),
+        ("sample_stride", True),
+        ("sample_stride", 2.0),
+        ("sample_stride", "2"),
+        ("effective_sample_period_s", 0.05),
+        ("effective_sample_period_s", True),
+        ("effective_sample_period_s", "0.04"),
+    ],
+)
+@pytest.mark.parametrize(
+    "channel", ["accelerometer", "gyroscope", "local_position", "barometric_altitude"]
+)
+def test_audit_decoder_rejects_inconsistent_derived_schedule_values(
+    channel: str, field_name: str, invalid_value: object
+) -> None:
+    manifest = RunManifest(_run_configuration(), _software_provenance())
+    mapping = json.loads(encode_run_manifest(manifest))
+    mapping["run_configuration"]["sensor_schedules"][channel][field_name] = invalid_value
+    with pytest.raises(ValueError, match=field_name):
+        decode_run_manifest(json.dumps(mapping).encode())
+
+
 def _run_configuration() -> RunConfiguration:
     truth = TruthConfiguration(
         rigid_body=RigidBodyParameters(

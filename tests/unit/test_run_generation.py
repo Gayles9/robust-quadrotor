@@ -39,6 +39,62 @@ from quadrotor_math.run_generation import generate_run_artifact_data
 from quadrotor_math.run_manifest import RunManifest, SoftwareProvenance, encode_run_manifest
 
 
+@pytest.mark.parametrize(
+    "field_name", ["gravity_acceleration", "thrust_coefficient", "moment_coefficient", "inertia_B"]
+)
+def test_audit_generation_preflights_truth_before_creating_random_streams(
+    field_name: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    configuration = _configuration()
+    truth = configuration.truth
+    if field_name == "gravity_acceleration":
+        truth = replace(truth, world=replace(truth.world, gravity_acceleration=0.0))
+        path = "world.gravity_acceleration"
+    elif field_name == "inertia_B":
+        inertia_B = truth.rigid_body.inertia_B.copy()
+        inertia_B[0, 1] = 1.0e-9  # Structurally accepted, rejected by the numerical plant.
+        truth = replace(truth, rigid_body=replace(truth.rigid_body, inertia_B=inertia_B))
+        path = "rigid_body.inertia_B"
+    else:
+        truth = replace(truth, rotors=replace(truth.rotors, **{field_name: 0.0}))
+        path = f"rotors.{field_name}"
+    configuration = replace(
+        configuration,
+        truth=truth,
+        declared_mismatches=(DeclaredMismatch(path, "Execution-domain regression"),),
+    )
+
+    def forbidden_streams(*args: object) -> None:
+        pytest.fail("truth validation must precede random-stream creation")
+
+    monkeypatch.setattr(
+        "quadrotor_math.run_generation.create_run_random_streams", forbidden_streams
+    )
+    with pytest.raises(ValueError, match=field_name):
+        generate_run_artifact_data(configuration)
+
+
+@pytest.mark.parametrize("delay_offset", [1.0e-13, -1.0e-13, 0.0])
+def test_audit_generated_delivery_boundary_round_trips(tmp_path: Path, delay_offset: float) -> None:
+    configuration = _configuration()
+    configuration = replace(
+        configuration,
+        sensor_schedules=replace(
+            configuration.sensor_schedules, accelerometer=SensorSchedule(0.1, 0.1 + delay_offset)
+        ),
+    )
+    data = generate_run_artifact_data(configuration)
+    expected_first_delivery = 3 if delay_offset > 0.0 else 2
+    assert data.accelerometer_delivered_at_truth_index[0] == expected_first_delivery
+    manifest = RunManifest(
+        configuration, SoftwareProvenance("0.1.0", "3.12.14", "2.5.2", "a" * 40, True)
+    )
+    save_run_directory(tmp_path / "run", manifest, data)
+    _, loaded = load_run_directory(tmp_path / "run")
+    for field in fields(data):
+        np.testing.assert_array_equal(getattr(loaded, field.name), getattr(data, field.name))
+
+
 def _configuration(
     *,
     truth_motor: bool = True,
@@ -1029,3 +1085,49 @@ def test_environmental_run_persistence_and_replay_are_exact(
         original_array = getattr(original_data, field.name)
         np.testing.assert_array_equal(original_array, original_artifact_snapshots[field.name])
         assert original_array.flags.writeable is original_artifact_writeability[field.name]
+
+
+def test_generation_preflights_initial_rotation_before_random_streams(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    configuration = _configuration()
+    initial = replace(
+        configuration.initial_truth_state, q_WB=np.array([1.0 + 1.5e-12, 0.0, 0.0, 0.0])
+    )
+    configuration = replace(configuration, initial_truth_state=initial)
+
+    def forbidden_streams(*args: object) -> None:
+        pytest.fail("initial rotation validation must precede random-stream creation")
+
+    monkeypatch.setattr(
+        "quadrotor_math.run_generation.create_run_random_streams", forbidden_streams
+    )
+    with pytest.raises(ValueError, match="unit norm"):
+        generate_run_artifact_data(configuration)
+
+
+def test_generation_preserves_historical_zero_nominal_parameter_domain() -> None:
+    configuration = _configuration()
+    nominal = replace(
+        configuration.nominal,
+        world=replace(configuration.nominal.world, gravity_acceleration=0.0),
+        rotors=replace(
+            configuration.nominal.rotors, thrust_coefficient=0.0, moment_coefficient=0.0
+        ),
+    )
+    changed = replace(
+        configuration,
+        nominal=nominal,
+        declared_mismatches=tuple(
+            DeclaredMismatch(path, "Nominal beliefs do not generate truth")
+            for path in (
+                "world.gravity_acceleration",
+                "rotors.thrust_coefficient",
+                "rotors.moment_coefficient",
+            )
+        ),
+    )
+    baseline = generate_run_artifact_data(configuration)
+    actual = generate_run_artifact_data(changed)
+    for field in fields(baseline):
+        np.testing.assert_array_equal(getattr(actual, field.name), getattr(baseline, field.name))

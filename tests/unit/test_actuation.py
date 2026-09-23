@@ -14,6 +14,25 @@ from quadrotor_math.actuation import (
 )
 
 
+@pytest.mark.parametrize("boundary", ["thrust", "reaction", "force", "moment", "allocation"])
+@pytest.mark.filterwarnings("error")
+def test_audit_actuation_rejects_finite_overflow(boundary: str) -> None:
+    huge = np.finfo(float).max
+    with pytest.raises(ValueError, match="finite"):
+        if boundary == "thrust":
+            rotor_thrusts_from_speeds(np.full(4, huge), 1.0)
+        elif boundary == "reaction":
+            reaction_moment_body_from_rotor_speeds(np.full(4, huge), np.ones(4), 1.0)
+        elif boundary == "force":
+            thrust_force_body_from_rotor_thrusts(np.full(4, huge))
+        elif boundary == "moment":
+            thrust_moment_body_from_rotor_thrusts(np.full((4, 3), huge), np.full(4, 2.0))
+        else:
+            actuation.commanded_rotor_speeds_from_collective_thrust_and_body_moment(
+                1.0, np.zeros(3), np.full((4, 3), huge), np.ones(4), 2.0, 1.0, 0.0, 1.0
+            )
+
+
 def test_allocate_nominal_hover_to_equal_commanded_rotor_speeds() -> None:
     rotor_positions_B = np.array(
         [

@@ -1,6 +1,6 @@
-"""Error-state Kalman filter prediction mathematics."""
+"""15-state right-local ESKF prediction and same-epoch measurement mathematics."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from math import cos, sin
 
 import numpy as np
@@ -192,18 +192,12 @@ class EskfNominalState:
                 raise ValueError(f"{field_name} must contain only finite values")
             owned_arrays[field_name] = owned_values
 
+        # Use the same squared-norm tolerance as the rotation boundary consumed
+        # by prediction; accepting a looser norm tolerance breaks composition.
         try:
-            with np.errstate(over="raise", invalid="raise"):
-                quaternion_norm = np.linalg.norm(owned_arrays["q_WB"])
-        except FloatingPointError:
+            rotation_matrix_body_to_world(owned_arrays["q_WB"])
+        except ValueError:
             raise ValueError("q_WB must have unit norm") from None
-        if not np.isclose(
-            quaternion_norm,
-            1.0,
-            rtol=1.0e-12,
-            atol=1.0e-12,
-        ):
-            raise ValueError("q_WB must have unit norm")
 
         for field_name, _, _ in arrays:
             owned_values = owned_arrays[field_name]
@@ -559,3 +553,326 @@ def predict_eskf(
         discrete_process_noise_covariance,
     )
     return propagated_nominal_state, propagated_covariance
+
+
+def _validated_float64_vector(
+    name: str, values: NDArray[np.float64], size: int
+) -> NDArray[np.float64]:
+    """Return an owned finite vector without reshaping the caller's input."""
+    if values.shape != (size,):
+        raise ValueError(f"{name} must have shape ({size},)")
+    owned = np.array(values, dtype=np.float64, order="C", copy=True)
+    if not np.all(np.isfinite(owned)):
+        raise ValueError(f"{name} must contain only finite values")
+    return owned
+
+
+def eskf_local_position_measurement_model(
+    nominal_state: EskfNominalState,
+    position_bias_W: NDArray[np.float64],
+) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
+    """Return local-position prediction (3,) in NED metres and error Jacobian (3,15).
+
+    The supplied bias is the assumed constant sensor bias, not a truth-state
+    input or an additional estimated state. The model is ``p_W + position_bias_W``.
+    Its only nonzero Jacobian block is the identity in the position columns.
+    """
+    bias = _validated_float64_vector("position_bias_W", position_bias_W, 3)
+    try:
+        with np.errstate(over="raise", invalid="raise"):
+            prediction = nominal_state.position_W + bias
+            if not np.all(np.isfinite(prediction)):
+                raise FloatingPointError
+    except FloatingPointError:
+        raise ValueError("ESKF local-position prediction must remain finite") from None
+    jacobian = np.zeros((3, 15), dtype=np.float64)
+    jacobian[:, 0:3] = np.eye(3)
+    return prediction, jacobian
+
+
+def eskf_barometric_altitude_measurement_model(
+    nominal_state: EskfNominalState,
+    reference_altitude: float,
+    barometric_altitude_bias: float,
+) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
+    """Return positive-up altitude prediction (1,) in metres and Jacobian (1,15).
+
+    ``h = reference_altitude - position_W[2] + barometric_altitude_bias``.
+    Reference altitude and constant bias are explicit nominal sensor assumptions.
+    Only the NED-down position column is nonzero: ``H[0, 2] = -1``.
+    """
+    if not np.isfinite(reference_altitude):
+        raise ValueError("reference_altitude must be finite")
+    if not np.isfinite(barometric_altitude_bias):
+        raise ValueError("barometric_altitude_bias must be finite")
+    try:
+        with np.errstate(over="raise", invalid="raise"):
+            altitude = reference_altitude - nominal_state.position_W[2] + barometric_altitude_bias
+            if not np.isfinite(altitude):
+                raise FloatingPointError
+    except FloatingPointError:
+        raise ValueError("ESKF barometric-altitude prediction must remain finite") from None
+    jacobian = np.zeros((1, 15), dtype=np.float64)
+    jacobian[0, 2] = -1.0
+    return np.array([altitude], dtype=np.float64), jacobian
+
+
+def eskf_reset_jacobian(error_state_correction: NDArray[np.float64]) -> NDArray[np.float64]:
+    """Return the (15,15) covariance-reset Jacobian after right-local injection.
+
+    For the injected rotation vector ``phi = error_state_correction[6:9]`` in
+    body-local radians, the attitude block is the SO(3) right Jacobian. It is
+    the derivative of ``Log(Exp(-phi) Exp(phi + epsilon))`` at epsilon=0.
+    Other diagonal blocks are identity and all off-diagonal blocks are zero.
+    This is an exact local derivative; covariance transport remains first order
+    in residual uncertainty. A Taylor branch avoids cancellation near zero.
+    """
+    correction = _validated_float64_vector("error_state_correction", error_state_correction, 15)
+    phi_B = correction[6:9]
+    try:
+        with np.errstate(over="raise", invalid="raise", divide="raise"):
+            angle = float(np.linalg.norm(phi_B))
+            if not np.isfinite(angle):
+                raise FloatingPointError
+            if angle < 1.0e-4:
+                angle_squared = angle * angle
+                first = 0.5 - angle_squared / 24.0 + angle_squared**2 / 720.0
+                second = 1.0 / 6.0 - angle_squared / 120.0 + angle_squared**2 / 5040.0
+                cross = skew_symmetric(phi_B)
+                attitude_reset = np.eye(3) - first * cross + second * (cross @ cross)
+            else:
+                axis_cross = skew_symmetric(phi_B / angle)
+                first = 2.0 * sin(0.5 * angle) ** 2 / angle
+                second = 1.0 - sin(angle) / angle
+                attitude_reset = np.eye(3) - first * axis_cross + second * (axis_cross @ axis_cross)
+            if not np.all(np.isfinite(attitude_reset)):
+                raise FloatingPointError
+    except FloatingPointError:
+        raise ValueError("ESKF reset Jacobian must remain finite") from None
+    jacobian = np.eye(15, dtype=np.float64)
+    jacobian[6:9, 6:9] = attitude_reset
+    return jacobian
+
+
+def reset_eskf_covariance(
+    covariance: NDArray[np.float64], error_state_correction: NDArray[np.float64]
+) -> NDArray[np.float64]:
+    """Transport a finite symmetric PSD (15,15) covariance after error injection.
+
+    Apply ``Gamma @ covariance @ Gamma.T`` to every block, including attitude
+    cross covariances. No process noise is added. Inputs are not mutated.
+    """
+    return propagate_eskf_covariance(
+        covariance, eskf_reset_jacobian(error_state_correction), np.zeros((15, 15))
+    )
+
+
+def _scaled_innovation_cholesky(
+    innovation_covariance: NDArray[np.float64],
+) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
+    """Factor a diagonally scaled innovation covariance, without regularization."""
+    diagonal = np.diag(innovation_covariance)
+    if np.any(diagonal <= 0.0):
+        raise ValueError("innovation_covariance must be numerically positive definite")
+    scales = np.sqrt(diagonal)
+    try:
+        with np.errstate(over="raise", invalid="raise", divide="raise"):
+            scaled = innovation_covariance / scales[:, None] / scales[None, :]
+            factor = np.linalg.cholesky(scaled)
+            if not np.all(np.isfinite(factor)):
+                raise FloatingPointError
+    except (FloatingPointError, np.linalg.LinAlgError):
+        raise ValueError("innovation_covariance must be numerically positive definite") from None
+    return scales, factor
+
+
+@dataclass(frozen=True, slots=True, eq=False)
+class EskfMeasurementUpdate:
+    """Own one corrected state and its same-epoch measurement diagnostics.
+
+    All stored arrays are finite, C-contiguous, independently owned float64,
+    and read-only. ``covariance`` is the posterior (15,15) error covariance
+    *after* reset. Innovation and innovation covariance have shapes (m,) and
+    (m,m) in measurement units and squared units. ``kalman_gain`` is (15,m).
+    ``error_state_correction`` is the injected (15,) correction in the existing
+    error-state order; it is a diagnostic, not a retained nonzero error mean.
+    """
+
+    nominal_state: EskfNominalState
+    covariance: NDArray[np.float64]
+    innovation: NDArray[np.float64]
+    innovation_covariance: NDArray[np.float64]
+    kalman_gain: NDArray[np.float64]
+    error_state_correction: NDArray[np.float64]
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.nominal_state, EskfNominalState):
+            raise TypeError("nominal_state must be an EskfNominalState")
+        if self.innovation.ndim != 1 or self.innovation.size == 0:
+            raise ValueError("innovation must have shape (m,) with m positive")
+        size = self.innovation.size
+        expected_shapes = (
+            ("covariance", self.covariance, (15, 15)),
+            ("innovation_covariance", self.innovation_covariance, (size, size)),
+            ("kalman_gain", self.kalman_gain, (15, size)),
+            ("error_state_correction", self.error_state_correction, (15,)),
+        )
+        for name, values, shape in expected_shapes:
+            if values.shape != shape:
+                raise ValueError(f"{name} must have shape {shape}")
+        arrays = {
+            "innovation": _validated_float64_vector("innovation", self.innovation, size),
+            "error_state_correction": _validated_float64_vector(
+                "error_state_correction", self.error_state_correction, 15
+            ),
+            "covariance": _validated_float64_matrix(
+                "covariance", self.covariance, (15, 15), symmetric_positive_semidefinite=True
+            ),
+            "innovation_covariance": _validated_float64_matrix(
+                "innovation_covariance",
+                self.innovation_covariance,
+                (size, size),
+                symmetric_positive_semidefinite=True,
+            ),
+            "kalman_gain": _validated_float64_matrix("kalman_gain", self.kalman_gain, (15, size)),
+        }
+        _scaled_innovation_cholesky(arrays["innovation_covariance"])
+        for name, values in arrays.items():
+            values.flags.writeable = False
+            object.__setattr__(self, name, values)
+        object.__setattr__(self, "nominal_state", replace(self.nominal_state))
+
+
+def update_eskf_linear_measurement(
+    nominal_state: EskfNominalState,
+    covariance: NDArray[np.float64],
+    measurement: NDArray[np.float64],
+    predicted_measurement: NDArray[np.float64],
+    measurement_jacobian: NDArray[np.float64],
+    measurement_noise_covariance: NDArray[np.float64],
+) -> EskfMeasurementUpdate:
+    """Correct, inject, and reset using one independent same-epoch observation.
+
+    Inputs are P (15,15), z/h (m,), H (m,15), and R (m,m), with m>0. H is the
+    derivative with respect to the existing right-local error. R is the discrete
+    per-observation covariance, not a standard deviation or continuous density.
+    P and R must be finite symmetric PSD. S=H P H.T+R must admit a scaled
+    Cholesky factorization. Singular S raises ValueError; there is no jitter,
+    pseudoinverse, observation rejection/gating, or timestamp handling.
+
+    The prior local error mean is zero. The observation noise must be independent
+    of that error. Compute r=z-h, K=P H.T S^-1 using linear solves, delta=K r,
+    and the Joseph covariance, then inject delta and transport covariance with
+    the exact local reset Jacobian. Zero correction preserves nominal-state
+    bytes while still applying the covariance update. Invalid shapes, nonfinite
+    values/results, or invalid covariance domains raise ValueError atomically.
+    """
+    if measurement.ndim != 1 or measurement.size == 0:
+        raise ValueError("measurement must have shape (m,) with m positive")
+    size = measurement.size
+    shapes = (
+        ("covariance", covariance, (15, 15)),
+        ("predicted_measurement", predicted_measurement, (size,)),
+        ("measurement_jacobian", measurement_jacobian, (size, 15)),
+        ("measurement_noise_covariance", measurement_noise_covariance, (size, size)),
+    )
+    for name, values, shape in shapes:
+        if values.shape != shape:
+            raise ValueError(f"{name} must have shape {shape}")
+    measured = _validated_float64_vector("measurement", measurement, size)
+    predicted = _validated_float64_vector("predicted_measurement", predicted_measurement, size)
+    P = _validated_float64_matrix(
+        "covariance", covariance, (15, 15), symmetric_positive_semidefinite=True
+    )
+    H = _validated_float64_matrix("measurement_jacobian", measurement_jacobian, (size, 15))
+    R = _validated_float64_matrix(
+        "measurement_noise_covariance",
+        measurement_noise_covariance,
+        (size, size),
+        symmetric_positive_semidefinite=True,
+    )
+    try:
+        with np.errstate(over="raise", invalid="raise", divide="raise"):
+            innovation = measured - predicted
+            cross_covariance = P @ H.T
+            innovation_covariance = _symmetrized_float64_matrix(H @ cross_covariance + R)
+            if not all(
+                np.all(np.isfinite(value))
+                for value in (innovation, cross_covariance, innovation_covariance)
+            ):
+                raise FloatingPointError
+            scales, factor = _scaled_innovation_cholesky(innovation_covariance)
+            scaled_rhs = cross_covariance.T / scales[:, None]
+            gain = (
+                np.linalg.solve(factor.T, np.linalg.solve(factor, scaled_rhs)) / scales[:, None]
+            ).T
+            correction = gain @ innovation
+            residual_map = np.eye(15) - gain @ H
+            joseph_covariance = _symmetrized_float64_matrix(
+                residual_map @ P @ residual_map.T + gain @ R @ gain.T
+            )
+            if not all(
+                np.all(np.isfinite(value)) for value in (gain, correction, joseph_covariance)
+            ):
+                raise FloatingPointError
+    except (FloatingPointError, np.linalg.LinAlgError):
+        raise ValueError("ESKF measurement update must remain finite and solvable") from None
+    updated_state = (
+        inject_eskf_error_state(nominal_state, correction)
+        if np.any(correction)
+        else replace(nominal_state)
+    )
+    updated_covariance = reset_eskf_covariance(joseph_covariance, correction)
+    return EskfMeasurementUpdate(
+        updated_state, updated_covariance, innovation, innovation_covariance, gain, correction
+    )
+
+
+def update_eskf_local_position(
+    nominal_state: EskfNominalState,
+    covariance: NDArray[np.float64],
+    position_measurement_W: NDArray[np.float64],
+    measurement_noise_covariance_W: NDArray[np.float64],
+    position_bias_W: NDArray[np.float64],
+) -> EskfMeasurementUpdate:
+    """Fuse one NED position (3,) in m with covariance (3,3) in m² and assumed bias.
+
+    The measurement refers to the nominal state's epoch. No scheduling, truth
+    access, or bias-state augmentation occurs. See update_eskf_linear_measurement.
+    """
+    prediction, jacobian = eskf_local_position_measurement_model(nominal_state, position_bias_W)
+    return update_eskf_linear_measurement(
+        nominal_state,
+        covariance,
+        position_measurement_W,
+        prediction,
+        jacobian,
+        measurement_noise_covariance_W,
+    )
+
+
+def update_eskf_barometric_altitude(
+    nominal_state: EskfNominalState,
+    covariance: NDArray[np.float64],
+    altitude_measurement: float,
+    measurement_noise_variance: float,
+    reference_altitude: float,
+    barometric_altitude_bias: float,
+) -> EskfMeasurementUpdate:
+    """Fuse one positive-up altitude in m with discrete variance in m².
+
+    Reference altitude and constant altitude bias are explicit nominal assumptions.
+    The measurement must refer to the nominal state's epoch. A zero variance is
+    allowed only when the resulting innovation covariance is positive definite.
+    """
+    prediction, jacobian = eskf_barometric_altitude_measurement_model(
+        nominal_state, reference_altitude, barometric_altitude_bias
+    )
+    return update_eskf_linear_measurement(
+        nominal_state,
+        covariance,
+        np.array([altitude_measurement], dtype=np.float64),
+        prediction,
+        jacobian,
+        np.array([[measurement_noise_variance]], dtype=np.float64),
+    )

@@ -363,3 +363,13 @@ innovation and Kalman gain, Joseph-form covariance update, error-state injection
 covariance-reset Jacobian. Rejection/gating and consistency testing require later explicit
 design decisions. Measurement updates and estimator integration remain outside this
 prediction-core milestone.
+
+## Superseding measurement-update closeout (2026-09-23)
+
+The bounded next milestone identified above is now implemented and verified in
+`a751fe843178440e035a6ad375a3abec828a2b1a`. See
+[ADR 0005](../decisions/0005-eskf-measurement-updates.md) and the
+[September 23 verification record](2026-09-23-eskf-measurement-updates-and-contract-audit.md).
+The earlier prediction-only scope and counts describe that historical increment, not the
+current measurement-update capability. Gating, delayed fusion, a runner, and consistency
+analysis remain outside the completed mathematical core.

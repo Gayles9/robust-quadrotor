@@ -3,7 +3,7 @@
 import ctypes
 import errno
 import os
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, fields, replace
 from hashlib import sha256
 from io import BytesIO
 from pathlib import Path
@@ -16,11 +16,11 @@ from numpy.typing import NDArray
 
 from .run_configuration import SensorSchedule
 from .run_manifest import RunManifest, decode_run_manifest, encode_run_manifest
+from .sensor_scheduling import _time_comparison_tolerance_s
 from .validation import validate_rigid_body_state_history
 
 _FLOAT64_DTYPE: Final[np.dtype[np.float64]] = np.dtype("<f8")
 _INT64_DTYPE: Final[np.dtype[np.int64]] = np.dtype("<i8")
-_SENSOR_TIME_ABSOLUTE_TOLERANCE_S: Final[float] = 1.0e-12
 _DELIVERY_SENSOR_ID_ACCELEROMETER: Final[int] = 1
 _DELIVERY_SENSOR_ID_GYROSCOPE: Final[int] = 2
 _DELIVERY_SENSOR_ID_LOCAL_POSITION: Final[int] = 3
@@ -85,13 +85,14 @@ def _require_static_shape[ScalarT: np.generic](
 def _validate_float_array(
     value: object, *, field_name: str, width: Literal[3, 4] | None
 ) -> NDArray[np.float64]:
-    """Require an exact little-endian float64 array and static shape."""
+    """Require a finite little-endian float64 array and static shape."""
     if type(value) is not np.ndarray:
         raise ValueError(f"{field_name} must be a NumPy array")
     array = cast(NDArray[np.float64], value)
     if array.dtype != _FLOAT64_DTYPE:
         raise ValueError(f"{field_name} must have dtype little-endian float64")
     _require_static_shape(array, field_name=field_name, width=width)
+    _require_finite_values(field_name, array)
     return array
 
 
@@ -132,7 +133,7 @@ def _require_consecutive_zero_based_indices(field_name: str, value: NDArray[np.i
 
 
 def _require_finite_values(field_name: str, value: NDArray[np.float64]) -> None:
-    """Require every timestamp in one sensor metadata array to be finite."""
+    """Require every entry in one floating payload or metadata array to be finite."""
     if not np.all(np.isfinite(value)):
         raise ValueError(f"{field_name} must contain only finite values")
 
@@ -186,7 +187,7 @@ def _delivered_stream_records(
 
 @dataclass(frozen=True, slots=True, eq=False)
 class RunArtifactData:
-    """Hold the 35 stable run arrays as owned, read-only copies."""
+    """Hold 35 stable run arrays as owned, read-only copies with finite float payloads."""
 
     truth_time_s: NDArray[np.float64]
     truth_position_history_W: NDArray[np.float64]
@@ -849,20 +850,18 @@ def _require_configured_sensor_timestamps(
     expected_acquisition_time_s = expected_rows.astype(_FLOAT64_DTYPE) * truth_time_step_s
     expected_delivery_time_s = expected_acquisition_time_s + schedule.delivery_delay_s
 
-    if not np.allclose(
-        acquisition_time_s,
-        expected_acquisition_time_s,
-        rtol=0.0,
-        atol=_SENSOR_TIME_ABSOLUTE_TOLERANCE_S,
+    if not all(
+        abs(float(actual) - float(expected))
+        <= _time_comparison_tolerance_s(float(actual), float(expected))
+        for actual, expected in zip(acquisition_time_s, expected_acquisition_time_s, strict=True)
     ):
         raise ValueError(
             f"{stream_name}_acquisition_time_s must equal the configured acquisition schedule"
         )
-    if not np.allclose(
-        delivery_time_s,
-        expected_delivery_time_s,
-        rtol=0.0,
-        atol=_SENSOR_TIME_ABSOLUTE_TOLERANCE_S,
+    if not all(
+        abs(float(actual) - float(expected))
+        <= _time_comparison_tolerance_s(float(actual), float(expected))
+        for actual, expected in zip(delivery_time_s, expected_delivery_time_s, strict=True)
     ):
         raise ValueError(
             f"{stream_name}_delivery_time_s must equal configured acquisition times "
@@ -880,9 +879,10 @@ def _require_configured_delivery_truth_indices(
     expected_indices = np.full(delivery_time_s.shape, -1, dtype=_INT64_DTYPE)
     for observation_index, scheduled_delivery_time_s in enumerate(delivery_time_s):
         for truth_index in range(1, truth_time_s.shape[0]):
-            if truth_time_s[truth_index] >= (
-                scheduled_delivery_time_s - _SENSOR_TIME_ABSOLUTE_TOLERANCE_S
-            ):
+            current_time_s = float(truth_time_s[truth_index])
+            scheduled_time_s = float(scheduled_delivery_time_s)
+            tolerance_s = _time_comparison_tolerance_s(scheduled_time_s, current_time_s)
+            if scheduled_time_s <= current_time_s + tolerance_s:
                 expected_indices[observation_index] = truth_index
                 break
 
@@ -1013,6 +1013,12 @@ def _validate_run_artifact_against_manifest(manifest: RunManifest, data: RunArti
         data.truth_q_history_WB,
         data.truth_omega_history_B,
     )
+    # Recheck at persistence as well: read-only flags are an ownership contract,
+    # not a security boundary against deliberate mutation of a NumPy buffer.
+    for field in fields(data):
+        values = getattr(data, field.name)
+        if values.dtype == _FLOAT64_DTYPE:
+            _require_finite_values(field.name, values)
 
     if not np.array_equal(
         data.truth_position_history_W[0], configuration.initial_truth_state.position_W

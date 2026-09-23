@@ -6,8 +6,23 @@ All notable changes to this project will be documented in this file following a 
 
 ### Added
 
+- Same-epoch 15-state ESKF local-position and positive-up altitude measurement models and
+  updates, scaled Cholesky gain solves, Joseph covariance, right-local injection/reset, and
+  immutable posterior diagnostics.
+- Analytic, finite-difference, numerical-edge, seeded, and known-motion regression evidence
+  for the measurement-update core; ADR 0005 records the contracts and scope.
+
 - Initial repository and reproducible workflow setup.
 - Reproducible Python 3.12 workflow managed by uv 0.12.3 and `uv.lock`.
 - Src-layout `quadrotor_math` package.
 - Initial deterministic `squared_norm` vector function and unit test.
 - Ruff linting and formatting, strict mypy checks, and pytest quality checks.
+
+### Fixed
+
+- Truth-execution preflight now catches configuration values or initial attitudes that the
+  current numerical plant cannot consume before allocating histories or creating RNGs.
+- Manifest decoding validates redundant sensor stride/effective-period values.
+- Run artifacts reject nonfinite floating payloads and use scheduler-consistent timestamps.
+- Rotor arithmetic and quaternion operations guard audited overflow/underflow cases.
+- ESKF nominal quaternion validation now matches its downstream rotation boundary.
