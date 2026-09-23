@@ -63,3 +63,23 @@ instead of the PX4/system Gazebo.
   ```
 
 - ROS-activated terminals must not build or launch PX4.
+
+## Nominal ESKF Evaluation Environment
+
+The 2026-09-23 consistency-evaluation milestone was checked on Linux with Python 3.12.14,
+uv 0.12.3, NumPy 2.5.2, pytest 9.1.1, Ruff 0.16.2 and mypy 1.20.2. This is the audit
+environment, not a revision of the historical WSL inventory above. Project dependencies,
+lockfile, tool pins and CI configuration are unchanged.
+
+Use `uv sync --locked`, then `uv run make check`. The nominal study is executable with
+`uv run python experiments/eskf_consistency.py --partition smoke --output /tmp/eskf-smoke.json`.
+Choose a new output path for each run; results are never overwritten. `development` and
+`validation` select the separately frozen longer partitions. The CLI records actual
+installed versions, Git HEAD/dirty status and a digest of source/configuration files.
+Run it from a real Git checkout with the project environment installed. The evaluation
+does not require ROS, PX4, SciPy, plotting packages or a display.
+
+An independently installed SciPy 1.17.0 was used only as an audit oracle for chi-square
+quantiles. It is not a dependency of the package, tests or experiment. Exact verification
+commands and numerical findings are in the
+[consistency record](progress/2026-09-23-eskf-consistency-evaluation.md).

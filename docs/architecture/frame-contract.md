@@ -138,6 +138,22 @@ It is recomputed from the current velocity and attitude at every derivative eval
 projected RK4 therefore uses the separate velocity and projected attitude of each of its four
 stages.
 
+## ESKF Evaluation Coordinates
+
+Estimator error order is `[delta_p_W, delta_v_W, delta_theta_B, delta_b_a_B,
+delta_b_g_B]`, with three coordinates per block. Additive errors are reference
+minus estimate. The attitude block is the principal rotation vector
+`Log(R_estimate_WB.T @ R_reference_WB)`, expressed in the estimate's local body
+coordinates. Thus `R_reference_WB = R_estimate_WB @ Exp(skew(delta_theta_B))`.
+This is the same right-local convention used by injection and covariance reset.
+
+The evaluation reference pairs artifact truth/bias row `j` with replay row `j-1`,
+for completed rows `j=1..N`. It compares the final post-update estimate and its
+reset covariance with truth at the exactly equal epoch. Truth never supplies
+the estimator prior through the measurement adapter. See
+[ADR 0008](../decisions/0008-eskf-consistency-evaluation.md) for the finite NEES
+domain, quaternion sign/pi convention and statistical assumptions.
+
 ## Boundaries and Naming
 
 ROS ENU/FLU conversions will be isolated in adapter functions when integration
