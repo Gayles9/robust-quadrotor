@@ -177,6 +177,21 @@ engineering evidence is available with this explicit consistency qualification. 
 [estimator guide](docs/estimation.md), [ADR 0009](docs/decisions/0009-eskf-completion-validation.md)
 and [completion verification record](docs/progress/2026-09-23-eskf-completion.md).
 
+An explicit **endpoint IMU propagation** option now integrates adjacent instantaneous
+samples with second-order accuracy and propagates their matched discrete covariance.
+It retains the current sample's conditional noise mean and cross-covariance across
+prediction and correction. There are 15 physical error states and six temporary noise
+coordinates. The original first-order default and its campaign remain reproducible.
+See [ADR 0010](docs/decisions/0010-eskf-endpoint-propagation.md) and the
+[endpoint interface guide](docs/estimation.md#endpoint-integration-and-matched-sample-noise-covariance).
+
+The [fresh calibration campaign](docs/progress/2026-09-23-eskf-endpoint-calibration.md)
+passed the declared targets across 100 independent 30-second trajectories and 380
+replay variants. Endpoint full-state NEES coverage was **95.29%** (mean 14.60), versus
+91.99% (mean 16.96) for the original method on the same new data. Mean position RMSE
+improved from .06809 m to .06739 m. All 2,517 tests and the local static checks pass.
+This is evidence for the declared known-prior simulation distribution, not flight readiness.
+
 The repository does not yet contain a reusable physically conditional invariant-monitoring
 API, a closed-loop controller, a live estimator service, adaptive integration, or a completed
 ROS 2/PX4 integration layer. Gate G2 baseline control remains open. The implemented delay
@@ -1678,6 +1693,56 @@ trial/protocol accounting and validates stored evidence before plotting. Reports
 record actual diagnostic epochs, reject duplicate seeds and unknown variants, and retain
 compatibility with the original report format. Existing campaign values and the NEES
 qualification remain unchanged.
+
+## ESKF endpoint propagation
+
+The [verification record](docs/progress/2026-09-23-eskf-endpoint-calibration.md) reports
+the fresh 100-seed campaign, derivation checks, development ablations and compatibility audit.
+
+| Fresh held-out comparison, identical data and prior | Original first order | Endpoint |
+| --- | --- | --- |
+| Mean 15-state NEES (reference mean 15) | 16.9643 | 14.6030 |
+| Individual central95 NEES coverage | 91.9943% | 95.2896% |
+| Epoch means inside pointwise 95% reference band | 14.5618% | 90.1699% |
+| Mean position RMSE | .0680870 m | .0673876 m |
+| Nominal divergence | 0/100 | 0/100 |
+
+The epoch percentages are descriptive because successive epochs are correlated.
+The original 88.84% result used different seeds and remains recorded above. The new
+380-replay campaign had zero numerical failures; its bias reduction, fault detection,
+dropout recovery and paired accuracy targets passed without retuning Q/R or gates.
+
+`EskfReplayConfiguration.sampled_imu_noise` explicitly selects the endpoint method.
+Provide `EskfSampledImuNoise(sample_covariance_B, bias_walk_spectral_density_B)` and
+set the unused `continuous_noise_covariance` to a zero `(12,12)` matrix. Both new
+matrices have shape `(6,6)` in FRD accelerometer-then-gyro order. Sample covariance
+is in squared measurement units; bias-walk spectral density is bias covariance per
+second. This avoids an implicit sample-noise/continuous-noise conversion.
+
+At each output epoch the filter uses only the current and preceding IMU samples,
+then processes fresh position and altitude observations. The first epoch has no
+prediction. Output remains an `EskfReplayResult` with physical `(15,15)` covariance;
+internal sample memory is conditioned by accepted observations and carried into the
+next interval. The saved-run adapter supports the same explicit option. See the
+[mathematical design](docs/decisions/0010-eskf-endpoint-propagation.md) for the
+nominal map, all discrete Jacobians and sample-memory covariance derivation.
+
+The fresh protocol preserves physical/noise/fault assumptions and adds a paired
+first-order comparison on identical data and priors. Its independent held-out seeds
+are 50000–50099; the original seeds are not reused for acceptance. Reproduce using
+Python 3.12 and pinned uv 0.12.3 with new output paths:
+
+```bash
+uv run python -m experiments.eskf_validation --propagation endpoint --partition smoke --output /tmp/eskf-endpoint-smoke.json
+uv run python -m experiments.eskf_validation --propagation endpoint --partition development --workers 4 --output /tmp/eskf-endpoint-development.json
+uv run python -m experiments.eskf_validation --propagation endpoint --partition validation --workers 4 --output /tmp/eskf-endpoint-validation.json
+uv run python -m experiments.plot_eskf_validation --input /tmp/eskf-endpoint-validation.json --output /tmp/eskf-endpoint-plots
+```
+
+Omitting `--propagation endpoint` runs the original protocol. Report schema version
+2 supports both explicitly identified protocol versions, validates complete trial
+accounting and recomputes assessments before plotting. No dependency, physical
+sensor model, controller, run-artifact schema or live transport is added.
 
 ## Frame and attitude conventions
 

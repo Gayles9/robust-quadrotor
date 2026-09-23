@@ -8,11 +8,20 @@ boundary and predeclared acceptance protocol are in [ADR 0009](decisions/0009-es
 Measured outcomes belong to the completion verification record; execution success alone
 does not establish statistical consistency or observability.
 
-The [completion record](progress/2026-09-23-eskf-completion.md) documents 100 held-out
+The original [completion record](progress/2026-09-23-eskf-completion.md) documents 100 held-out
 30-second nominal trajectories with no divergence and the completed fault/bias/sensitivity
 evaluation. Full-state NEES coverage is 88.84%, below the declared investigation band.
 That calibration finding remains explicit; the basic implementation and engineering
 evidence are complete, while an unqualified statistical-consistency claim is not supported.
+The explicit endpoint method in [ADR 0010](decisions/0010-eskf-endpoint-propagation.md)
+addresses numerical propagation and its sampled-noise covariance together. The original
+first-order method remains the default for compatibility; select endpoint mode explicitly
+as described below. Its [separate evaluation](progress/2026-09-23-eskf-endpoint-calibration.md)
+used 100 fresh held-out seeds and 380 replays: endpoint NEES coverage was **95.29%**
+with mean **14.60**, versus 91.99% and 16.96 for the paired original method.
+Mean position RMSE was .06739 m versus .06809 m. There were no numerical failures or
+nominal/gated divergences, and the declared bias/fault/recovery targets passed. This
+supports improved consistency for the tested distribution; it is not a universal guarantee.
 
 ## State, prediction and correction
 
@@ -24,7 +33,7 @@ accelerometer bias and gyro bias, each with three components. Units are m, m/s, 
 m/s² and rad/s. Position, velocity and biases use true-minus-nominal additive errors;
 attitude uses `R_true_WB = R_nominal_WB Exp(skew(delta_theta_B))`.
 
-For measured specific force `f_m` and angular rate `omega_m`, prediction subtracts the
+For measured specific force `f_m` and angular rate `omega_m`, default prediction subtracts the
 estimated biases, forms `a_W = [0,0,g] + R_WB @ (f_m-b_a)`, and integrates position,
 velocity and the quaternion over a left-held IMU interval. Specific force excludes
 gravity: a stationary level accelerometer observes `[0,0,-g]`, not zero or `[0,0,g]`.
@@ -49,6 +58,90 @@ heading, Earth-rate/geodetic correction or unknown-pose bootstrap. Small local a
 errors and meaningful uncertainty are part of the filter model; passing array validation
 does not make arbitrary large-error initialization reliable.
 
+## Endpoint integration and matched sample-noise covariance
+
+For instantaneous paired samples, `EskfReplayConfiguration.sampled_imu_noise` selects
+the second-order `eskf_endpoint.py` path. Its `EskfSampledImuNoise` contains two explicit
+6-by-6 matrices in accelerometer-then-gyro FRD order: `sample_covariance_B` is the
+per-sample covariance, and `bias_walk_spectral_density_B` is bias covariance per second.
+Samples at different epochs, bias increments and the initial prior are independent.
+Within each six-vector, correlations are allowed. The unused legacy
+`continuous_noise_covariance` must be zero; mixed declarations are rejected.
+
+At `t[k+1]` both endpoint samples are available. After subtracting estimated bias and
+the old sample's conditional noise mean, let the two specific forces be `f0,f1` and
+body rates `w0,w1`. For `h=t[k+1]-t[k]>0`, `R=R_WB[k]` and NED gravity `g_W`,
+
+$$\phi=\tfrac h2(\omega_0+\omega_1),\qquad
+R_1=R\operatorname{Exp}([\phi]_\times),$$
+$$a_0=g_W+Rf_0,\qquad a_1=g_W+R_1f_1,$$
+$$v_1=v+h(a_0+a_1)/2,\qquad
+p_1=p+hv+h^2(2a_0+a_1)/6.$$
+
+Here `phi` is a body-local rotation vector in radians, `R` and `R1` map body to world,
+accelerations are NED m/s², velocity is NED m/s and position is NED metres. Translation
+integrates a linear world-acceleration interpolant; attitude uses an exponential of
+the averaged rate. Nominal biases stay constant during prediction. These equations
+give second-order convergence on smooth motion, with remaining higher-order rotation
+and interpolation errors. They are not an exact continuous-time model.
+
+The covariance follows the derivative of this discrete map. Sample `k` is used by
+intervals `k-1→k` and `k→k+1`. Treating successive average noises as independent would
+undercount uncertainty. The implementation maintains `EskfEndpointState`: the physical
+nominal state, the six-component `imu_noise_mean_B`, and `joint_covariance` of shape
+`(21,21)`. The last six coordinates are temporary sample noise, not new physical states.
+
+The prior is `diag(P0,Sigma)`, where `Sigma` is sample covariance. Each prediction
+retains physical/sample cross terms, adds independent next-sample noise and the
+bias endpoint increment with covariance `W*h`, and discards the previous noise variable
+after its final use. `eskf_endpoint_map` returns the nominal state and analytic
+matrices `A (21,21)` and `B (21,12)`; prediction uses
+
+$$C_1=AC A^T+B\operatorname{diag}(\Sigma,Wh)B^T.$$
+
+`C` is joint covariance and `W` is bias-increment spectral density. The 12 driver
+coordinates are new accelerometer/gyro noise followed by accelerometer/gyro bias
+increments. All derivatives, including signs of endpoint bias effects and the SO(3)
+right Jacobian, are specified in ADR 0010. No empirical covariance multiplier is used.
+
+Corrections have joint Jacobian `[H,0]`. `update_eskf_endpoint` conditions both the
+physical estimate and the current sample-noise mean, uses a full Joseph covariance,
+then transports every cross term with `diag(J_reset,I6)`. Gates use the physical
+15-by-15 marginal, which is also what replay results and NEES expose.
+Rejected/stale/disabled/pending observations never condition the noise memory.
+
+Select this path on an existing measurement-only configuration as follows. The four
+standard-deviation/density arrays below come from the caller's declared sensor assumptions
+in the units above; they are not fitted from evaluation truth.
+
+```python
+from dataclasses import replace
+import numpy as np
+from quadrotor_math.eskf_endpoint import EskfSampledImuNoise
+from quadrotor_math.eskf_replay import replay_eskf
+
+sample_covariance = np.diag(np.r_[sigma_accel_B**2, sigma_gyro_B**2])
+walk_density = np.diag(np.r_[eta_accel_B**2, eta_gyro_B**2])
+endpoint_configuration = replace(
+    configuration,
+    continuous_noise_covariance=np.zeros((12, 12)),
+    sampled_imu_noise=EskfSampledImuNoise(sample_covariance, walk_density),
+)
+result = replay_eskf(measurements, endpoint_configuration)
+```
+
+The nominal run adapter also accepts explicit `sampled_imu_noise`. Stored run-artifact
+formats and measurement extraction are unchanged. Direct callers can use
+`initialize_eskf_endpoint`, `predict_eskf_endpoint` and `update_eskf_endpoint`; they must
+retain the complete `EskfEndpointState` between calls. Reinitializing it from physical
+covariance after every step would lose sample correlations. Replay output is a history
+for evaluation, not a restart checkpoint or persisted live-service state.
+
+Tests independently check all 21 prior and 12 driver derivative columns, analytic
+constant/linear acceleration and yaw cases, smooth-motion convergence, exact repeated
+sample-noise variance, batch linear-Gaussian conditioning, seeded nonlinear moments,
+invalid inputs, ownership, causal timing and recorded-run compatibility.
+
 ## Interfaces, timing and failure contracts
 
 | Boundary | Responsibility and contract |
@@ -57,14 +150,15 @@ does not make arbitrary large-error initialization reliable.
 | `update_eskf_local_position`, `update_eskf_barometric_altitude` | Same-epoch corrections; owned posterior/gain/residual/reset diagnostics |
 | `EskfReplayInput` | Increasing `time_s (n,)`, paired specific force and rate `(n,3)`, typed observation tuple; no truth fields |
 | `EskfReplayConfiguration` | Explicit epoch/state/P, gravity, Q, nominal observation models/R and optional gate policy |
-| `replay_eskf` | State/covariance histories and an exhaustive observation event ledger |
+| `replay_eskf` | Explicit first-order or endpoint propagation; physical state/covariance histories and an exhaustive observation event ledger |
 | `eskf_replay_input_from_run_artifact` | Validated adaptation of full-rate, simultaneous, zero-delay recorded IMU; no truth-state access |
 | `evaluate_eskf_replay` | Separate truth-based error/NEES calculation, requiring exact epoch equality |
 | `inject_eskf_observation_faults` | Copy measured observations with explicit faults and retain a separate source-label ledger |
 | `make_eskf_synthetic_case` | Independent analytic kinematics, randomized measurement generation and known-prior verification fixture |
 
-At `t[k+1]`, replay predicts with IMU row `k`, then corrects with fresh position followed
-by fresh altitude. No prediction precedes `t[0]`; the last IMU row has no following interval.
+At `t[k+1]`, default replay predicts with IMU row `k`; endpoint replay uses rows `k,k+1`.
+Both then correct with fresh position followed by fresh altitude. No prediction precedes
+`t[0]`. The final row is unused by default prediction and closes the endpoint method's last interval.
 Each observation has an acquisition index and actual delivery index. Delivery `-1` means
 pending beyond the horizon. A delivered observation acquired at an older epoch is `STALE`
 and cannot affect state or covariance. Disabled fresh observations are `DISABLED`.
@@ -118,7 +212,7 @@ PCG64 stream IDs. Stream derivation is explicit, versioned and independent of ex
 order. The measured input and nominal configuration are the only arguments passed to
 replay; reference states and fault labels are consumed afterward by evaluation.
 
-The filter expects continuous process-noise spectral density. For held independent
+Default prediction expects continuous process-noise spectral density. For held independent
 IMU samples with standard deviation `sigma`, its leading increment variance is matched
 by `Q_c = diag(sigma_a² dt, sigma_g² dt, eta_a², eta_g²)`. Observation `R` instead uses
 the squared per-observation standard deviation without `dt`. This conversion does not
@@ -161,6 +255,12 @@ uv run python -m experiments.eskf_validation --partition validation --workers 4 
 uv run python -m experiments.plot_eskf_validation --input /tmp/eskf-validation.json --output /tmp/eskf-validation-plots
 ```
 
+For the endpoint protocol, append `--propagation endpoint` to the validation commands
+and use new output paths. It uses smoke seeds 20–21, development seeds 5000–5004 and
+held-out seeds 50000–50099; the held-out report contains 380 variants including 100
+paired original-method comparisons. The same plot CLI accepts either protocol and
+adds a propagation-comparison figure for endpoint evidence.
+
 Use new paths: reports and plot directories refuse overwrite. Worker count changes job
 throughput, not seed assignment or output ordering. Core computations do not require
 Matplotlib; the development group installs it for headless plotting and plot tests.
@@ -199,7 +299,8 @@ epoch, not the number of time samples. Pointwise bands are not simultaneous guar
 Stationary and pure-yaw motion do not expose every attitude/bias direction as strongly
 as changing translational acceleration and attitude. Bias-convergence claims therefore
 apply to the excited evaluation distribution, not every flight or every initial condition.
-The filter retains its first-order propagation and local Gaussian assumptions. Persistent
+Default propagation remains first order; endpoint mode has its explicit discrete sample
+contract and second-order smooth-motion accuracy. Both retain local Gaussian assumptions. Persistent
 observation loss, sustained wrong-model rejection, large attitude errors, hardware faults,
 unknown datums and unobservable states remain technical limits. The separate control gate,
 live transport, estimator continuation/persistence, delayed correction and flight-stack

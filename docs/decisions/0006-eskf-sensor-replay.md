@@ -4,6 +4,8 @@
 - Status: Accepted and implemented
 - Extension: [ADR 0007](0007-eskf-innovation-gating.md) adds optional pre-update scoring,
   fixed gates and `REJECTED` events while preserving this epoch and default execution policy.
+- Extension: [ADR 0010](0010-eskf-endpoint-propagation.md) adds explicit endpoint IMU
+  propagation with sample-noise memory; the original default remains unchanged.
 - Extends: [ADR 0004](0004-eskf-error-state-conventions.md) and
   [ADR 0005](0005-eskf-measurement-updates.md)
 - Implementation: `src/quadrotor_math/eskf_replay.py`,

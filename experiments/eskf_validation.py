@@ -1,4 +1,4 @@
-"""Run the frozen estimator-completion protocol in ADR 0009.
+"""Run frozen ESKF protocols: original ADR 0009 or endpoint ADR 0010.
 
 python -m experiments.eskf_validation --partition smoke --output /tmp/new.json
 Generated JSON is an analysis report, not a persisted estimator/run-artifact schema.
@@ -25,6 +25,7 @@ from experiments.eskf_consistency import (
     protocol_sha256,
 )
 from quadrotor_math.eskf_consistency import evaluate_eskf_replay
+from quadrotor_math.eskf_endpoint import EskfSampledImuNoise
 from quadrotor_math.eskf_faults import (
     EskfFaultInjection,
     EskfObservationFault,
@@ -61,6 +62,11 @@ PARTITIONS = {
     "development": (range(4000, 4005), 3000),
     "validation": (range(40000, 40100), 3000),
 }
+ENDPOINT_PARTITIONS = {
+    "smoke": (range(20, 22), 40),
+    "development": (range(5000, 5005), 3000),
+    "validation": (range(50000, 50100), 3000),
+}
 SENSITIVITY = {
     "q_low": (0.25, 1.0),
     "q_high": (4.0, 1.0),
@@ -69,15 +75,22 @@ SENSITIVITY = {
 }
 
 
-def planned_jobs(partition: str) -> list[tuple[str, int, int, tuple[str, ...], bool]]:
+def planned_jobs(
+    partition: str, propagation: str = "first_order"
+) -> list[tuple[str, int, int, tuple[str, ...], bool]]:
     """Freeze paired variants; each job has isolated RNGs, independent of worker order."""
-    if partition not in PARTITIONS:
+    if propagation not in ("first_order", "endpoint"):
+        raise ValueError(f"unknown propagation: {propagation}")
+    partitions = ENDPOINT_PARTITIONS if propagation == "endpoint" else PARTITIONS
+    if partition not in partitions:
         raise ValueError(f"unknown partition: {partition}")
-    seeds, steps = PARTITIONS[partition]
+    seeds, steps = partitions[partition]
     jobs = []
     for family in MOTIONS if partition == "development" else ("excited",):
         for index, seed in enumerate(seeds):
             variants = ["nominal", "dead_reckoning"]
+            if propagation == "endpoint":
+                variants.append("first_order")
             if family == "excited":
                 if index < 20:
                     variants.extend(("fault_gated", "fault_ungated"))
@@ -87,10 +100,10 @@ def planned_jobs(partition: str) -> list[tuple[str, int, int, tuple[str, ...], b
     return jobs
 
 
-def validation_protocol(partition: str) -> dict[str, Any]:
+def validation_protocol(partition: str, propagation: str = "first_order") -> dict[str, Any]:
     """Complete finite canonical metadata; no time, source or worker count in its hash."""
-    jobs = planned_jobs(partition)
-    return {
+    jobs = planned_jobs(partition, propagation)
+    protocol: dict[str, Any] = {
         "name": "eskf_completion",
         "version": 1,
         "partition": partition,
@@ -175,6 +188,31 @@ def validation_protocol(partition: str) -> dict[str, Any]:
             "on any failure; retain finite divergent cases"
         ),
     }
+    if propagation == "endpoint":
+        protocol["version"] = 2
+        protocol["propagation"] = "endpoint"
+        protocol["noise_conversion"] = (
+            "sample Sigma=diag(sigma_a^2,sigma_g^2); "
+            "bias endpoint increment covariance=diag(eta_a^2,eta_g^2)*dt; "
+            "retain conditional sample mean and 21x21 joint covariance"
+        )
+        protocol["targets"]["paired_position_rmse_max_ratio"] = 1.05
+    return protocol
+
+
+def endpoint_case(case: EskfSyntheticCase) -> EskfSyntheticCase:
+    """Select explicit sample units, preserving measurements, prior and noise levels."""
+    return replace(
+        case,
+        configuration=replace(
+            case.configuration,
+            continuous_noise_covariance=np.zeros((12, 12)),
+            sampled_imu_noise=EskfSampledImuNoise(
+                np.diag(np.repeat([ACCEL_STD**2, GYRO_STD**2], 3)),
+                np.diag(np.repeat([ACCEL_WALK**2, GYRO_WALK**2], 3)),
+            ),
+        ),
+    )
 
 
 def validation_fault_plan(data: EskfReplayInput, seed: int) -> tuple[EskfObservationFault, ...]:
@@ -303,10 +341,28 @@ def fault_detection_metrics(
 def _evaluate_variant(
     case: EskfSyntheticCase, variant: str, injected: EskfFaultInjection, keep_history: bool
 ) -> dict[str, Any]:
-    if variant not in ("nominal", "dead_reckoning", "fault_gated", "fault_ungated", *SENSITIVITY):
+    if variant not in (
+        "nominal",
+        "dead_reckoning",
+        "first_order",
+        "fault_gated",
+        "fault_ungated",
+        *SENSITIVITY,
+    ):
         raise ValueError(f"unknown variant {variant}")
     configuration = case.configuration
     data = case.measurements
+    if variant == "first_order":
+        if configuration.sampled_imu_noise is None:
+            raise ValueError("first_order comparison requires an endpoint case")
+        dt = float(data.time_s[1] - data.time_s[0])
+        configuration = replace(
+            configuration,
+            sampled_imu_noise=None,
+            continuous_noise_covariance=np.diag(
+                np.repeat([ACCEL_STD**2 * dt, GYRO_STD**2 * dt, ACCEL_WALK**2, GYRO_WALK**2], 3)
+            ),
+        )
     if variant == "dead_reckoning":
         configuration = replace(
             configuration, fuse_local_position=False, fuse_barometric_altitude=False
@@ -326,6 +382,14 @@ def _evaluate_variant(
             * r_scale,
             barometric_altitude_noise_variance=configuration.barometric_altitude_noise_variance
             * r_scale,
+            sampled_imu_noise=(
+                EskfSampledImuNoise(
+                    configuration.sampled_imu_noise.sample_covariance_B * q_scale,
+                    configuration.sampled_imu_noise.bias_walk_spectral_density_B * q_scale,
+                )
+                if configuration.sampled_imu_noise is not None
+                else None
+            ),
         )
     # Only measured data and nominal assumptions cross the estimator boundary.
     result = replay_eskf(data, configuration)
@@ -402,12 +466,18 @@ def _evaluate_variant(
     return report
 
 
-def run_validation_trial(job: tuple[str, int, int, tuple[str, ...], bool]) -> dict[str, Any]:
+def run_validation_trial(
+    job: tuple[str, int, int, tuple[str, ...], bool], propagation: str = "first_order"
+) -> dict[str, Any]:
     """Execute all declared variants; preserve any failed seed and continue the others."""
+    if propagation not in ("first_order", "endpoint"):
+        raise ValueError(f"unknown propagation: {propagation}")
     family, seed, steps, variants, keep_history = job
     report: dict[str, Any] = {"family": family, "seed": seed, "variants": {}}
     try:
         case = make_eskf_synthetic_case(seed, family=family, number_of_steps=steps)
+        if propagation == "endpoint":
+            case = endpoint_case(case)
         injected = inject_eskf_observation_faults(
             case.measurements, validation_fault_plan(case.measurements, seed)
         )
@@ -427,6 +497,12 @@ def run_validation_trial(job: tuple[str, int, int, tuple[str, ...], bool]) -> di
                 ),
             }
         )
+        if case.configuration.sampled_imu_noise is not None:
+            model = case.configuration.sampled_imu_noise
+            report["sampled_imu_noise"] = {
+                "sample_covariance_B": model.sample_covariance_B.tolist(),
+                "bias_walk_spectral_density_B": model.bias_walk_spectral_density_B.tolist(),
+            }
     except (ValueError, FloatingPointError, np.linalg.LinAlgError) as error:
         report["variants"] = {
             name: {
@@ -464,7 +540,15 @@ def _validate_trial_plan(
             raise ValueError("duplicate trial family/seed cannot represent independent replicates")
         seen.add(identity)
         if not trial["variants"] or any(
-            name not in ("nominal", "dead_reckoning", "fault_gated", "fault_ungated", *SENSITIVITY)
+            name
+            not in (
+                "nominal",
+                "dead_reckoning",
+                "first_order",
+                "fault_gated",
+                "fault_ungated",
+                *SENSITIVITY,
+            )
             for name in trial["variants"]
         ):
             raise ValueError("unknown or empty trial variants")
@@ -614,17 +698,19 @@ def summarize_validation(
     return groups
 
 
-def run_validation(partition: str, workers: int = 1) -> dict[str, Any]:
+def run_validation(
+    partition: str, workers: int = 1, propagation: str = "first_order"
+) -> dict[str, Any]:
     """Run deterministic jobs; worker count changes throughput, never seed assignment."""
     if type(workers) is not int or not 1 <= workers <= 8:
         raise ValueError("workers must be an integer in [1,8]")
-    protocol = validation_protocol(partition)
-    jobs = planned_jobs(partition)
+    protocol = validation_protocol(partition, propagation)
+    jobs = planned_jobs(partition, propagation)
     if workers == 1:
-        trials = [run_validation_trial(job) for job in jobs]
+        trials = [run_validation_trial(job, propagation) for job in jobs]
     else:
         with ProcessPoolExecutor(max_workers=workers) as pool:
-            trials = list(pool.map(run_validation_trial, jobs))
+            trials = list(pool.map(run_validation_trial, jobs, [propagation] * len(jobs)))
     return _assemble_report(protocol, trials)
 
 
@@ -669,8 +755,9 @@ def validate_validation_report(report: dict[str, Any]) -> dict[str, Any]:
         ):
             raise ValueError("unsupported estimator completion report schema")
         protocol = checked["protocol"]
+        propagation = "endpoint" if protocol["version"] == 2 else "first_order"
         if canonical_json(protocol) != canonical_json(
-            validation_protocol(protocol["partition"])
+            validation_protocol(protocol["partition"], propagation)
         ) or checked["protocol_sha256"] != protocol_sha256(protocol):
             raise ValueError("report must match the frozen protocol and its hash")
         if schema["version"] == 1:
@@ -782,6 +869,20 @@ def assess_validation(report: dict[str, Any]) -> dict[str, Any]:
             }
         else:
             result["paired_sensitivity"][name] = None
+    if report["protocol"].get("propagation") == "endpoint":
+        original = groups.get("excited/first_order", {}).get("ensemble")
+        result["paired_first_order"] = None
+        if nominal is not None and original is not None:
+            ratio = (
+                nominal["rmse_distribution"]["position_m"]["mean"]
+                / original["rmse_distribution"]["position_m"]["mean"]
+            )
+            result["paired_first_order"] = {
+                "position_rmse_ratio": ratio,
+                "accuracy_target_met": ratio <= 1.05,
+                "nominal_nees_mean": float(np.mean(nominal["nees"]["mean_by_epoch"])),
+                "first_order_nees_mean": float(np.mean(original["nees"]["mean_by_epoch"])),
+            }
     return result
 
 
@@ -789,6 +890,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--partition", choices=tuple(PARTITIONS), default="smoke")
     parser.add_argument("--workers", type=int, default=1)
+    parser.add_argument("--propagation", choices=("first_order", "endpoint"), default="first_order")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args(argv)
     if args.output.exists():
@@ -797,11 +899,12 @@ def main(argv: list[str] | None = None) -> int:
     provenance = capture_software_provenance(root)
     source_hash = _source_sha256(root)
     print(
-        f"Frozen protocol SHA256: {protocol_sha256(validation_protocol(args.partition))}",
+        "Frozen protocol SHA256: "
+        + protocol_sha256(validation_protocol(args.partition, args.propagation)),
         file=sys.stderr,
         flush=True,
     )
-    report = run_validation(args.partition, args.workers)
+    report = run_validation(args.partition, args.workers, args.propagation)
     if source_hash != _source_sha256(root):
         raise RuntimeError("source files changed during evaluation")
     report.update(

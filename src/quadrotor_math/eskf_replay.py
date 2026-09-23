@@ -20,6 +20,12 @@ from .eskf import (
     update_eskf_barometric_altitude,
     update_eskf_local_position,
 )
+from .eskf_endpoint import (
+    EskfSampledImuNoise,
+    initialize_eskf_endpoint,
+    predict_eskf_endpoint,
+    update_eskf_endpoint,
+)
 from .eskf_innovation import (
     EskfInnovation,
     EskfInnovationPolicy,
@@ -161,8 +167,9 @@ class EskfReplayInput:
     """Own paired IMU samples and independent position/altitude observations.
 
     IMU rows (n,3) are simultaneous and available at their time_s row. Specific
-    force is FRD m/s²; angular velocity is FRD rad/s. Row k is left-held over
-    [time_s[k], time_s[k+1]); the last row has no following prediction interval.
+    force is FRD m/s²; angular velocity is FRD rad/s. By default row k is left-held
+    over [time_s[k], time_s[k+1]). With explicit sampled_imu_noise, adjacent rows
+    are instantaneous endpoints and the final row closes the final interval.
     All acquisitions must lie in this horizon. Each sensor's source row IDs
     must be consecutive from zero and acquisitions strictly increasing.
     """
@@ -193,6 +200,9 @@ class EskfReplayConfiguration:
     Fusion flags disable fresh updates without disabling observation validation.
     innovation_policy=None preserves unscored execution. An explicit policy
     records pre-update NIS and optionally gates each fresh enabled sensor.
+    sampled_imu_noise selects endpoint propagation (ADR 0010); the unused
+    continuous_noise_covariance must then be zero. The prior must be independent
+    of the first IMU sample noise. The physical output remains 15-dimensional.
     """
 
     initial_time_s: float
@@ -208,6 +218,7 @@ class EskfReplayConfiguration:
     fuse_local_position: bool = True
     fuse_barometric_altitude: bool = True
     innovation_policy: EskfInnovationPolicy | None = None
+    sampled_imu_noise: EskfSampledImuNoise | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.initial_state, EskfNominalState):
@@ -237,6 +248,12 @@ class EskfReplayConfiguration:
             ("local_position_noise_covariance_W", 3),
         ):
             object.__setattr__(self, name, _owned_covariance(name, getattr(self, name), size))
+        if self.sampled_imu_noise is not None:
+            if not isinstance(self.sampled_imu_noise, EskfSampledImuNoise):
+                raise TypeError("sampled_imu_noise must be an EskfSampledImuNoise or None")
+            if np.any(self.continuous_noise_covariance):
+                raise ValueError("continuous_noise_covariance must be zero with sampled_imu_noise")
+            object.__setattr__(self, "sampled_imu_noise", replace(self.sampled_imu_noise))
         object.__setattr__(
             self,
             "local_position_bias_W",
@@ -361,10 +378,11 @@ class EskfReplayResult:
 
 
 def replay_eskf(data: EskfReplayInput, configuration: EskfReplayConfiguration) -> EskfReplayResult:
-    """Execute a causal left-held-IMU replay without mutating any caller input.
+    """Execute a causal replay with the explicitly configured IMU propagation.
 
-    No prediction precedes the first epoch. Later epochs predict using row k-1,
-    then fuse fresh position followed by altitude. Older acquisitions are STALE;
+    No prediction precedes the first epoch. Later epochs predict using row k-1
+    (default) or endpoints k-1/k (sampled_imu_noise), then fuse fresh position
+    followed by altitude. Older acquisitions are STALE;
     undelivered observations are PENDING. A disabled fresh update is DISABLED.
     An explicit innovation policy scores fresh enabled observations before any
     correction; NIS strictly above its threshold is REJECTED without changing
@@ -380,6 +398,11 @@ def replay_eskf(data: EskfReplayInput, configuration: EskfReplayConfiguration) -
         raise ValueError("initial_time_s must exactly equal the first input epoch")
     state = replace(configuration.initial_state)
     covariance = configuration.initial_covariance
+    endpoint = (
+        initialize_eskf_endpoint(state, covariance, configuration.sampled_imu_noise)
+        if configuration.sampled_imu_noise is not None
+        else None
+    )
     states: list[EskfNominalState] = []
     covariances = np.empty((data.time_s.size, 15, 15), dtype=np.float64)
     events: list[EskfReplayEvent] = []
@@ -387,7 +410,19 @@ def replay_eskf(data: EskfReplayInput, configuration: EskfReplayConfiguration) -
     for observation in data.observations:
         delivered.setdefault(observation.delivery_index, []).append(observation)
     for index, time_s in enumerate(data.time_s):
-        if index:
+        if index and endpoint is not None and configuration.sampled_imu_noise is not None:
+            endpoint = predict_eskf_endpoint(
+                endpoint,
+                data.specific_force_measurements_B[index - 1],
+                data.angular_velocity_measurements_B[index - 1],
+                data.specific_force_measurements_B[index],
+                data.angular_velocity_measurements_B[index],
+                configuration.gravity_acceleration,
+                configuration.sampled_imu_noise,
+                float(time_s - data.time_s[index - 1]),
+            )
+            state, covariance = endpoint.nominal_state, endpoint.joint_covariance[:15, :15]
+        elif index:
             state, covariance = predict_eskf(
                 state,
                 covariance,
@@ -441,7 +476,23 @@ def replay_eskf(data: EskfReplayInput, configuration: EskfReplayConfiguration) -
                         )
                     )
                     continue
-            if position:
+            if endpoint is not None:
+                if position:
+                    predicted, jacobian = eskf_local_position_measurement_model(
+                        state, configuration.local_position_bias_W
+                    )
+                    noise = configuration.local_position_noise_covariance_W
+                else:
+                    predicted, jacobian = eskf_barometric_altitude_measurement_model(
+                        state,
+                        configuration.barometric_reference_altitude,
+                        configuration.barometric_altitude_bias,
+                    )
+                    noise = np.array([[configuration.barometric_altitude_noise_variance]])
+                endpoint, update = update_eskf_endpoint(
+                    endpoint, observation.measurement, predicted, jacobian, noise
+                )
+            elif position:
                 update = update_eskf_local_position(
                     state,
                     covariance,
