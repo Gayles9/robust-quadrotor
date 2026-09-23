@@ -157,10 +157,20 @@ passed [hosted CI](https://github.com/Gayles9/robust-quadrotor/actions/runs/3589
 See [ADR 0007](docs/decisions/0007-eskf-innovation-gating.md) and the
 [gating verification record](docs/progress/2026-09-23-eskf-innovation-gating.md).
 
+Evaluation now includes exact truth/replay alignment, right-local 15-state error extraction,
+positive-definite NEES, an explicit sampled-IMU noise conversion, and independent-seed
+NIS/NEES summaries. A frozen nominal ensemble compares fused estimation with dead reckoning
+on hover and translating/yaw cases, with separate smoke, development and validation seeds.
+Truth remains confined to evaluation. Every numerical failure is retained, and scored NIS
+includes rejected observations. See
+[ADR 0008](docs/decisions/0008-eskf-consistency-evaluation.md) and the
+[consistency verification record](docs/progress/2026-09-23-eskf-consistency-evaluation.md).
+
 The repository does not yet contain a reusable physically conditional invariant-monitoring
 API, a closed-loop controller, a live estimator service, adaptive integration, robustness
-campaigns, or a completed ROS 2/PX4 integration layer. Delayed fusion and held-out consistency
-analysis remain future work. Stale rejection and optional statistical gating are implemented.
+campaigns, or a completed ROS 2/PX4 integration layer. Delayed fusion, stronger-excitation
+consistency studies and fault campaigns remain future work. Stale rejection, optional
+statistical gating and a bounded nominal consistency study are implemented.
 Gate G2 baseline control and the broader Gate G3 estimator-validation requirements remain open.
 
 ## Current end-to-end pipeline
@@ -1531,8 +1541,75 @@ Records and policy remain in memory; existing manifests and artifacts do not per
 Keep the estimator configuration to reproduce a scored replay. Fixed outlier regressions
 and Gaussian statistic checks are documented in
 [ADR 0007](docs/decisions/0007-eskf-innovation-gating.md) and the
-[verification record](docs/progress/2026-09-23-eskf-innovation-gating.md). Held-out NIS/NEES
-coverage, general fault-detection performance and closed-loop robustness remain unverified.
+[verification record](docs/progress/2026-09-23-eskf-innovation-gating.md). The nominal NIS/NEES
+evaluation below adds bounded coverage evidence; general fault-detection performance and
+closed-loop robustness remain unverified.
+
+## ESKF consistency evaluation
+
+`eskf_consistency.py` is an evaluation boundary. `eskf_reference_from_run_artifact(data)`
+extracts truth/bias rows `1..N` to match the existing replay adapter's completed-row IMU
+clock. `evaluate_eskf_replay(result, reference)` requires exactly equal epochs and returns
+owned read-only `time_s`, `error_states` `(N,15)` and dimensionless `nees` `(N,)`.
+It evaluates the final post-update state and reset covariance at each epoch. No reference
+history enters prediction, correction or prior construction.
+
+`eskf_right_local_error(estimate, reference)` returns additive reference-minus-estimate
+position, velocity and bias blocks, with attitude error
+`Log(R_estimate_WB.T @ R_reference_WB)`. This is a signed local-body rotation vector in
+radians; quaternion signs do not matter. Its principal angle is at most π, with a
+deterministic exact-π axis tie and the unavoidable discontinuity of a principal log.
+Large attitude errors do not satisfy a local Gaussian interpretation.
+
+`normalized_estimation_error_squared(error_state, covariance)` computes
+`error_state.T @ inverse(covariance) @ error_state` through a scaled Cholesky solve,
+without forming an inverse. It requires finite, symmetric, numerically positive-definite
+`(15,15)` covariance. Singular covariance is an evaluation error, including for zero error;
+there is no pseudoinverse, jitter or hidden change of degrees of freedom.
+
+The explicit `sampled_imu_continuous_noise_covariance(parameters, sample_interval_s)` maps
+independent per-sample IMU variances to continuous `Q_c`: white accelerometer/gyro blocks
+are `sigma**2 * dt`, and bias random-walk blocks are `density**2`. This matches leading
+velocity/attitude increment variance for left-held samples. It does not supply missing
+higher-order position/cross terms in the unchanged first-order covariance discretization.
+The ordinary nominal replay adapter still requires caller-supplied `Q_c`.
+
+`NormalizedErrorEnsemble` takes a `(seeds, common_epochs)` matrix and one fixed degree
+count: 15 for NEES, 3 for position NIS, 1 for altitude NIS. Individual central95 bounds
+use χ² with that count. Pointwise mean bounds use χ² with `seed_count * degrees`, divided
+by `seed_count`. Time samples are not independent trials; temporal averages and coverage
+are descriptive. The dependency-free quantile helper supports integer degrees 1–15,000.
+Chi-square comparisons assume zero-mean Gaussian errors with correctly specified covariance.
+
+The frozen protocol and its mathematical justification are in
+[ADR 0008](docs/decisions/0008-eskf-consistency-evaluation.md). Run from a Git checkout:
+
+```bash
+uv sync --locked
+uv run python experiments/eskf_consistency.py --partition smoke --output /tmp/eskf-smoke.json
+uv run python experiments/eskf_consistency.py --partition development --output /tmp/eskf-development.json
+uv run python experiments/eskf_consistency.py --partition validation --output /tmp/eskf-validation.json
+```
+
+Use a new output path each time. The study performs four short smoke trials, 20 full-horizon
+development trials or 200 validation trials (100 seeds per case). The full replay spans
+`.01..2.01 s`, with noisy IMU, bias random walks, position and altitude updates. The prior
+is sampled independently around the declared analytic case, and includes the generator's
+first bias-random-walk increment variance. Both NIS gates remain off. The paired dead-
+reckoning run uses the same prior and IMU with observation fusion disabled.
+
+JSON contains complete per-trial run manifests, priors, `Q_c`, NEES and pre-update NIS
+histories, all event counts, physical block RMSE distributions, final bias errors, numerical
+failures and predeclared divergence flags. Incomplete numerical ensembles have no aggregate
+summary; finite divergent trials remain included. The CLI returns nonzero for numerical
+failures or fused divergence flags. Coverage outside the predeclared investigation band is
+reported as a scientific finding, not converted into a CI failure or tuned away.
+
+The output also records the frozen protocol SHA-256, actual software versions, Git HEAD
+and dirty status, source digest and UTC generation time. Repeating the same study under
+the same source/environment reproduces its numerical content. Results are created
+exclusively and belong outside Git. This JSON is an evaluation report; the existing
+manifest/artifact formats and estimator persistence boundary are unchanged.
 
 ## Frame and attitude conventions
 
@@ -1589,6 +1666,10 @@ The full convention, state shapes, signs, and hover sanity check are defined in 
   replay tests, truth-access traps and deterministic generated-run regressions.
 - Pre-update innovation whitening/NIS, opt-in per-sensor fixed gates, complete rejected
   observation diagnostics, and tested rejection-before-correction semantics.
+- Exact reference/replay alignment, signed right-local state errors, positive-definite
+  NEES, explicit sampled-IMU noise conversion and pointwise independent-seed statistics.
+- A frozen nominal ensemble with paired dead reckoning, complete seed/failure accounting,
+  physical error distributions and reproducible JSON/provenance records.
 - Quadratic rotor thrust magnitudes from four rotor speeds.
 - First-order motor-speed response with saturated command targets, plus feasible
   collective-thrust/body-moment allocation to ordered rotor-speed commands.
@@ -1773,15 +1854,31 @@ also passed. The 24 seeded stationary/moving cases and vertical-bias case are bo
 regression evidence, not a held-out consistency campaign. Exact commands and claims are in
 the [replay verification record](docs/progress/2026-09-23-eskf-sensor-replay.md).
 
-The innovation/gating increment adds **236 tests**, bringing the current suite to
+The innovation/gating increment added **236 tests**, reaching
 **2,157 passing tests** in `make check` and a full warnings-as-errors run. Ruff/formatting
-pass (87 files at documentation closeout), and mypy passes over 22 source files.
-[Hosted code CI](https://github.com/Gayles9/robust-quadrotor/actions/runs/35890398654) passes.
+passed (87 files at documentation closeout), and mypy passed over 22 source files.
+[Hosted code CI](https://github.com/Gayles9/robust-quadrotor/actions/runs/35890398654) passed.
 Six independent-process baseline comparisons match all 2,394 compared array payloads and
 metadata. Fixed signed outlier fixtures verify exact rejection-versus-omission equality
 and fresh recovery. These are bounded regressions; known-Gaussian NIS tests do not certify
 the ESKF's covariance. See the
 [gating verification record](docs/progress/2026-09-23-eskf-innovation-gating.md).
+
+The consistency-evaluation increment adds **201 tests**, bringing the suite to
+**2,358 passing tests** in `make check` and the full warnings-as-errors run. Ruff and
+formatting pass, and mypy checks **25 source files**.
+[Hosted code CI](https://github.com/Gayles9/robust-quadrotor/actions/runs/35896788372) also passes.
+Analytic geometric/covariance checks, independent chi-square values, timing and
+truth-isolation traps, complete seed accounting, deterministic reruns and CLI failure
+tests verify the evaluation contract. Campaign findings and exact commands are in the
+[consistency verification record](docs/progress/2026-09-23-eskf-consistency-evaluation.md).
+
+The fixed validation partition completed **100 seeds per case**, without numerical
+failures or divergence flags. Mean position RMSE was 0.106205 m for hover and 0.107411 m
+for translating yaw, reductions of 73.4% and 72.7% relative to paired dead reckoning.
+Descriptive NEES coverage was 96.2% and 95.5%; position/altitude NIS coverage was near 95%.
+These are short nominal-case results. Development's higher NEES coverage is retained in
+the record; no gates, noise assumptions or seed selections were fitted to validation.
 
 ## Repository structure
 
@@ -1790,7 +1887,8 @@ the ESKF's covariance. See the
   validation, sensor measurement, fixed-rate sensor scheduling, immutable run configuration,
   named run-random-stream ownership, canonical run manifests, immutable run artifacts,
   complete-run generation, ESKF prediction/measurement mathematics, measurement-only replay
-  and run adapters, innovation diagnostics/gating, and trajectory-error algorithms.
+  and run adapters, innovation diagnostics/gating, aligned consistency evaluation,
+  independent-seed statistics, and trajectory-error algorithms.
 - `experiments/`: reproducible numerical studies built from the public mathematical core.
 - `tests/unit/`: focused unit and composition tests for the mathematical core.
 - `docs/architecture/`: architectural contracts, including frames and state conventions.
@@ -1825,8 +1923,14 @@ the ESKF's covariance. See the
 - ESKF mathematical primitives require same-epoch observations. The replay runner now
   enforces this with explicit stale rejection; its recorded-run adapter requires full-rate,
   paired, zero-delay IMU and a supplied prior at the first sample time. No delayed
-  fusion/rewind, asynchronous IMU, live estimator service, estimator persistence schema or
-  NIS/NEES campaign exists yet. In-memory estimator configuration is implemented.
+  fusion/rewind, asynchronous IMU, live estimator service or estimator persistence schema
+  exists yet. In-memory estimator configuration and a frozen nominal NIS/NEES campaign
+  are implemented; evaluation JSON does not provide resumable estimator state.
+- The nominal ensemble covers two short, matched-model cases with limited excitation.
+  Its validation seeds are held out; its trajectory families are deliberately fixed.
+  It does not establish broad bias observability, robustness, long-duration stability,
+  or full G3 completion. Pointwise chi-square comparisons are not simultaneous confidence
+  guarantees; temporal coverage cannot be interpreted as independent Bernoulli trials.
 - Opt-in NIS diagnostics and gating require a finite, positive-definite innovation
   covariance. A gate can reject valid data under a poor prior/model and can leave the
   filter drifting during sustained rejection. It is not a fault classifier or a consistency
@@ -1910,10 +2014,16 @@ the final high-accuracy simulation method, especially for larger time steps or l
    `b674c716b4d2fff345e457b6f0ff247b40acd88c`: owned residual/covariance/whitening/NIS,
    explicit per-sensor thresholds, rejection before correction and complete in-memory
    event records. Legacy unscored execution and the accepted epoch policy are preserved.
-9. The next bounded estimator step is a frozen consistency-evaluation contract and nominal
-   measurement-only evaluation harness: align reference epochs and right-local errors,
-   establish the noise-discretization relationship and NEES domain, and fix configurations
-   and seed partitions before evaluation. Held-out NIS/NEES, broader bias excitation,
-   the 100-seed target and estimator-result persistence remain uncompleted. Gate G2 baseline
-   control remains open; no closed-loop estimator/controller claim is justified.
-   Controller, ROS 2, PX4 and C++ integration remain future work.
+9. Aligned consistency evaluation and the frozen nominal measurement-only ensemble are
+   implemented: exact reference epochs, right-local errors, a positive-definite NEES
+   domain, explicit sampled-noise conversion, separate seed partitions, complete failure
+   accounting and pointwise NIS/NEES summaries. See the
+   [verification record](docs/progress/2026-09-23-eskf-consistency-evaluation.md) for results.
+10. The next bounded evaluation step is a frozen observation-fault campaign over the
+    measurement-only replay boundary: define deterministic corruption/dropout fixtures,
+    retain unmodified baselines, compare ungated and fixed-gate runs, and report recovery,
+    error, rejection and failure accounting on disjoint seeds. No covariance/gate tuning
+    against held-out data, delayed fusion or production sensor-model expansion is implied.
+    Broader bias excitation and model-mismatch evaluation remain separate requirements.
+    G2 baseline control and full G3 validation remain open; controller, ROS 2, PX4 and
+    C++ integration remain future work.

@@ -201,10 +201,12 @@ test-only; the production sensor generator is unchanged. An independent six-case
 comparison checks default replay output bytes. Exact counts and commands are recorded in
 the linked verification record rather than inferred from the statistical reference.
 
-The full estimator consistency target, held-out NIS/NEES coverage, fault precision/recall,
-100-seed nominal campaign, broad IMU-bias observability, delayed fusion, persistence and
-closed-loop validation remain uncompleted. Gate G2 baseline control and broader G3 evidence
-remain open. Revisit this decision when adding another observation dimension, correlated
+The subsequent [ADR 0008](0008-eskf-consistency-evaluation.md) adds aligned NEES and a
+frozen 100-seed-per-case nominal NIS/NEES campaign; it preserves this gate contract.
+The full estimator consistency target, fault precision/recall, broad IMU-bias observability,
+delayed fusion, persistence and closed-loop validation remain uncompleted. Gate G2 baseline
+control and broader G3 evidence remain open. Revisit this decision when adding another
+observation dimension, correlated
 sensor noise, persistence or a different time policy; do not silently reuse these degrees
 of freedom or relax the existing epoch contract.
 
