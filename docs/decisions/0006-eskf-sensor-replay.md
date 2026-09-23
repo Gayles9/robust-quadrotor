@@ -2,6 +2,8 @@
 
 - Date: 2026-09-23
 - Status: Accepted and implemented
+- Extension: [ADR 0007](0007-eskf-innovation-gating.md) adds optional pre-update scoring,
+  fixed gates and `REJECTED` events while preserving this epoch and default execution policy.
 - Extends: [ADR 0004](0004-eskf-error-state-conventions.md) and
   [ADR 0005](0005-eskf-measurement-updates.md)
 - Implementation: `src/quadrotor_math/eskf_replay.py`,
@@ -97,7 +99,8 @@ including its attitude-error reset. A measurement is used at most once.
 
 | Status | Condition | Effect on the filter |
 | --- | --- | --- |
-| `FUSED` | Acquisition index equals current delivery index, and stream enabled | Apply the existing model, Joseph correction, injection and reset |
+| `FUSED` | Fresh enabled observation, with no gate or a passing gate under ADR 0007 | Apply the existing model, Joseph correction, injection and reset |
+| `REJECTED` | Fresh enabled observation whose finite NIS exceeds its explicit threshold (ADR 0007) | Retain diagnostics; skip correction and preserve the current state/covariance |
 | `STALE` | Delivery index is later than acquisition index | Log and skip; never reinterpret it as a current measurement |
 | `DISABLED` | Fresh measurement with its fusion flag disabled | Log and skip; useful for an identical-input dead-reckoning comparator |
 | `PENDING` | `delivery_index == -1` | Log at the end of the result; never fuse before actual delivery |
@@ -154,6 +157,8 @@ recover omitted acquisitions from a manifest, or establish data authenticity on 
 `EskfReplayConfiguration` contains an explicit initial epoch, `EskfNominalState`, prior
 `initial_covariance (15,15)`, positive scalar gravity, `continuous_noise_covariance (12,12)`,
 nominal position/altitude model parameters and two strict Boolean fusion flags.
+ADR 0007 appends optional `innovation_policy=None`; this default retains unscored
+execution. A supplied policy enables pre-update diagnostics and optional rejection.
 
 The 12-component continuous noise order and units remain ADR 0004. For example, an
 accelerometer white-noise diagonal in $Q_c$ has units $(\mathrm{m/s^2})^2\,\mathrm{s}$,
@@ -172,7 +177,7 @@ underflows to zero are rejected; exact zero and representable subnormal variance
 silently inflated. The explicit initial state, covariance and $Q_c$ are preserved.
 
 All covariance matrices must be finite, symmetric and PSD under the existing locally
-scaled validation. Every fused innovation covariance must additionally be numerically
+scaled validation. Every scored or fused innovation covariance must additionally be numerically
 positive definite. A singular innovation is an error, not a `STALE` event or hidden gate.
 There is no jitter, pseudoinverse, clipping or auto-tuning. Independent observation noise
 and the existing local-Gaussian error assumptions remain requirements of the caller.
@@ -191,7 +196,7 @@ protect ordinary use, not deliberate hostile mutation. No RNG is owned or advanc
 | `EskfReplayInput` | Measurement-only clock `(n,)`, paired IMU arrays `(n,3)`, canonical owned observations |
 | `EskfReplayConfiguration` | Explicit prior and noise/model assumptions, independent of truth |
 | `replay_eskf` | Predict/correct sequence; returns one complete result or raises without caller mutation |
-| `EskfReplayEvent` | Observation, exhaustive status and optional full `EskfMeasurementUpdate` |
+| `EskfReplayEvent` | Observation, exhaustive status, optional full `EskfMeasurementUpdate`, and optional pre-update score/threshold under ADR 0007 |
 | `EskfReplayResult` | Time vector, tuple of `n` nominal states, `(n,15,15)` covariance history and all event outcomes |
 | `eskf_replay_input_from_run_artifact` | Strict clock/sensor adapter; no truth payload access |
 | `eskf_replay_configuration_from_nominal` | Explicit nominal world/sensor mapping; caller still owns prior and $Q_c$ |
@@ -227,7 +232,9 @@ dead-reckoning drift. Their precise durations and assertions are in the verifica
 
 These are regression and integration results, not held-out NIS/NEES consistency, general
 IMU-bias observability, robust-flight certification or the master plan's 100-seed target.
-No estimator-result persistence schema, outlier gate, sensor-fault generator, delayed-state
-rewind, asynchronous IMU treatment, closed-loop control or ROS/PX4 integration is added.
+The initial replay increment added no outlier gate; ADR 0007 now supplies that opt-in
+extension with its own verification evidence. No estimator-result persistence schema,
+sensor-fault generator, delayed-state rewind, asynchronous IMU treatment, closed-loop
+control or ROS/PX4 integration is added by either increment.
 Revisit this contract when one of those capabilities requires new timing or data semantics;
 do not silently relax the adapter or treat stale data as current.

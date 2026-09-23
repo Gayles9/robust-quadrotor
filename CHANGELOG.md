@@ -6,6 +6,14 @@ All notable changes to this project will be documented in this file following a 
 
 ### Added
 
+- Pre-update ESKF innovation whitening and normalized innovation squared diagnostics;
+  immutable derived results with explicit finite and covariance-domain validation.
+- Opt-in per-sensor fixed outlier gating and a rounded 99% chi-square preset. Rejection
+  precedes correction and preserves state/covariance; events retain diagnostics and thresholds.
+- Legacy unscored and diagnostics-only replay modes, explicit nominal-policy forwarding,
+  and 236 analytic, numerical, gate, ownership and integration regression cases. ADR 0007
+  defines the bounded contract; no persisted schema or correction-core change is introduced.
+
 - Measurement-only ESKF sensor replay with explicit first-sample initialization, left-held
   paired IMU timing, canonical correction order, and stale/pending/disabled event outcomes.
 - Immutable replay configuration, state/covariance histories and full correction diagnostics;

@@ -8,6 +8,9 @@
 - Review: [pull request #2](https://github.com/Gayles9/robust-quadrotor/pull/2)
 - Hosted code CI: [run 35884309624](https://github.com/Gayles9/robust-quadrotor/actions/runs/35884309624), successful
 - Contracts: [ADR 0006](../decisions/0006-eskf-sensor-replay.md)
+- Successor: [innovation diagnostics and gating](2026-09-23-eskf-innovation-gating.md)
+  completes the next bounded decision below. This record retains the replay milestone's
+  original commands, counts and limits.
 
 ## Completed scope and plan
 

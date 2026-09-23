@@ -148,11 +148,20 @@ The supported recorded-run IMU contract is deliberately full-rate, paired and ze
 See [ADR 0006](docs/decisions/0006-eskf-sensor-replay.md) and the
 [replay verification record](docs/progress/2026-09-23-eskf-sensor-replay.md).
 
+Replay now also supports opt-in pre-update innovation diagnostics and fixed outlier gates
+for position and altitude. It records residuals, predicted innovation covariance, whitened
+residuals and normalized innovation squared (NIS); rejected values leave the state and
+covariance unchanged. The default remains unscored replay. Code commit
+[`b674c716b4d2fff345e457b6f0ff247b40acd88c`](https://github.com/Gayles9/robust-quadrotor/commit/b674c716b4d2fff345e457b6f0ff247b40acd88c)
+passed [hosted CI](https://github.com/Gayles9/robust-quadrotor/actions/runs/35890398654).
+See [ADR 0007](docs/decisions/0007-eskf-innovation-gating.md) and the
+[gating verification record](docs/progress/2026-09-23-eskf-innovation-gating.md).
+
 The repository does not yet contain a reusable physically conditional invariant-monitoring
 API, a closed-loop controller, a live estimator service, adaptive integration, robustness
-campaigns, or a completed ROS 2/PX4 integration layer. Gating, delayed fusion and consistency
-analysis remain future work; stale-observation rejection is implemented. Gate G2 baseline
-control and the broader Gate G3 estimator-validation requirements remain open.
+campaigns, or a completed ROS 2/PX4 integration layer. Delayed fusion and held-out consistency
+analysis remain future work. Stale rejection and optional statistical gating are implemented.
+Gate G2 baseline control and the broader Gate G3 estimator-validation requirements remain open.
 
 ## Current end-to-end pipeline
 
@@ -1432,7 +1441,8 @@ rejects sparse/asynchronous/delayed IMU, off-grid acquisitions and contradictory
 metadata. Position/altitude measurements delivered at a later epoch are logged as `STALE`
 and skipped; `PENDING` observations are never fused early. Fresh disabled streams produce
 `DISABLED` events, allowing a same-input dead-reckoning comparison. This is explicit
-rejection of stale observations, not delay compensation or outlier gating.
+rejection of stale observations. The optional statistical gate described next operates only
+on fresh enabled values and does not provide delay compensation.
 
 Each `FUSED` event retains its full `EskfMeasurementUpdate`. Result states, covariance
 history and event arrays own read-only copies. Invalid or singular updates fail without
@@ -1440,6 +1450,89 @@ changing caller input or returning a partial result. No RNG is advanced. The res
 in memory only; no estimator file schema or live continuation API is introduced. See
 [ADR 0006](docs/decisions/0006-eskf-sensor-replay.md) for exact validation, timing, ownership
 and limitations, and the [test record](docs/progress/2026-09-23-eskf-sensor-replay.md).
+
+## ESKF innovation diagnostics and outlier gating
+
+`eskf_innovation.py` provides `compute_eskf_linear_innovation(P, z, h, H, R)` and the
+immutable `EskfInnovation` diagnostic. For the pre-observation covariance `P`, measured
+value `z`, model prediction `h`, Jacobian `H` and discrete noise covariance `R`, it computes
+
+$$
+r=z-h,\qquad S=HPH^T+R,\qquad \mathrm{NIS}=r^TS^{-1}r.
+$$
+
+Shapes are `(15,15)`, `(m,)`, `(m,)`, `(m,15)` and `(m,m)`, respectively, with `m>0`.
+Diagonal scaling and Cholesky solves whiten the residual without constructing an inverse.
+For replay, position is a 3D NED vector in metres, altitude is positive-up metres, and `S`
+has units m². `whitened_innovation` and `normalized_innovation_squared` are dimensionless.
+The diagnostic owns its residual, covariance and whitened residual and derives its own NIS.
+
+`EskfReplayConfiguration.innovation_policy` selects three explicit modes:
+
+| Value | Behavior for fresh enabled observations |
+| --- | --- |
+| `None` (default) | Original unscored correction; no extra numeric scoring domain |
+| `EskfInnovationPolicy()` | Record diagnostics for both sensors and apply every correction |
+| Policy with per-sensor thresholds | Record diagnostics; reject that sensor when NIS is strictly above its threshold |
+
+The two optional fields are `local_position_nis_threshold` and
+`barometric_altitude_nis_threshold`. Each supplied threshold must be positive and finite.
+An absent threshold leaves that sensor in diagnostics-only mode. The explicit factory
+`chi_square_99_percent_eskf_innovation_policy()` supplies rounded thresholds 11.345 for
+joint 3D position and 6.635 for scalar altitude. These have an approximately 99% marginal
+acceptance interpretation under a correct zero-mean Gaussian innovation model; they do
+not establish estimator consistency or guarantee detection of physical sensor faults.
+Choose the policy before evaluation; the implementation never tunes it from residuals.
+
+This continuation of the runnable replay example above demonstrates both opt-in modes:
+
+```python
+from dataclasses import replace
+from quadrotor_math.eskf_innovation import (
+    EskfInnovationPolicy,
+    chi_square_99_percent_eskf_innovation_policy,
+)
+from quadrotor_math.eskf_replay import EskfReplayStatus
+
+scored = replay_eskf(
+    measurements,
+    replace(configuration, innovation_policy=EskfInnovationPolicy()),
+)
+assert scored.covariances.tobytes() == result.covariances.tobytes()
+assert scored.events[0].innovation is not None
+
+# Deliberate test value; the production sensor generator is unchanged.
+outlier = replace(measurements.observations[0], measurement=np.array([100.0, 0.0, 0.0]))
+gated = replay_eskf(
+    replace(measurements, observations=(outlier,)),
+    replace(configuration, innovation_policy=chi_square_99_percent_eskf_innovation_policy()),
+)
+event = gated.events[0]
+assert event.status is EskfReplayStatus.REJECTED
+assert event.update is None
+assert event.innovation is not None and event.nis_threshold is not None
+assert event.innovation.normalized_innovation_squared > event.nis_threshold
+```
+
+The nominal configuration helper also accepts the explicit `innovation_policy` keyword.
+It does not infer thresholds from nominal noise or true parameters. `FUSED` and `REJECTED`
+events carry pre-correction diagnostics when scoring is enabled. Only `FUSED` carries a
+correction; rejected values do not inject error or contract covariance. The next same-epoch
+sensor sees the actual current prior. Stale, disabled and pending observations are not scored.
+
+Invalid covariance, singular `S`, nonfinite whitening or unrepresentable NIS raises
+`ValueError`; these are numerical/model failures, never statistical rejections. No partial
+result or caller mutation is produced. Scoring is optional because an otherwise valid
+zero-gain correction can coexist with an unrepresentable squared residual. Diagnostics-only
+also cannot prevent damage from applying a gross outlier. No jitter, clipping, automatic
+noise adjustment, truth access or random draws are introduced.
+
+Records and policy remain in memory; existing manifests and artifacts do not persist them.
+Keep the estimator configuration to reproduce a scored replay. Fixed outlier regressions
+and Gaussian statistic checks are documented in
+[ADR 0007](docs/decisions/0007-eskf-innovation-gating.md) and the
+[verification record](docs/progress/2026-09-23-eskf-innovation-gating.md). Held-out NIS/NEES
+coverage, general fault-detection performance and closed-loop robustness remain unverified.
 
 ## Frame and attitude conventions
 
@@ -1494,6 +1587,8 @@ The full convention, state shapes, signs, and hover sanity check are defined in 
   canonical position/altitude order, stale/pending/disabled outcomes, and owned histories.
 - A validated recorded-run adapter, nominal-only model mapping, exact save/load estimator
   replay tests, truth-access traps and deterministic generated-run regressions.
+- Pre-update innovation whitening/NIS, opt-in per-sensor fixed gates, complete rejected
+  observation diagnostics, and tested rejection-before-correction semantics.
 - Quadratic rotor thrust magnitudes from four rotor speeds.
 - First-order motor-speed response with saturated command targets, plus feasible
   collective-thrust/body-moment allocation to ordered rotor-speed commands.
@@ -1670,13 +1765,23 @@ artifact array and both canonical files byte for byte. Hosted code CI
 passed after publication. Exact commands, scope, and compatibility qualifications are in the
 [verification record](docs/progress/2026-09-23-eskf-measurement-updates-and-contract-audit.md).
 
-The sensor-replay increment adds **246 tests** and passes **1,921 tests** in both `make check`
-and a full warnings-as-errors run. Ruff and formatting pass (82 files at documentation closeout), and mypy
-passes over 21 source files. All 82 prior tracked files were byte-identical before this
+The sensor-replay increment added **246 tests** and passed **1,921 tests** in both `make check`
+and a full warnings-as-errors run. Ruff and formatting passed (82 files at that documentation
+closeout), and mypy passed over 21 source files. All 82 prior tracked files were byte-identical before that
 documentation update. [Hosted code CI](https://github.com/Gayles9/robust-quadrotor/actions/runs/35884309624)
 also passed. The 24 seeded stationary/moving cases and vertical-bias case are bounded
 regression evidence, not a held-out consistency campaign. Exact commands and claims are in
 the [replay verification record](docs/progress/2026-09-23-eskf-sensor-replay.md).
+
+The innovation/gating increment adds **236 tests**, bringing the current suite to
+**2,157 passing tests** in `make check` and a full warnings-as-errors run. Ruff/formatting
+pass (87 files at documentation closeout), and mypy passes over 22 source files.
+[Hosted code CI](https://github.com/Gayles9/robust-quadrotor/actions/runs/35890398654) passes.
+Six independent-process baseline comparisons match all 2,394 compared array payloads and
+metadata. Fixed signed outlier fixtures verify exact rejection-versus-omission equality
+and fresh recovery. These are bounded regressions; known-Gaussian NIS tests do not certify
+the ESKF's covariance. See the
+[gating verification record](docs/progress/2026-09-23-eskf-innovation-gating.md).
 
 ## Repository structure
 
@@ -1685,7 +1790,7 @@ the [replay verification record](docs/progress/2026-09-23-eskf-sensor-replay.md)
   validation, sensor measurement, fixed-rate sensor scheduling, immutable run configuration,
   named run-random-stream ownership, canonical run manifests, immutable run artifacts,
   complete-run generation, ESKF prediction/measurement mathematics, measurement-only replay
-  and run adapters, and trajectory-error algorithms.
+  and run adapters, innovation diagnostics/gating, and trajectory-error algorithms.
 - `experiments/`: reproducible numerical studies built from the public mathematical core.
 - `tests/unit/`: focused unit and composition tests for the mathematical core.
 - `docs/architecture/`: architectural contracts, including frames and state conventions.
@@ -1719,9 +1824,13 @@ the [replay verification record](docs/progress/2026-09-23-eskf-sensor-replay.md)
   adaptive step size exists.
 - ESKF mathematical primitives require same-epoch observations. The replay runner now
   enforces this with explicit stale rejection; its recorded-run adapter requires full-rate,
-  paired, zero-delay IMU and a supplied prior at the first sample time. No gating, delayed
+  paired, zero-delay IMU and a supplied prior at the first sample time. No delayed
   fusion/rewind, asynchronous IMU, live estimator service, estimator persistence schema or
   NIS/NEES campaign exists yet. In-memory estimator configuration is implemented.
+- Opt-in NIS diagnostics and gating require a finite, positive-definite innovation
+  covariance. A gate can reject valid data under a poor prior/model and can leave the
+  filter drifting during sustained rejection. It is not a fault classifier or a consistency
+  guarantee; no production outlier/dropout generator or persisted gate policy exists yet.
 - Position/altitude biases are explicit nominal assumptions rather than estimated extra
   states. The vertical-bias regression does not establish general IMU-bias observability or
   calibrated sensor performance. Covariance reset remains a local uncertainty approximation.
@@ -1797,8 +1906,14 @@ the final high-accuracy simulation method, especially for larger time steps or l
    deterministic correction order, stale/pending policy, owned histories and a validated
    measurement-only artifact adapter. The filter can now run end to end on compatible
    generated or loaded measurements without truth access.
-8. The next estimator decision is pre-update innovation diagnostics and a fixed, explicitly
-   specified gating policy before held-out consistency evaluation. NIS/NEES, broader bias
-   excitation, the master plan's 100-seed target and estimator-result persistence remain
-   uncompleted. Gate G2 baseline control remains open; no closed-loop estimator/controller
-   claim is justified. Controller, ROS 2, PX4 and C++ integration remain future work.
+8. Pre-update innovation diagnostics and optional fixed gating are complete in code commit
+   `b674c716b4d2fff345e457b6f0ff247b40acd88c`: owned residual/covariance/whitening/NIS,
+   explicit per-sensor thresholds, rejection before correction and complete in-memory
+   event records. Legacy unscored execution and the accepted epoch policy are preserved.
+9. The next bounded estimator step is a frozen consistency-evaluation contract and nominal
+   measurement-only evaluation harness: align reference epochs and right-local errors,
+   establish the noise-discretization relationship and NEES domain, and fix configurations
+   and seed partitions before evaluation. Held-out NIS/NEES, broader bias excitation,
+   the 100-seed target and estimator-result persistence remain uncompleted. Gate G2 baseline
+   control remains open; no closed-loop estimator/controller claim is justified.
+   Controller, ROS 2, PX4 and C++ integration remain future work.
