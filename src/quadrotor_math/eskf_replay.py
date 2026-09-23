@@ -14,9 +14,17 @@ from .eskf import (
     EskfMeasurementUpdate,
     EskfNominalState,
     _validated_float64_matrix,
+    eskf_barometric_altitude_measurement_model,
+    eskf_local_position_measurement_model,
     predict_eskf,
     update_eskf_barometric_altitude,
     update_eskf_local_position,
+)
+from .eskf_innovation import (
+    EskfInnovation,
+    EskfInnovationPolicy,
+    _positive_nis_threshold,
+    compute_eskf_linear_innovation,
 )
 
 
@@ -31,6 +39,7 @@ class EskfReplayStatus(Enum):
     """One exhaustive replay disposition for every supplied observation."""
 
     FUSED = "fused"
+    REJECTED = "rejected"
     STALE = "stale"
     DISABLED = "disabled"
     PENDING = "pending"
@@ -182,6 +191,8 @@ class EskfReplayConfiguration:
     density units. Position R (3,3) and altitude variance are per-observation m².
     Biases and altitude datum are assumed metres; gravity is positive NED m/s².
     Fusion flags disable fresh updates without disabling observation validation.
+    innovation_policy=None preserves unscored execution. An explicit policy
+    records pre-update NIS and optionally gates each fresh enabled sensor.
     """
 
     initial_time_s: float
@@ -196,10 +207,15 @@ class EskfReplayConfiguration:
     barometric_altitude_noise_variance: float
     fuse_local_position: bool = True
     fuse_barometric_altitude: bool = True
+    innovation_policy: EskfInnovationPolicy | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.initial_state, EskfNominalState):
             raise TypeError("initial_state must be an EskfNominalState")
+        if self.innovation_policy is not None:
+            if not isinstance(self.innovation_policy, EskfInnovationPolicy):
+                raise TypeError("innovation_policy must be an EskfInnovationPolicy or None")
+            object.__setattr__(self, "innovation_policy", replace(self.innovation_policy))
         for name in ("fuse_local_position", "fuse_barometric_altitude"):
             if type(getattr(self, name)) is not bool:
                 raise TypeError(f"{name} must be a bool")
@@ -231,11 +247,18 @@ class EskfReplayConfiguration:
 
 @dataclass(frozen=True, slots=True, eq=False)
 class EskfReplayEvent:
-    """One observation disposition; only FUSED carries correction diagnostics."""
+    """One observation disposition and independently owned optional diagnostics.
+
+    Only FUSED carries an update. With scoring enabled, FUSED and REJECTED carry
+    pre-correction innovation diagnostics; REJECTED requires NIS > nis_threshold.
+    Legacy unscored FUSED events remain valid. Other dispositions are unscored.
+    """
 
     observation: EskfReplayObservation
     status: EskfReplayStatus
     update: EskfMeasurementUpdate | None = None
+    innovation: EskfInnovation | None = None
+    nis_threshold: float | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.observation, EskfReplayObservation):
@@ -257,6 +280,34 @@ class EskfReplayEvent:
             object.__setattr__(self, "update", replace(self.update))
         elif self.update is not None:
             raise ValueError("unfused event cannot contain an update")
+        if self.nis_threshold is not None:
+            object.__setattr__(
+                self, "nis_threshold", _positive_nis_threshold("nis_threshold", self.nis_threshold)
+            )
+        if self.innovation is not None:
+            if not isinstance(self.innovation, EskfInnovation):
+                raise TypeError("innovation must be an EskfInnovation or None")
+            if self.status not in (EskfReplayStatus.FUSED, EskfReplayStatus.REJECTED):
+                raise ValueError("only FUSED or REJECTED events can contain innovation diagnostics")
+            diagnostic = replace(self.innovation)
+            if diagnostic.innovation.shape != observation.measurement.shape:
+                raise ValueError("innovation dimension must match observation")
+            if self.update is not None and not (
+                np.array_equal(diagnostic.innovation, self.update.innovation)
+                and np.array_equal(
+                    diagnostic.innovation_covariance, self.update.innovation_covariance
+                )
+            ):
+                raise ValueError("innovation diagnostics must match the update")
+            rejected = (
+                self.nis_threshold is not None
+                and diagnostic.normalized_innovation_squared > self.nis_threshold
+            )
+            if (self.status is EskfReplayStatus.REJECTED) != rejected:
+                raise ValueError("REJECTED status requires NIS strictly above its threshold")
+            object.__setattr__(self, "innovation", diagnostic)
+        elif self.nis_threshold is not None or self.status is EskfReplayStatus.REJECTED:
+            raise ValueError("a gate threshold or REJECTED status requires innovation diagnostics")
         object.__setattr__(self, "observation", replace(observation))
 
 
@@ -315,6 +366,9 @@ def replay_eskf(data: EskfReplayInput, configuration: EskfReplayConfiguration) -
     No prediction precedes the first epoch. Later epochs predict using row k-1,
     then fuse fresh position followed by altitude. Older acquisitions are STALE;
     undelivered observations are PENDING. A disabled fresh update is DISABLED.
+    An explicit innovation policy scores fresh enabled observations before any
+    correction; NIS strictly above its threshold is REJECTED without changing
+    state/covariance. Each later sensor uses the actual preceding posterior.
     Invalid/unsolvable arithmetic raises ValueError, not a rejection event. No
     partial result is returned on failure and no external state/RNG is changed.
     """
@@ -356,6 +410,37 @@ def replay_eskf(data: EskfReplayInput, configuration: EskfReplayConfiguration) -
             if not enabled:
                 events.append(EskfReplayEvent(observation, EskfReplayStatus.DISABLED))
                 continue
+            innovation = None
+            threshold = None
+            if configuration.innovation_policy is not None:
+                policy = configuration.innovation_policy
+                if position:
+                    predicted, jacobian = eskf_local_position_measurement_model(
+                        state, configuration.local_position_bias_W
+                    )
+                    noise = configuration.local_position_noise_covariance_W
+                    threshold = policy.local_position_nis_threshold
+                else:
+                    predicted, jacobian = eskf_barometric_altitude_measurement_model(
+                        state,
+                        configuration.barometric_reference_altitude,
+                        configuration.barometric_altitude_bias,
+                    )
+                    noise = np.array([[configuration.barometric_altitude_noise_variance]])
+                    threshold = policy.barometric_altitude_nis_threshold
+                innovation = compute_eskf_linear_innovation(
+                    covariance, observation.measurement, predicted, jacobian, noise
+                )
+                if threshold is not None and innovation.normalized_innovation_squared > threshold:
+                    events.append(
+                        EskfReplayEvent(
+                            observation,
+                            EskfReplayStatus.REJECTED,
+                            innovation=innovation,
+                            nis_threshold=threshold,
+                        )
+                    )
+                    continue
             if position:
                 update = update_eskf_local_position(
                     state,
@@ -374,7 +459,9 @@ def replay_eskf(data: EskfReplayInput, configuration: EskfReplayConfiguration) -
                     configuration.barometric_altitude_bias,
                 )
             state, covariance = update.nominal_state, update.covariance
-            events.append(EskfReplayEvent(observation, EskfReplayStatus.FUSED, update))
+            events.append(
+                EskfReplayEvent(observation, EskfReplayStatus.FUSED, update, innovation, threshold)
+            )
         states.append(state)
         covariances[index] = covariance
     events.extend(EskfReplayEvent(o, EskfReplayStatus.PENDING) for o in delivered.get(-1, ()))
