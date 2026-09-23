@@ -6,6 +6,13 @@ All notable changes to this project will be documented in this file following a 
 
 ### Added
 
+- Measurement-only ESKF sensor replay with explicit first-sample initialization, left-held
+  paired IMU timing, canonical correction order, and stale/pending/disabled event outcomes.
+- Immutable replay configuration, state/covariance histories and full correction diagnostics;
+  strict recorded-run and nominal-parameter adapters without truth-payload access.
+- 246 replay unit/integration cases, including save/load equality, truth isolation, seeded
+  stationary/moving runs and vertical-bias correction; ADR 0006 defines the bounded contract.
+
 - Same-epoch 15-state ESKF local-position and positive-up altitude measurement models and
   updates, scaled Cholesky gain solves, Joseph covariance, right-local injection/reset, and
   immutable posterior diagnostics.

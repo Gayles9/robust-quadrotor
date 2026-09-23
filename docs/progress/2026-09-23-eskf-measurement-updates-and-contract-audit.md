@@ -103,7 +103,7 @@ The final working tree was subsequently published as code commit `a751fe84317844
 
 | Command | Outcome |
 | --- | --- |
-| `uvx --from uv==0.12.3 uv run make check` | 1,675 tests passed; Ruff passed; 74 Python files already formatted; mypy passed over 19 source files |
+| `uvx --from uv==0.12.3 uv run make check` | 1,675 tests passed; Ruff passed; 74 files already formatted; mypy passed over 19 source files |
 | `uvx --from uv==0.12.3 uv run pytest -W error -q` | 1,675 passed, no warnings |
 | `uvx --from uv==0.12.3 uv run pytest -W error -q tests/unit/test_eskf.py tests/unit/test_eskf_update.py tests/unit/test_run_generation.py tests/unit/test_run_artifact.py` | 579 passed |
 | `git diff --check` | Passed |
@@ -122,3 +122,13 @@ Gating and NIS/NEES evaluation also need their own bounded decisions. None of th
 is silently embedded in these timestamp-free primitives. General bias observability and
 flight performance remain unverified. Gate G2 baseline control must remain visible before a
 later closed-loop estimator-integration claim.
+
+## Subsequent execution closeout
+
+The timing and data-access decision above is now implemented by
+[ADR 0006](../decisions/0006-eskf-sensor-replay.md) and the
+[sensor-replay milestone](2026-09-23-eskf-sensor-replay.md), published as code commit
+`2e26a26d2b4867e0a905e94fad68cb1385955b84`. The runner starts at the first IMU sample,
+uses left-held paired IMU, and logs stale/pending observations without fusing them as
+current. It does not alter the mathematical core documented here. Gating, consistency
+evaluation, estimator-result persistence and Gate G2 baseline control remain open.

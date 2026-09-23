@@ -112,7 +112,8 @@ explicitly symmetric covariance prediction, and a composed prediction boundary. 
 finite-difference Jacobians, adversarial covariance validation, empirical process-noise
 covariance, and repeated-prediction probes verify the frame/sign convention and numerical
 behavior. That initial milestone covered prediction; measurement correction is now implemented
-as described below. A complete estimator runner is not yet present.
+as described below. A bounded measurement-only replay runner is also implemented below;
+live-stream and closed-loop estimator integration remain outside the current scope.
 It was published in
 [commit `104fdfc1902e968de283ec76e720220fba577320`](https://github.com/Gayles9/robust-quadrotor/commit/104fdfc1902e968de283ec76e720220fba577320),
 and hosted push CI
@@ -136,10 +137,22 @@ gaps while preserving the tested historical run outputs. See
 [ADR 0005](docs/decisions/0005-eskf-measurement-updates.md) and the
 [verification record](docs/progress/2026-09-23-eskf-measurement-updates-and-contract-audit.md).
 
+The ESKF can now replay generated or loaded sensor records through a measurement-only
+execution boundary. It uses an explicit prior at the first acquired IMU epoch, left-held
+paired IMU prediction, deterministic position-before-altitude correction, and explicit
+stale/pending/disabled observation outcomes. It owns state/covariance histories and full
+per-fusion diagnostics without reading true trajectories or biases. Code commit
+[`2e26a26d2b4867e0a905e94fad68cb1385955b84`](https://github.com/Gayles9/robust-quadrotor/commit/2e26a26d2b4867e0a905e94fad68cb1385955b84)
+passed [hosted CI](https://github.com/Gayles9/robust-quadrotor/actions/runs/35884309624).
+The supported recorded-run IMU contract is deliberately full-rate, paired and zero-delay.
+See [ADR 0006](docs/decisions/0006-eskf-sensor-replay.md) and the
+[replay verification record](docs/progress/2026-09-23-eskf-sensor-replay.md).
+
 The repository does not yet contain a reusable physically conditional invariant-monitoring
-API, a closed-loop controller, an estimator runner, adaptive integration, robustness
-campaigns, or a completed ROS 2/PX4 integration layer. Gating, delayed fusion, and consistency
-analysis remain explicit future decisions. Gate G2 baseline control remains open.
+API, a closed-loop controller, a live estimator service, adaptive integration, robustness
+campaigns, or a completed ROS 2/PX4 integration layer. Gating, delayed fusion and consistency
+analysis remain future work; stale-observation rejection is implemented. Gate G2 baseline
+control and the broader Gate G3 estimator-validation requirements remain open.
 
 ## Current end-to-end pipeline
 
@@ -185,6 +198,12 @@ artifact data. Actual rotor-speed history is reconstructed during generation but
 The allocator is not invoked because the configuration already supplies rotor-speed commands;
 allocation is upstream of this boundary when a future controller supplies thrust and moment
 demands. Saving a run directory remains an explicit separate call.
+
+For compatible sensor schedules, `eskf_replay_input_from_run_artifact` extracts only clock
+and measurement/delivery information from an in-memory or loaded artifact. `replay_eskf`
+then combines this owned measurement-only input with an independently supplied estimator
+prior and nominal assumptions. Truth histories remain outside the filter, available to the
+caller for evaluation. Replay never regenerates sensor noise or changes the run artifact.
 
 **Practical interpretation.** Rotor speeds determine the force and turning effect on the
 vehicle; the dynamics convert those effects into rates of motion; integration turns those
@@ -1339,6 +1358,89 @@ The full derivation and contracts are in
 delayed; these timestamp-free primitives must not be called on such data without a separate
 measurement-epoch policy.
 
+## ESKF sensor replay
+
+`eskf_replay.py` provides that execution policy, while `eskf_run_replay.py` adapts recorded
+runs and nominal parameters. The initial state and covariance must refer to the first
+replay epoch. For generated runs this is `dt`, not zero, because no time-zero IMU sample
+exists. IMU row `k` predicts only the following interval `[t[k], t[k+1])`. Each output row
+contains the state after its current position and altitude updates, in that order.
+
+This runnable synthetic example uses illustrative values, not calibrated sensor parameters:
+
+```python
+import numpy as np
+from quadrotor_math.eskf import EskfNominalState
+from quadrotor_math.eskf_replay import (
+    EskfObservationKind,
+    EskfReplayConfiguration,
+    EskfReplayInput,
+    EskfReplayObservation,
+    replay_eskf,
+)
+
+measurements = EskfReplayInput(
+    time_s=np.array([0.01, 0.02, 0.03]),
+    specific_force_measurements_B=np.tile([0.0, 0.0, -9.81], (3, 1)),
+    angular_velocity_measurements_B=np.zeros((3, 3)),
+    observations=(
+        EskfReplayObservation(
+            kind=EskfObservationKind.LOCAL_POSITION,
+            observation_index=0,
+            acquisition_index=1,
+            delivery_index=1,
+            measurement=np.zeros(3),
+        ),
+    ),
+)
+prior = EskfNominalState(
+    position_W=np.array([0.1, -0.1, 0.2]),
+    velocity_W=np.zeros(3),
+    q_WB=np.array([1.0, 0.0, 0.0, 0.0]),
+    accelerometer_bias_B=np.zeros(3),
+    gyroscope_bias_B=np.zeros(3),
+)
+configuration = EskfReplayConfiguration(
+    initial_time_s=0.01,
+    initial_state=prior,
+    initial_covariance=np.eye(15) * 0.1,
+    gravity_acceleration=9.81,
+    continuous_noise_covariance=np.zeros((12, 12)),
+    local_position_bias_W=np.zeros(3),
+    local_position_noise_covariance_W=np.eye(3) * 0.01,
+    barometric_reference_altitude=0.0,
+    barometric_altitude_bias=0.0,
+    barometric_altitude_noise_variance=0.04,
+)
+result = replay_eskf(measurements, configuration)
+assert len(result.states) == 3
+assert result.covariances.shape == (3, 15, 15)
+assert result.events[0].status.value == "fused"
+```
+
+For saved runs, first use the existing authenticated `load_run_directory`, then call
+`eskf_replay_input_from_run_artifact(data)`. The optional
+`eskf_replay_configuration_from_nominal(manifest.run_configuration.nominal, ...)` helper
+requires explicit `initial_time_s`, `initial_state`, `initial_covariance` and
+`continuous_noise_covariance`. It maps nominal gravity, observation biases, altitude datum
+and squared observation standard deviations; it does not initialize from truth or convert
+per-sample IMU noise into a continuous spectral density. Direct configuration supports
+correlated position noise. Noise covariances retain the units and ordering in ADRs 0004/0005.
+
+The adapter accepts paired IMU at every completed truth-clock row with zero delay. It
+rejects sparse/asynchronous/delayed IMU, off-grid acquisitions and contradictory delivery
+metadata. Position/altitude measurements delivered at a later epoch are logged as `STALE`
+and skipped; `PENDING` observations are never fused early. Fresh disabled streams produce
+`DISABLED` events, allowing a same-input dead-reckoning comparison. This is explicit
+rejection of stale observations, not delay compensation or outlier gating.
+
+Each `FUSED` event retains its full `EskfMeasurementUpdate`. Result states, covariance
+history and event arrays own read-only copies. Invalid or singular updates fail without
+changing caller input or returning a partial result. No RNG is advanced. The result is
+in memory only; no estimator file schema or live continuation API is introduced. See
+[ADR 0006](docs/decisions/0006-eskf-sensor-replay.md) for exact validation, timing, ownership
+and limitations, and the [test record](docs/progress/2026-09-23-eskf-sensor-replay.md).
+
 ## Frame and attitude conventions
 
 - World frame `W` is north-east-down (NED): `+x` north, `+y` east, and `+z` down.
@@ -1388,6 +1490,10 @@ The full convention, state shapes, signs, and hover sanity check are defined in 
   and exact local SO(3) reset Jacobian applied to all covariance blocks.
 - Immutable posterior diagnostics plus analytic, finite-difference, seeded covariance,
   numerical-edge, and known-motion prediction/update composition tests.
+- Measurement-only ESKF replay with explicit initialization and left-held IMU timing,
+  canonical position/altitude order, stale/pending/disabled outcomes, and owned histories.
+- A validated recorded-run adapter, nominal-only model mapping, exact save/load estimator
+  replay tests, truth-access traps and deterministic generated-run regressions.
 - Quadratic rotor thrust magnitudes from four rotor speeds.
 - First-order motor-speed response with saturated command targets, plus feasible
   collective-thrust/body-moment allocation to ordered rotor-speed commands.
@@ -1519,7 +1625,7 @@ The complete-run generator audit passed 13 generator tests, 1,082 related tests,
 1,239 full-suite tests. It added regression coverage for empty acquisition streams and runs
 whose observations all remain pending. Commit `4cc132af291f9352b8145e6397482e8a632e76fd`
 published the generator. Its [hosted push CI run](https://github.com/Gayles9/robust-quadrotor/actions/runs/35674673151)
-succeeded with Ruff lint, 67 Python files already formatted, mypy passing over 18 source
+succeeded with Ruff lint, 67 files already formatted, mypy passing over 18 source
 files, and 1,239 tests passed. The follow-up replay characterization confirms that both
 historical and motorized configurations loaded from saved runs reproduce all 35 artifact
 arrays exactly, as well as the canonical manifest and NPZ bytes in the tested environment.
@@ -1556,7 +1662,7 @@ tests, and all 1,470 repository tests; Ruff, formatting, mypy, and `make check` 
 Hosted push CI completed successfully.
 
 The September 23 measurement-update and contract-audit revision passed **1,675 tests**,
-including a full warnings-as-errors run. Ruff passed, all 74 Python files were already
+including a full warnings-as-errors run. Ruff passed, all 74 files were already
 formatted, and mypy passed over 19 source files. The focused prediction/update/generation/
 artifact audit passed 579 tests. Six original-versus-revised replay cases matched every
 artifact array and both canonical files byte for byte. Hosted code CI
@@ -1564,18 +1670,26 @@ artifact array and both canonical files byte for byte. Hosted code CI
 passed after publication. Exact commands, scope, and compatibility qualifications are in the
 [verification record](docs/progress/2026-09-23-eskf-measurement-updates-and-contract-audit.md).
 
+The sensor-replay increment adds **246 tests** and passes **1,921 tests** in both `make check`
+and a full warnings-as-errors run. Ruff and formatting pass (82 files at documentation closeout), and mypy
+passes over 21 source files. All 82 prior tracked files were byte-identical before this
+documentation update. [Hosted code CI](https://github.com/Gayles9/robust-quadrotor/actions/runs/35884309624)
+also passed. The 24 seeded stationary/moving cases and vertical-bias case are bounded
+regression evidence, not a held-out consistency campaign. Exact commands and claims are in
+the [replay verification record](docs/progress/2026-09-23-eskf-sensor-replay.md).
+
 ## Repository structure
 
 - `src/quadrotor_math/`: ROS/PX4-independent vector, randomness, rotation, actuation,
   dynamics, integration, deterministic simulation, ideal IMU mathematics, state-history
   validation, sensor measurement, fixed-rate sensor scheduling, immutable run configuration,
   named run-random-stream ownership, canonical run manifests, immutable run artifacts,
-  complete-run generation, ESKF prediction and measurement-update mathematics, and
-  trajectory-error algorithms.
+  complete-run generation, ESKF prediction/measurement mathematics, measurement-only replay
+  and run adapters, and trajectory-error algorithms.
 - `experiments/`: reproducible numerical studies built from the public mathematical core.
 - `tests/unit/`: focused unit and composition tests for the mathematical core.
 - `docs/architecture/`: architectural contracts, including frames and state conventions.
-- `docs/decisions/`: accepted workflow, frame-convention, and environmental-model decisions.
+- `docs/decisions/`: accepted workflow, frame, environment and ESKF mathematical/execution decisions.
 - `docs/environment.md`: recorded host, toolchain, ROS 2, Gazebo, and PX4 environment details.
 - `docs/progress/`: dated engineering progress records.
 
@@ -1603,9 +1717,11 @@ passed after publication. Exact commands, scope, and compatibility qualification
   inertia behavior, Euler drift, or long-duration stability.
 - No controller, scheduled rotor input, integration callback, dynamics event handling, or
   adaptive step size exists.
-- ESKF prediction and measurement correction are mathematical primitives. Observations must
-  refer to the nominal state's epoch. No gating, delayed/out-of-sequence fusion, estimator
-  runner, estimator configuration/artifact schema, or NIS/NEES campaign exists yet.
+- ESKF mathematical primitives require same-epoch observations. The replay runner now
+  enforces this with explicit stale rejection; its recorded-run adapter requires full-rate,
+  paired, zero-delay IMU and a supplied prior at the first sample time. No gating, delayed
+  fusion/rewind, asynchronous IMU, live estimator service, estimator persistence schema or
+  NIS/NEES campaign exists yet. In-memory estimator configuration is implemented.
 - Position/altitude biases are explicit nominal assumptions rather than estimated extra
   states. The vertical-bias regression does not establish general IMU-bias observability or
   calibrated sensor performance. Covariance reset remains a local uncertainty approximation.
@@ -1676,7 +1792,13 @@ the final high-accuracy simulation method, especially for larger time steps or l
 6. The bounded measurement-update core is complete in code commit
    `a751fe843178440e035a6ad375a3abec828a2b1a`: position/altitude models, innovation and gain,
    Joseph covariance, injection/reset, owned diagnostics, and regression evidence.
-7. Before estimator execution is added, define filter-epoch and IMU-interval semantics,
-   observation ordering, and delayed-sample policy. Gating and consistency evaluation need
-   separate decisions. Gate G2 baseline control is still open; controller, broader
-   uncertainty campaigns, ROS 2, PX4, and C++ integration remain future work.
+7. Bounded sensor replay is complete in code commit
+   `2e26a26d2b4867e0a905e94fad68cb1385955b84`: explicit prior epoch, paired left-held IMU,
+   deterministic correction order, stale/pending policy, owned histories and a validated
+   measurement-only artifact adapter. The filter can now run end to end on compatible
+   generated or loaded measurements without truth access.
+8. The next estimator decision is pre-update innovation diagnostics and a fixed, explicitly
+   specified gating policy before held-out consistency evaluation. NIS/NEES, broader bias
+   excitation, the master plan's 100-seed target and estimator-result persistence remain
+   uncompleted. Gate G2 baseline control remains open; no closed-loop estimator/controller
+   claim is justified. Controller, ROS 2, PX4 and C++ integration remain future work.

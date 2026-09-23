@@ -190,9 +190,12 @@ known constant world acceleration.
 
 These are deterministic core-regression results. They do not establish general bias
 observability, calibrated sensor performance, NIS/NEES consistency, outlier robustness,
-delayed-measurement correctness, or closed-loop flight performance. No runner, estimator
-configuration, manifest extension, controller, ROS 2/PX4 adapter, or dependency is added.
-Gate G2 baseline control remains open.
+delayed-measurement correctness, or closed-loop flight performance. This mathematical
+increment added no runner, estimator configuration, manifest extension, controller,
+ROS 2/PX4 adapter or dependency. The subsequent [ADR 0006](0006-eskf-sensor-replay.md)
+implements bounded replay and in-memory configuration, with explicit stale rejection;
+it does not change these timestamp-free correction equations. Gate G2 baseline control
+remains open.
 
 ## References
 

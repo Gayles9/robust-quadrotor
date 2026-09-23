@@ -195,11 +195,13 @@ magnitude.
 
 The prediction increment itself did not include measurement updates, a Kalman gain or
 innovation, or a covariance-reset Jacobian. Those are now implemented under ADR 0005.
-The following remain outside the implemented estimator core:
+The bounded replay runner and in-memory execution configuration are now implemented in
+[ADR 0006](0006-eskf-sensor-replay.md), including explicit stale-observation rejection.
+The following remain outside the implemented estimator system:
 
-- delayed-measurement handling;
-- an estimator runner;
-- estimator configuration or a manifest schema;
+- delayed-measurement fusion/rewind and asynchronous IMU handling;
+- a live estimator service or continuation API;
+- an estimator persistence/manifest schema;
 - NIS/NEES analysis or a Monte Carlo consistency campaign;
 - exact matrix-exponential or Van Loan discretization;
 - Earth rotation, Coriolis effects, gravity estimation, or a geodetic model;
