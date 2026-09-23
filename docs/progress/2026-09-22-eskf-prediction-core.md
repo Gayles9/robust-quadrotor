@@ -1,10 +1,11 @@
 # 15-State ESKF Prediction Core
 
 - Date: 2026-09-22
-- Status: Published; post-publication numerical correction complete locally and pending review
-- Published commit: `104fdfc1902e968de283ec76e720220fba577320`
-- Published subject: `feat: add ESKF prediction core`
-- Recommended correction subject: `fix: harden ESKF numerical edge cases`
+- Status: Published; post-publication numerical correction published and verified
+- Prediction-core commit: `104fdfc1902e968de283ec76e720220fba577320`
+- Prediction-core subject: `feat: add ESKF prediction core`
+- Numerical-hardening commit: `3afe58e91ec4bda283a81b9fe8032379582b8a4d`
+- Numerical-hardening subject: `fix: harden ESKF numerical edge cases`
 
 ## Scope
 
@@ -334,8 +335,25 @@ in 19 source files, and `make check` passed all 1,470 tests. There were no failu
 skips, xfails, or warnings.
 
 This correction changes only the ESKF implementation, its unit tests, this progress record,
-ADR 0004, and the README. It remains local and unpublished pending separate review and
-authorization.
+ADR 0004, and the README.
+
+## Publication closeout (2026-09-22)
+
+The numerical-edge correction was published as
+[`3afe58e91ec4bda283a81b9fe8032379582b8a4d`](https://github.com/Gayles9/robust-quadrotor/commit/3afe58e91ec4bda283a81b9fe8032379582b8a4d)
+with parent `104fdfc1902e968de283ec76e720220fba577320` and subject
+`fix: harden ESKF numerical edge cases`. The commit contains exactly the README, ADR 0004,
+this progress record, the ESKF implementation, and its unit tests.
+
+The publication gate passed 108 ESKF tests, 397 related regression tests, and all 1,470
+repository tests. Ruff lint, Ruff format verification over 73 Python files, mypy over 19
+source files, and `make check` passed without failures, errors, skips, xfails, or warnings.
+The normal push synchronized `main` and `origin/main`. Hosted push CI
+[run 35805483357](https://github.com/Gayles9/robust-quadrotor/actions/runs/35805483357)
+completed successfully.
+
+The prediction milestone and its numerical hardening are therefore closed. Measurement-update
+design remains the next bounded milestone.
 
 ## Next exact milestone
 
