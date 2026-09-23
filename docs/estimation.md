@@ -177,6 +177,16 @@ uncertainty support inspection.
 Plot metadata records the exact input report hash and Matplotlib version. No generated
 result, figure or large log is committed.
 
+Report schema version 2 records each completed variant's actual `time_s` and the actual
+epochs used for dropout diagnostics. Before plotting, `validate_validation_report` checks
+the frozen protocol/hash, complete unique trial/variant identities and clocks, then
+recomputes aggregate results, counters and assessments. Inconsistent evidence is rejected
+before output creation. Version 1 remains readable through its verified fixed-clock
+convention; the original report and source provenance are preserved. These checks detect
+truncation or stale summaries, but do not authenticate the underlying execution. See the
+[post-merge audit](progress/2026-09-23-eskf-post-merge-audit.md) for the corrections and
+numerical compatibility evidence.
+
 ## Interpreting completion
 
 The acceptance target is a functioning basic ESKF under its documented input, prior,
