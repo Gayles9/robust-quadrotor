@@ -7,6 +7,7 @@ import numpy as np
 import pytest
 
 from quadrotor_math.eskf import EskfNominalState
+from quadrotor_math.eskf_endpoint import EskfSampledImuNoise
 from quadrotor_math.eskf_innovation import (
     EskfInnovationPolicy,
     chi_square_99_percent_eskf_innovation_policy,
@@ -82,7 +83,7 @@ def _run(
     )
 
 
-def _config(run: RunConfiguration, policy=None):
+def _config(run: RunConfiguration, policy=None, *, endpoint=False):
     # Known experiment prior at dt; never initialized from a truth-history row.
     state = EskfNominalState(
         np.array([0.3, -0.2, 0.5]), np.zeros(3), np.array([1.0, 0, 0, 0]), np.zeros(3), np.zeros(3)
@@ -92,8 +93,11 @@ def _config(run: RunConfiguration, policy=None):
         initial_time_s=run.numerics.truth_time_step_s,
         initial_state=state,
         initial_covariance=np.eye(15),
-        continuous_noise_covariance=np.eye(12) * 1.0e-5,
+        continuous_noise_covariance=np.zeros((12, 12)) if endpoint else np.eye(12) * 1.0e-5,
         innovation_policy=policy,
+        sampled_imu_noise=(
+            EskfSampledImuNoise(np.eye(6) * 1e-4, np.eye(6) * 1e-8) if endpoint else None
+        ),
     )
 
 
@@ -121,15 +125,21 @@ def test_adapter_extracts_exact_measurement_rows_and_source_identifiers() -> Non
     ]
 
 
-def test_generated_saved_loaded_run_has_identical_estimator_replay(tmp_path: Path) -> None:
+@pytest.mark.parametrize("endpoint", [False, True])
+def test_generated_saved_loaded_run_has_identical_estimator_replay(
+    tmp_path: Path, endpoint
+) -> None:
     run = _run(30, noise=1.0)
     artifact = generate_run_artifact_data(run)
     manifest = RunManifest(run, SoftwareProvenance("0.1.0", "3.12.14", "2.5.2", "a" * 40, True))
     save_run_directory(tmp_path / "run", manifest, artifact)
     loaded_manifest, loaded = load_run_directory(tmp_path / "run")
-    first = replay_eskf(eskf_replay_input_from_run_artifact(artifact), _config(run))
+    first = replay_eskf(
+        eskf_replay_input_from_run_artifact(artifact), _config(run, endpoint=endpoint)
+    )
     second = replay_eskf(
-        eskf_replay_input_from_run_artifact(loaded), _config(loaded_manifest.run_configuration)
+        eskf_replay_input_from_run_artifact(loaded),
+        _config(loaded_manifest.run_configuration, endpoint=endpoint),
     )
     assert first.covariances.tobytes() == second.covariances.tobytes()
     for actual, expected in zip(first.states, second.states, strict=True):
@@ -168,10 +178,13 @@ def test_delayed_and_pending_position_data_are_not_fused() -> None:
     assert [e.status for e in position] == [EskfReplayStatus.STALE] * 3 + [EskfReplayStatus.PENDING]
 
 
-def test_adapter_and_runner_do_not_read_truth_payloads() -> None:
+@pytest.mark.parametrize("endpoint", [False, True])
+def test_adapter_and_runner_do_not_read_truth_payloads(endpoint) -> None:
     run = _run(noise=1.0)
     original = generate_run_artifact_data(run)
-    expected = replay_eskf(eskf_replay_input_from_run_artifact(original), _config(run))
+    expected = replay_eskf(
+        eskf_replay_input_from_run_artifact(original), _config(run, endpoint=endpoint)
+    )
     # Fail loudly even on read, not merely alter values and hope a test notices.
     forbidden = {
         "truth_position_history_W",
@@ -189,7 +202,9 @@ def test_adapter_and_runner_do_not_read_truth_payloads() -> None:
                 pytest.fail(f"truth/control access: {name}")
             return getattr(original, name)
 
-    actual = replay_eskf(eskf_replay_input_from_run_artifact(MeasurementOnly()), _config(run))
+    actual = replay_eskf(
+        eskf_replay_input_from_run_artifact(MeasurementOnly()), _config(run, endpoint=endpoint)
+    )
     np.testing.assert_array_equal(actual.covariances, expected.covariances)
 
 
@@ -603,10 +618,11 @@ def test_diagnostics_only_preserves_ungated_gross_outlier_outcome() -> None:
     assert outcomes[0] == outcomes[1]
 
 
-def test_scored_replay_uses_no_truth_or_rng(monkeypatch) -> None:
+@pytest.mark.parametrize("endpoint", [False, True])
+def test_scored_replay_uses_no_truth_or_rng(monkeypatch, endpoint) -> None:
     run = _run(20, noise=1.0)
     original = generate_run_artifact_data(run)
-    configuration = _config(run, chi_square_99_percent_eskf_innovation_policy())
+    configuration = _config(run, chi_square_99_percent_eskf_innovation_policy(), endpoint=endpoint)
     allowed = {"truth_time_s"} | {
         field.name
         for field in fields(original)

@@ -35,6 +35,7 @@ def render_validation_report(report: dict[str, Any], output: Path) -> list[str]:
     groups = report["groups"]
     status = (
         f"{report['protocol']['partition']}; "
+        f"{report['protocol'].get('propagation', 'first_order')}; "
         f"numerical failures {report['numerical_failure_count']}; "
         f"nominal/gated divergence {report['nominal_or_gated_divergence_count']}"
     )
@@ -73,6 +74,29 @@ def render_validation_report(report: dict[str, Any], output: Path) -> list[str]:
         axes[0, 0].legend(fontsize=8)
         figure.suptitle("Nominal consistency: temporal summaries are descriptive\n" + status)
         save(figure, "consistency.png")
+
+        original = groups.get("excited/first_order", {}).get("ensemble")
+        if original is not None:
+            figure, axes = _figure(1, 2, 11, 4)
+            for label, ensemble in (("First order", original), ("Endpoint", nominal)):
+                scores = ensemble["nees"]
+                axes[0, 0].plot(scores["time_s"], scores["mean_by_epoch"], label=label)
+                axes[0, 1].plot(scores["time_s"], scores["coverage_by_epoch"], label=label)
+            lower, upper = nominal["nees"]["pointwise_mean_interval_95"]
+            axes[0, 0].axhspan(lower, upper, color="green", alpha=0.15)
+            axes[0, 0].axhline(15, color="black", linestyle=":", linewidth=0.8)
+            axes[0, 0].set(xlabel="Time [s]", ylabel="Mean 15-state NEES")
+            axes[0, 1].axhspan(0.90, 0.98, color="orange", alpha=0.15)
+            axes[0, 1].axhline(0.95, color="black", linestyle=":", linewidth=0.8)
+            axes[0, 1].set(
+                xlabel="Time [s]", ylabel="Individual central95 coverage", ylim=(0, 1.02)
+            )
+            for axis in axes[0]:
+                axis.legend(fontsize=8)
+            figure.suptitle(
+                "Paired identical measurements and prior; temporal summaries descriptive\n" + status
+            )
+            save(figure, "propagation_comparison.png")
 
         figure, axes = _figure(1, 2, 11, 4)
         for col, (block, label) in enumerate(

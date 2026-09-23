@@ -5,6 +5,10 @@ Date: 2026-09-22
 Status: Accepted; measurement correction is specified by
 [ADR 0005](0005-eskf-measurement-updates.md).
 
+The first-order equations below remain the default. The explicit sampled-IMU endpoint
+alternative and its matched discrete covariance are specified in
+[ADR 0010](0010-eskf-endpoint-propagation.md); both use these physical error conventions.
+
 ## Context
 
 The first state-estimation increment needs a single, testable convention for nominal
