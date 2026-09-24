@@ -216,3 +216,103 @@ entire iterator must complete before any report directory is created. Tests
 require exact serial/parallel histories and saved bytes and prove that corruption
 in a later worker prevents publication. This changes scheduling of verification,
 not numerical execution, mathematical criteria or evidence completeness.
+
+## Further development: stiffness with a damping constraint
+
+Version 2 is preserved in `a56cdc0cdc79b79926dcf1ef9f446addc5d9d7c9`.
+Its new failures at 5.52 and 7.4125 s are startup recovery peaks, not just
+hold-entry samples; changing the scoring window is not a remedy. All attitude
+and numerical conditions pass. The all-real family has exhausted its stiffness
+bound. Extend the same physical model to the equal-decay complex-pole family
+
+    D_b(s) = .025*(s+8)*((s+8)^2+b^2)^2.
+
+All real parts remain -8 s^-1, so their sum preserves the fixed motor lag.
+Require continuous complex-mode damping at least 1/sqrt(2), giving 0<=b<=8.
+Writing x=b^2, coefficient matching gives
+
+    kp(x)=(64+x)^2/(640+6*x),
+    d(kp)/dx=(64+x)*(896+6*x)/(640+6*x)^2 > 0.
+
+Consequently b=8 maximizes position stiffness in this explicitly constrained
+family. It is not an optimum over arbitrary controllers. The selected candidate is
+
+    D3(s)=.025*(s+8)*(s^2+16*s+128)^2
+         =.025*s^5+s^4+19.2*s^3+204.8*s^2+1228.8*s+3276.8,
+    kp=16 s^-2, kv=6 s^-1, ka=32/3 s^-1, kr=96/5 s^-1.
+
+The unchanged held-clock map predicts minimum damping .59084 and slowest
+equivalent decay 5.38638 s^-1. The tilt and velocity-error static sensitivities
+are .613125 and .375, respectively. This exchanges some sampled damping for
+faster recovery and greater disturbance rejection; control effort and limiting
+must be measured. The sensor/filter prior and every remaining configuration
+field stay as in version 2.
+
+Before implementation, run an explicitly labeled short startup development probe
+with the same takeoff and 5-s hold entry. Require <.065 m over 5..10 s for the
+four known failed identities 30, 91001, 93003 and 93012, with no limiting or
+abort. Additional observed diagnostic seeds retain the original .08 m criterion.
+These short probes are not full-hover qualification.
+
+Implementation must preserve versions 1 and 2 and their exact protocol hashes.
+Require the original five full fixed missions and **33 development missions**:
+the thirteen version-2 development identities plus every exposed version-2
+validation hover (93000..93019), including both passes and failures. This broadens
+regression evidence after the two failed qualifications without treating reused
+data as fresh validation. Include nonlinear Jacobian checks for both axes,
+analytic coefficients/sensitivities, strict version and seed boundaries, startup
+regressions, complete replay/artifact audits and the full pinned repository gate.
+
+Freeze the complete new execution and prerequisite evidence before using fresh
+hover seeds **95000..95019** and square seeds **96000..96009**. All 30 must pass
+the unchanged full-mission conditions, including the entire 5..65 s hover window
+and .08 m limit. Retain all outcomes and measured effort; qualification remains
+bounded numerical evidence, not a universal stability or hardware claim.
+
+### Rejected prototype and diagnostic boundary
+
+The preceding b=8 proposal did not pass its pre-implementation probe. Seed 93012
+reached .0844626 m and activated a limit; seed 93003 reached .0759334 m, above the
+declared .065 m development margin. No version-3 production profile was added.
+The failed probe and its exact script are retained as development evidence.
+
+A separate causal bounded-integral prototype also failed. Its continuous target
+was .025*(s+20/3)^6, with kp=40/3, kv=5, ka=80/9, kr=50/3 and integral gain
+400/27 s^-3. The horizontal integral acceleration used the previous outer-tick
+position error and was bounded at +/-.5 m/s². Seed 93012 reached .111452 m;
+93003 reached .069758 m, and the integral bound became active. These observations
+do not support adding integral state to the maintained controller. The hook was
+confined to the external prototype process; repository control behavior and
+serialized schemas were unchanged.
+
+Recorded-error screens treat estimation errors as fixed external inputs; they
+cannot predict their change under a new controller or establish infeasibility.
+The extended screen correctly uses pitch inertia .025 kg m² for the north axis
+and roll inertia .02 kg m² for east. The earlier screen used .02 on both axes,
+so its pitch moment magnitudes are not valid; its position predictions are
+unaffected. Retain the earlier output with this limitation, not as a quantitative
+moment bound. The corrected expanded PD/integral screen found no candidate below
+.08 m within both requested rate and moment bounds among its 129 stable entries.
+This is finite-grid diagnostic evidence, not an optimal-control impossibility proof.
+
+The inherited full-mission actuator contract permits at most .5 s of consecutive
+actuator limiting and requires the final second to be limit-free. This is distinct
+from the extra absence-of-any-limiting development condition above. Additional
+complex-pole probes report both conditions separately and keep all actual limits
+unchanged. They do not retroactively qualify either frozen batch or the failed
+strict-margin prototype. New held-out seeds remain unused until a documented
+candidate and its prerequisites have been fixed.
+
+The b=10,12,14 saturation diagnostics all failed even the inherited .08 m startup
+target: seed 93012 reached .0822047, .0826201 and .0913843 m, respectively.
+The b=14 profile additionally failed seeds 91016 and 8200. Across these probes,
+the longest actuator-limiting intervals were .05, .10 and .15 s; brief limiting
+was therefore not the disqualifying inherited condition. Higher bandwidth did
+not resolve the performance issue and increased measured moment effort. Do not
+promote these profiles or open the reserved 95000/96000 validation batches.
+
+The present bounded gain/prior investigation is unqualified. Keep the integration
+PR in draft. Resolve the startup estimation/control coupling with a separately
+scoped design and explicit error/effort requirements before trajectory-planning
+integration. A sampled local pole calculation and a finite recorded-error screen
+do not substitute for that qualification.

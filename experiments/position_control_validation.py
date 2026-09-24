@@ -342,7 +342,7 @@ def score_case(job: dict[str, Any], result: MissionResult) -> dict[str, Any]:
         selected = (time >= 5) & (time <= 65)
         peak = float(np.max(position_error[selected])) if np.any(selected) else None
         metrics["hover_segment_peak_error_m"] = peak
-        conditions["60_second_hover"] = time[-1] >= 65 and peak is not None and peak <= 0.08
+        conditions["60_second_hover"] = bool(time[-1] >= 65 and peak is not None and peak <= 0.08)
     if job["case"] == "vertical_step":
         selected_indices = np.flatnonzero((time >= 7) & (time < 15))
         outside = selected_indices[

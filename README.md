@@ -13,6 +13,14 @@ and validation testable without depending on a flight stack or message transport
 
 ## Current status
 
+**Estimated-feedback qualification remains open.** The two frozen design
+profiles pass 29/30 and 28/30 fresh cases; both miss the unchanged 8 cm hover
+target. The implementation and verification infrastructure are in the draft
+feedback change. See the [technical status](docs/status.md) and
+[complete qualification record](docs/progress/2026-09-24-feedback-design.md).
+The isolated [early-abort scoring correction](docs/progress/2026-09-24-hover-abort-scoring.md)
+has its own audit and regression evidence; it does not qualify the feedback profile.
+
 The current working tree extends the foundational rotor-actuation and six-degree-of-freedom
 rigid-body dynamics pipeline with explicit-Euler propagation, fixed-step projected RK4
 propagation, deterministic multi-step Euler and RK4 state histories, reusable rigid-body

@@ -1,5 +1,10 @@
 # 2026-09-24: Estimated-feedback design and qualification
 
+**Outcome: qualification remains open; PR #10 stays in draft.** Passing source
+checks and physical replay do not override the retained hover-performance
+failures. A separate failure-reporting correction is isolated in
+[PR #11](https://github.com/Gayles9/robust-quadrotor/pull/11).
+
 ## Scope and preceding-step audit
 
 Audited branch commit: `94c074ef20d6e862f7143c39b00418799b5c4c6e`.
@@ -330,6 +335,68 @@ The source is numerically reproducible, but this profile is **not qualified**.
 Its demonstrated startup response remains insufficient across the fresh batch.
 Further design work must retain this batch as observed evidence and use a new
 held-out seed set.
+
+## Further development audit: no qualifying replacement
+
+All further probes used already observed seeds and the same 5 s hold entry.
+They shortened the hold to inspect 5–10 s startup behavior and therefore are
+not full 60-second hover qualifications. Their strict development condition
+required <.065 m for 30, 91001, 93003 and 93012, <.08 m for the other ten
+diagnostic identities, no limiting and no abort. The conditions were not
+retroactively changed to turn a failed probe into a pass.
+
+| Development prototype | Seed-93012 startup peak (m) | Result |
+| --- | ---: | --- |
+| Complex pole family, b=8 | .0844626 | Above inherited .08 m target; limiting present |
+| Bounded integral, .025*(s+20/3)^6 | .1114516 | Above target; integral acceleration reaches its .5 m/s² bound |
+| Complex pole family, b=10 | .0822047 | Above target; longest actuator limiting across 14 probes .05 s |
+| Complex pole family, b=12 | .0826201 | Above target; longest actuator limiting .10 s |
+| Complex pole family, b=14 | .0913843 | Above target; 91016 and 8200 also exceed .08 m; longest limiting .15 s |
+
+The b=10/12/14 diagnostics additionally report the original allowance for brief
+limiting, whose longest consecutive interval must be <=.5 s. Even under that
+inherited condition, the position target fails. Their sampled local minimum
+damping ratios are .51408, .44339 and .38175. Increasing stiffness further trades
+away damping and raises control effort without resolving the observed case.
+The integral hook existed only in its external development process. No extra
+controller state, production profile or evidence schema was introduced.
+
+The corrected recorded-error screen uses the actual pitch/roll inertias
+.025/.02 kg m² and includes PD and causal bounded-integral feedback. None of
+its 129 stable entries meets .08 m while keeping requested rates and moments
+inside their bounds. Its version-2 reconstruction differs from the recorded
+93003/93012 horizontal response by at most .000366/.000516 m over 0–10 s.
+This supports the local forcing diagnosis but is neither a global impossibility
+proof nor a substitute for new nonlinear estimated-feedback simulation. The
+first screen's use of .02 kg m² on both axes understated pitch moments; that
+output is retained with this limitation. Its position predictions are unaffected.
+
+The later diagnostic exposed a real publication defect: for a hover ending
+before 65 s, a short-circuit condition returned a NumPy boolean that canonical
+JSON could not encode. Two early-abort regressions reproduce this issue; an
+explicit `bool` conversion preserves both the failed result and its serializable
+record. Successful-case scoring and all thresholds are unchanged. Initial
+incomplete diagnostic JSON outputs and error logs are retained; the complete
+42-case diagnostic was rerun with explicit scalar conversion in its external
+serializer. Incomplete outputs are not counted as successful evidence.
+
+After the scoring correction, the draft's full pinned
+`PYTEST_ADDOPTS='-W error' make check` passes **3,063 tests in 236.09 s**,
+Ruff lint, formatting of 160 files and mypy over 49 source files. The focused
+abort/scoring/design regressions pass **53 tests in 49.20 s**. These are software
+verification outcomes, not acceptance of either failed frozen profile. The
+isolated correction on main's source passes its own **2,861-test** gate.
+
+The reserved 95000/96000 validation seeds were not opened. The immediate technical
+requirement is a separately scoped startup estimation/control design with an
+explicit error and control-effort budget, followed by observed-case regressions,
+complete fixed/development missions and another frozen fresh campaign. The
+unqualified integration remains a draft. The isolated reporting correction was
+merged through PR #11 as `f45f610776ec1c6877e896d7f63ec17c87f1d322`, after successful
+GitHub CI run 36037670598 and exact-tree verification. Its merged tree is identical
+to the locally tested correction. The two abort regressions also pass on that
+clean merged checkout. Its main-branch CI is checked separately in the publication
+receipt; this merge does not include the unqualified feedback integration.
 
 ## Limits and next scope
 

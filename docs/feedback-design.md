@@ -180,6 +180,16 @@ every full-history check must finish before publication. Tests prove exact
 serial/parallel saved bytes for identical report metadata and failure propagation
 from later workers. CLI provenance separately records the chosen worker count.
 
+## Qualification status
+
+Both implemented profiles remain **unqualified**: version 1 passes 29/30 fresh
+cases, and version 2 passes 28/30. The failures concern the unchanged .08 m hover
+peak criterion; numerical, replay and independent physical audits pass.
+Subsequent complex-pole and bounded-integral development probes do not close the
+gap and are not maintained controller options. The reserved 95000/96000 seeds
+have not been evaluated. See the complete record before interpreting local poles
+or individual passing plots as system qualification.
+
 ## Reproduction
 
 Use Python 3.12, uv 0.12.3 and the existing lockfile. Output directories must be new.

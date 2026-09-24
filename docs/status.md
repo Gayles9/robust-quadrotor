@@ -5,6 +5,12 @@ or a claim of hardware readiness. The [latest verification record](progress/2026
 is authoritative for the actual tested profile and results. Historical baselines
 remain reproducible and must not be confused with that separately named profile.
 
+**Qualification is open.** The two frozen estimated-feedback profiles pass 29/30
+and 28/30 fresh cases. Both miss the unchanged .08 m hover target. Later gain and
+integral prototypes do not resolve the observed failures and are not promoted.
+The implemented numerical integration and its passing software checks must not
+be presented as completed hover-performance qualification.
+
 | Area | Implemented technical capability | Important boundary or remaining work |
 | --- | --- | --- |
 | Physical and numerical foundation | NED/FRD rigid-body dynamics, quaternion utilities, rotor allocation and lag, wind/drag, Euler/RK4 histories and analytic/convergence checks | Illustrative parameters and numerical physics, not hardware identification or contact dynamics |
@@ -36,8 +42,14 @@ not turn all robustness/integration work into completed scope.
 
 ## Next bounded package
 
-Begin with an audit of the current feedback milestone. The next implementation
-package is the minimum-snap formulation: normalized-time seventh-order segments,
+The immediate work is to resolve the startup estimation/control coupling under
+the existing hover, actuator and timing requirements. A new design needs an
+explicit error and control-effort budget, observed-seed regressions, full replay
+and physical audits, and fresh validation after its complete source freeze.
+The current draft cannot be promoted using its failed results.
+
+After that qualification, audit the feedback milestone before the minimum-snap
+formulation: normalized-time seventh-order segments,
 derivatives through snap, exact integrated snap cost, waypoint/boundary/continuity
 constraints and a checked equality-constrained solve. Its evidence must include
 constraint residuals, knot continuity, comparison against a feasible non-optimal
