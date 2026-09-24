@@ -2,7 +2,13 @@
 
 Every work session records its objective, concepts learned, changes, verification evidence, blockers, and next exact action.
 
+## Control verification
+
+- [2026-09-24: Baseline attitude/rate control and recovery evidence](2026-09-24-baseline-attitude-control.md)
+
 ## Recent estimator verification records
+
+- [2026-09-23: Endpoint propagation and fresh calibration](2026-09-23-eskf-endpoint-calibration.md)
 
 - [2026-09-23: Post-merge ESKF experiment and evidence audit](2026-09-23-eskf-post-merge-audit.md)
 - [2026-09-23: Basic ESKF completion and held-out fault/consistency evidence](2026-09-23-eskf-completion.md)
