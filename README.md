@@ -13,6 +13,12 @@ and validation testable without depending on a flight stack or message transport
 
 ## Current status
 
+The latest [hover-abort scoring audit](docs/progress/2026-09-24-hover-abort-scoring.md)
+fixes failure-record serialization for a hover that aborts before its full scoring
+window. An aborted trial remains an explicit failed result. The separate
+estimated-state feedback qualification is still under review and is not promoted
+by this correction.
+
 The current working tree extends the foundational rotor-actuation and six-degree-of-freedom
 rigid-body dynamics pipeline with explicit-Euler propagation, fixed-step projected RK4
 propagation, deterministic multi-step Euler and RK4 state histories, reusable rigid-body
