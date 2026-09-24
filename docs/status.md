@@ -52,6 +52,11 @@ now shows that replacing position/velocity feedback with truth reduces the two
 observed startup peaks below 1 cm, while replacing attitude/rate feedback leaves
 both above 8 cm. This narrows the next design target to translational
 estimation/control coupling; it is diagnostic evidence, not a production fix.
+The subsequent [uncertainty and motor-response study](progress/2026-09-24-translational-feedback-design.md)
+finds no clear noise-calibration defect in the observed population. One fixed
+causal candidate improves both misses but still fails at 8.386 cm. It remains
+an explicitly rejected experiment; the next design must address tracking,
+measurement-error amplification and actuator effort together.
 
 After that qualification, audit the feedback milestone before the minimum-snap
 formulation: normalized-time seventh-order segments,

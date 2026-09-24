@@ -23,6 +23,9 @@ has its own audit and regression evidence; it does not qualify the feedback prof
 The [bounded startup diagnostic](docs/progress/2026-09-24-feedback-startup-diagnostic.md)
 isolates position/velocity feedback error as the main contributor in the two observed
 failures. Its truth-assisted counterfactuals do not qualify a deployable controller.
+The [translational uncertainty and motor-response study](docs/progress/2026-09-24-translational-feedback-design.md)
+retains one rejected causal candidate: it improves both observed misses but still
+reaches 8.386 cm in one case. Production behavior and qualification remain unchanged.
 
 The current working tree extends the foundational rotor-actuation and six-degree-of-freedom
 rigid-body dynamics pipeline with explicit-Euler propagation, fixed-step projected RK4
