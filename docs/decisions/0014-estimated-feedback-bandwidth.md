@@ -316,3 +316,29 @@ PR in draft. Resolve the startup estimation/control coupling with a separately
 scoped design and explicit error/effort requirements before trajectory-planning
 integration. A sampled local pole calculation and a finite recorded-error screen
 do not substitute for that qualification.
+
+## Protocol identity and numerical backends
+
+Final draft CI exposed a faulty cross-backend assumption in the golden protocol
+test. Local construction reproduced the frozen version-1 validation digest;
+CI produced `de28fa6bedf6986df434a515181c954a28f5dc54f7bcd229ffb8ced90c338f5b`.
+Selecting OpenBLAS HASWELL locally reproduces that exact digest. Compared with
+the recorded kernel, only the q_WB y component for hover seed 91010 differs:
+-.011563447064241896 versus -.011563447064241898 (one float64 unit).
+The same audit finds only derived initial-quaternion differences in the other
+protocols across seven kernel selections; all remaining fields are identical.
+
+Correct the test's assumption, not the production experiment. Keep a small
+golden initial-attitude fixture from the authenticated recorded input protocols.
+Before checking the unchanged golden digest, the test may substitute only those
+attitudes and only after each component agrees within four float64 units. Every
+other protocol field remains in the exact digest check. Negative tests must
+reject a five-unit attitude change and retain sensitivity to changes elsewhere.
+Check both design versions and the legacy profile on the observed kernels.
+
+Production protocol generation, strict report/digest validation, online/offline
+array equality, source behavior and all flight acceptance criteria remain
+unchanged. Byte-identical numerical replay requires matching the numerical
+backend as well as package versions. This regression test establishes preserved
+mathematical inputs to roundoff across the checked kernels; it does not establish
+portable byte-identical trajectories or rewrite the frozen experiment records.

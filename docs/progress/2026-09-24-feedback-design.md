@@ -398,6 +398,47 @@ to the locally tested correction. The two abort regressions also pass on that
 clean merged checkout. Its main-branch CI is checked separately in the publication
 receipt; this merge does not include the unqualified feedback integration.
 
+## Final CI audit: backend-dependent input roundoff
+
+GitHub CI run **36038666466** at `23d950e1f43d2b5306450b66a8400380e49a68bf`
+reported **3,062 passes and one failure**, in the test that assumed an identical
+golden protocol digest across numerical backends. The failed log is retained.
+Selecting the HASWELL OpenBLAS kernel locally reproduces the exact CI digest
+`de28fa6bedf6986df434a515181c954a28f5dc54f7bcd229ffb8ced90c338f5b`.
+For that version-1 validation protocol, only seed 91010's initial quaternion
+y component changes, from -.011563447064241896 to -.011563447064241898.
+The population draw and all non-quaternion fields are identical.
+
+The seven-selection audit checks the legacy protocol and both design versions.
+Every difference is confined to derived initial-quaternion components. The
+generation environment reports NumPy 2.5.2 and OpenBLAS 0.3.34.0.0 with the
+SkylakeX kernel; the full backend record is retained separately. The published
+raw protocol hashes describe that numerical realization. They were not edited
+to match another machine.
+
+The corrected test uses **87 frozen initial-attitude inputs** extracted from the
+authenticated recorded protocols. Only those derived components may differ by
+up to four float64 units before the original golden digest is checked. The
+helper is confined to tests; no runtime protocol, simulation, RNG, filter,
+scorer or artifact validator changes. New negative tests reject a five-unit
+attitude change, preserve sensitivity to a one-unit position change, and prove
+that the production validator still rejects even a one-unit attitude alteration.
+The [reproduction guide](../feedback-design.md) states the exact-backend boundary.
+
+Ten focused identity checks pass under the default, HASWELL and PRESCOTT kernel
+selections. The first saved HASWELL log was found truncated despite its recorded
+zero subprocess exit status; it is retained as incomplete. An independent repeat
+passes **10 tests in 1.04 s** and writes a complete authenticated log. No truncated
+log is presented as a complete gate transcript.
+
+The revised full pinned `PYTEST_ADDOPTS='-W error' make check` passes
+**3,071 tests in 213.92 s**, Ruff lint, format verification of 163 files and mypy
+over 49 source files. The execution-source digest remains
+`000bb213a7e14cefe2ea6a6a631ee8d2cf13ac15f08d5a3e869548a89d94067b`;
+the portability correction changes only tests, their input fixture and documentation.
+Fresh CI on that exact committed tree is recorded in the final publication receipt.
+These source-check results do not close the unchanged hover-performance gate.
+
 ## Limits and next scope
 
 This is a matched-model numerical profile with a known bounded initialization

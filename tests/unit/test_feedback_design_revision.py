@@ -6,6 +6,7 @@ from dataclasses import asdict
 
 import numpy as np
 import pytest
+from protocol_identity import frozen_protocol_identity
 from test_cascade_analysis import (
     test_lifted_model_matches_nonlinear_plant_jacobian as check_nonlinear_jacobian,
 )
@@ -24,7 +25,7 @@ from experiments.feedback_bandwidth_validation import (
 )
 
 
-def test_version_one_protocols_are_preserved_exactly():
+def test_version_one_protocol_definitions_are_preserved_to_roundoff():
     hashes = {
         "fixed": "80df4d0315667dc87e57078ae74bfa43bfa59cc9e7f1a0c81dd04c69f381d93e",
         "development": "4acb0aa56eb4e75fb3097dbb7a4b3fda4404a666599464d3abdcd7fe2877859b",
@@ -32,7 +33,7 @@ def test_version_one_protocols_are_preserved_exactly():
     }
     for partition, expected in hashes.items():
         p = validation_protocol(partition)
-        assert hashlib.sha256(canonical_json(p)).hexdigest() == expected
+        assert hashlib.sha256(frozen_protocol_identity(p)).hexdigest() == expected
         assert p == validation_protocol(partition, design_version=1)
 
 

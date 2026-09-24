@@ -5,6 +5,7 @@ from dataclasses import asdict, replace
 
 import numpy as np
 import pytest
+from protocol_identity import frozen_protocol_identity
 
 from experiments.attitude_control_validation import canonical_json
 from experiments.estimated_feedback_evidence import plain
@@ -76,7 +77,7 @@ def test_noiseless_prior_and_population_not_realization_based():
     )
 
 
-def test_legacy_protocol_hashes_unchanged_and_seeds_disjoint():
+def test_legacy_protocol_definitions_and_seed_separation():
     import hashlib
 
     hashes = {
@@ -85,7 +86,10 @@ def test_legacy_protocol_hashes_unchanged_and_seeds_disjoint():
         "validation": "e942a867424a6c4d1578c949286f90f99171ae183655808d276e9cd451e66927",
     }
     for partition, digest in hashes.items():
-        assert hashlib.sha256(canonical_json(original_protocol(partition))).hexdigest() == digest
+        assert (
+            hashlib.sha256(frozen_protocol_identity(original_protocol(partition))).hexdigest()
+            == digest
+        )
     sets = [
         {j["seed"] for j in planned_jobs(p)}
         for p in ("smoke", "fixed", "development", "validation")

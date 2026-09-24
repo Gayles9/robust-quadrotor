@@ -192,6 +192,24 @@ or individual passing plots as system qualification.
 
 ## Reproduction
 
+Exact protocol bytes and numerical replay also depend on the floating-point
+backend. The same NumPy build with another OpenBLAS kernel can change a derived
+initial-quaternion component by one float64 unit and therefore change the raw
+protocol digest. This was reproduced locally for the final CI mismatch; it is
+not a change to the seeded population or feedback equations. NumPy's
+[compatibility policy](https://numpy.org/doc/stable/reference/random/compatibility.html)
+likewise limits exact reproducibility to tightly matched execution conditions.
+
+The source-definition regression tests use an authenticated initial-attitude
+fixture and permit at most four float64 units only in those derived quaternion
+components before comparing the original golden digest. A five-unit change and
+changes to other fields remain detectable. This is a test-only mathematical-input
+comparison: production protocol hashes, archive digests and full-history replay
+validation remain strict. Match the original numerical backend to reload an
+exact historical replay; a different backend is a distinct numerical realization
+and must not be described as byte-identical. No test tolerance changes a flight
+performance criterion or converts a failed campaign into a pass.
+
 Use Python 3.12, uv 0.12.3 and the existing lockfile. Output directories must be new.
 Generated full histories stay outside Git. Freeze source and protocol before
 opening the held-out partition; a previously observed seed set is no longer fresh.
