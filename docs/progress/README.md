@@ -4,6 +4,7 @@ Every work session records its objective, concepts learned, changes, verificatio
 
 ## Control verification
 
+- [2026-09-24: Joint feedback design and qualification](2026-09-24-feedback-design.md)
 - [2026-09-24: Causal ESKF feedback and paired mission evidence](2026-09-24-estimated-state-feedback.md)
 - [2026-09-24: Position/velocity cascade and baseline mission evidence](2026-09-24-position-control-and-missions.md)
 - [2026-09-24: Baseline attitude/rate control and recovery evidence](2026-09-24-baseline-attitude-control.md)

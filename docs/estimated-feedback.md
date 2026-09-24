@@ -8,6 +8,13 @@ states the scope and frozen acceptance criteria. The
 [verification record](progress/2026-09-24-estimated-state-feedback.md) records the
 actual audit and campaign results.
 
+The original profile described here remains reproducible. A separately named
+[joint bandwidth and prior design](feedback-design.md) addresses its noisy-hover
+qualification with explicit horizontal/roll/pitch gains and population-matched
+initial covariance. It uses the same execution boundaries and retains the original
+thresholds, seeds, clocks and sensor noise. Its results must not be attributed to
+the original gains.
+
 ## Information flow
 
 ```mermaid

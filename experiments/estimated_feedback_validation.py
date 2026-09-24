@@ -286,12 +286,21 @@ def score_trial(
 
 
 def audit_history(
-    job: dict[str, Any], result: EstimatedMissionResult, baseline: MissionResult
+    job: dict[str, Any],
+    result: EstimatedMissionResult,
+    baseline: MissionResult,
+    *,
+    configuration: dict[str, Any] | None = None,
 ) -> None:
     """Recompute offline ESKF, feedback commands, phases, clocks and reference values."""
-    kwargs = make_configuration(job)
+    kwargs = make_configuration(job) if configuration is None else configuration
     generic_job = {"case": job["case"], "seed": job["seed"], "refinement": 1}
-    _validate_history(generic_job, baseline)
+    _validate_history(
+        generic_job,
+        baseline,
+        position_controller=kwargs["position_controller"],
+        attitude_controller=kwargs["attitude_controller"],
+    )
     r, estimates = result.mission, result.estimates
     dt = kwargs["numerics"].time_step_s
     if not np.array_equal(r.time_s, np.arange(len(r.time_s)) * dt):

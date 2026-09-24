@@ -17,6 +17,7 @@ Record architectural or version changes here as numbered decision records, such 
 - [0011: Bounded cascaded attitude and body-rate baseline](0011-baseline-attitude-control.md)
 - [0012: True-state position control and baseline missions](0012-position-control-and-missions.md)
 - [0013: Causal online ESKF and estimated-state mission feedback](0013-estimated-state-mission-feedback.md)
+- [0014: Joint cascade bandwidth and moment-matched initialization](0014-estimated-feedback-bandwidth.md)
 
 ## Template
 
