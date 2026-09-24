@@ -20,6 +20,9 @@ feedback change. See the [technical status](docs/status.md) and
 [complete qualification record](docs/progress/2026-09-24-feedback-design.md).
 The isolated [early-abort scoring correction](docs/progress/2026-09-24-hover-abort-scoring.md)
 has its own audit and regression evidence; it does not qualify the feedback profile.
+The [bounded startup diagnostic](docs/progress/2026-09-24-feedback-startup-diagnostic.md)
+isolates position/velocity feedback error as the main contributor in the two observed
+failures. Its truth-assisted counterfactuals do not qualify a deployable controller.
 
 The current working tree extends the foundational rotor-actuation and six-degree-of-freedom
 rigid-body dynamics pipeline with explicit-Euler propagation, fixed-step projected RK4

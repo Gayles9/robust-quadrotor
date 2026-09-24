@@ -47,6 +47,11 @@ the existing hover, actuator and timing requirements. A new design needs an
 explicit error and control-effort budget, observed-seed regressions, full replay
 and physical audits, and fresh validation after its complete source freeze.
 The current draft cannot be promoted using its failed results.
+The [bounded startup diagnostic](progress/2026-09-24-feedback-startup-diagnostic.md)
+now shows that replacing position/velocity feedback with truth reduces the two
+observed startup peaks below 1 cm, while replacing attitude/rate feedback leaves
+both above 8 cm. This narrows the next design target to translational
+estimation/control coupling; it is diagnostic evidence, not a production fix.
 
 After that qualification, audit the feedback milestone before the minimum-snap
 formulation: normalized-time seventh-order segments,
