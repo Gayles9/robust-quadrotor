@@ -76,6 +76,24 @@ def configuration(seed: int) -> dict[str, Any]:
 def run(seed: int, output: Path, *, horizon_s: float = 10.0) -> dict[str, Any]:
     """One process-local probe. A shorter grid-aligned horizon is only for tests."""
     kwargs = configuration(seed)
+    return _run_configuration(seed, kwargs, output, damping=0.5, horizon_s=horizon_s)
+
+
+def _run_configuration(
+    seed: int,
+    kwargs: dict[str, Any],
+    output: Path,
+    *,
+    damping: float,
+    horizon_s: float = 10.0,
+) -> dict[str, Any]:
+    """Shared experimental execution; callers own their frozen gain/seed policy.
+
+    The original public probe still fixes damping=.5 and its six observed seeds.
+    This private helper does not add a production controller option.
+    """
+    if isinstance(damping, (bool, np.bool_)) or not np.isfinite(damping) or not 0 <= damping <= 2:
+        raise ValueError("damping must be finite in [0, 2]")
     if isinstance(horizon_s, (bool, np.bool_)) or not np.isfinite(horizon_s):
         raise ValueError("horizon_s must be finite")
     steps = round(horizon_s / 0.0025)
@@ -107,7 +125,9 @@ def run(seed: int, output: Path, *, horizon_s: float = 10.0) -> dict[str, Any]:
             inertia,
             _wrench(speeds, parameters.nominal_rotors)[1] - np.cross(omega_B, inertia @ omega_B),
         )
-        requested = result.moment_requested_B - inertia @ (np.array([0.5, 0.5, 0]) * acceleration)
+        requested = result.moment_requested_B - inertia @ (
+            np.array([damping, damping, 0]) * acceleration
+        )
         limited = np.clip(requested, -parameters.maximum_moment_B, parameters.maximum_moment_B)
         allocation = allocate_limited_body_moment(thrust, limited, parameters.nominal_rotors)
         result = replace(

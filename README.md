@@ -26,6 +26,12 @@ failures. Its truth-assisted counterfactuals do not qualify a deployable control
 The [translational uncertainty and motor-response study](docs/progress/2026-09-24-translational-feedback-design.md)
 retains one rejected causal candidate: it improves both observed misses but still
 reaches 8.386 cm in one case. Production behavior and qualification remain unchanged.
+The [bounded joint-design cycle](docs/progress/2026-09-24-feedback-codesign.md)
+also stops without promotion: its single selected candidate reaches 9.140/9.038 cm
+in the two difficult observed prefixes, with no actuator limiting. The declared
+tracking/noise/effort objective does not deliver the required tracking margin.
+No reserved validation seeds are opened; further gain tuning is not the next
+automatic step. An explicit architecture/requirements decision is needed.
 
 The current working tree extends the foundational rotor-actuation and six-degree-of-freedom
 rigid-body dynamics pipeline with explicit-Euler propagation, fixed-step projected RK4

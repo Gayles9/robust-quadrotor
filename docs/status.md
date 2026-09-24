@@ -40,13 +40,13 @@ It is not obtained by dividing passed tests by a target test count, and it shoul
 not be read as a forecast of remaining effort. Passing a bounded campaign does
 not turn all robustness/integration work into completed scope.
 
-## Next bounded package
+## Feedback qualification and stop decision
 
-The immediate work is to resolve the startup estimation/control coupling under
-the existing hover, actuator and timing requirements. A new design needs an
-explicit error and control-effort budget, observed-seed regressions, full replay
-and physical audits, and fresh validation after its complete source freeze.
-The current draft cannot be promoted using its failed results.
+The startup estimation/control coupling remains unresolved under the existing
+hover, actuator and timing requirements. The current draft cannot be promoted
+using its failed results. Any subsequently authorized architecture change still
+needs observed-case regressions, full replay and physical audits, and fresh
+validation after its complete source freeze.
 The [bounded startup diagnostic](progress/2026-09-24-feedback-startup-diagnostic.md)
 now shows that replacing position/velocity feedback with truth reduces the two
 observed startup peaks below 1 cm, while replacing attitude/rate feedback leaves
@@ -55,8 +55,18 @@ estimation/control coupling; it is diagnostic evidence, not a production fix.
 The subsequent [uncertainty and motor-response study](progress/2026-09-24-translational-feedback-design.md)
 finds no clear noise-calibration defect in the observed population. One fixed
 causal candidate improves both misses but still fails at 8.386 cm. It remains
-an explicitly rejected experiment; the next design must address tracking,
+an explicitly rejected experiment; it motivated evaluating tracking,
 measurement-error amplification and actuator effort together.
+
+The [bounded joint-design cycle](progress/2026-09-24-feedback-codesign.md)
+has now evaluated that joint objective within a frozen 542-evaluation budget.
+Its one nonlinear candidate fails at 9.140/9.038 cm in the two difficult
+observed prefixes despite zero actuator limiting. The cycle is closed without
+promotion or fresh validation. **Do not continue automatic gain sweeps.**
+The next decision is architectural: explicitly keep the measured unqualified
+baseline, or authorize a separately scoped information/initialization/control
+change with a technical justification. No filter defect or fundamental
+infeasibility has been established. Existing progress estimates are unchanged.
 
 After that qualification, audit the feedback milestone before the minimum-snap
 formulation: normalized-time seventh-order segments,
