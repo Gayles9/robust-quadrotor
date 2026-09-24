@@ -195,6 +195,31 @@ with the existing locked Python 3.12 environment. `MISSION_EVIDENCE` is outside 
 | `load_report` plus independent `audit_histories.py` | Complete ledgers and physical reconstructions pass |
 | `experiments.plot_position_control` | Five fixed figures and held-out ensemble; no generated results in Git |
 
+## Published implementation and second audit
+
+Implementation commit:
+[`7366409f1fdfe0c2365c21d786b557780f9e1477`](https://github.com/Gayles9/robust-quadrotor/commit/7366409f1fdfe0c2365c21d786b557780f9e1477).
+Published tree: `01f08941c072443d0fb2619180b81416eb1a2a36`.
+[PR 9](https://github.com/Gayles9/robust-quadrotor/pull/9) contains 16 scoped files.
+All **144 published file objects** match the local tested checkout. The scope audit
+confirms **128 pre-existing files byte-preserved**, with only four existing documentation
+files modified. No source, test, schema, dependency or CI behavior from the preceding
+milestone was changed.
+
+[Hosted CI run 35993128185](https://github.com/Gayles9/robust-quadrotor/actions/runs/35993128185)
+passed on 2026-09-24 against the implementation PR revision: locked installation,
+Ruff, formatting and strict mypy succeeded, with **2,859 tests passed in 170.68 s**.
+A clean checkout of the published commit also passed both smoke cases with two workers.
+Its provenance identifies this exact commit, a clean tree and the same frozen execution
+digest. This is a publication/provenance check, not additional mission-performance evidence.
+
+The second complete physical audit also passes all ten held-out histories. Together
+with the prevalidation audit, all 18 full-mission records have been reloaded, digest-
+checked, ledger/metric-validated and physically reconstructed. Five fixed figures and
+the held-out ensemble were rendered and visually inspected for NED axes, signs,
+units, reference overlays, guard limits and readable layout. The documentation-only
+closeout preserves every execution-source and test byte from the verified code commit.
+
 ## Technical completion boundary
 
 The implemented true-state baseline satisfies the declared G2 numerical mission targets.

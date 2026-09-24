@@ -227,6 +227,10 @@ with no actuator limiting in the mission campaign. See the
 These satisfy the declared G2 true-state numerical targets; they are not evidence of
 estimated-state flight, real ground contact or hardware readiness. Landing is virtual
 and a guard abort stops the simulation, not a physical emergency maneuver.
+Published implementation
+[`7366409f`](https://github.com/Gayles9/robust-quadrotor/commit/7366409f1fdfe0c2365c21d786b557780f9e1477)
+passes [GitHub CI](https://github.com/Gayles9/robust-quadrotor/actions/runs/35993128185)
+with 2,859 tests; the published-tree comparison and clean-checkout smoke also pass.
 
 The repository does not yet contain a reusable physically conditional invariant-monitoring
 API, a live estimator/control integration, adaptive integration, or a completed
