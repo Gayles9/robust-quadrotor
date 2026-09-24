@@ -112,8 +112,8 @@ explicitly symmetric covariance prediction, and a composed prediction boundary. 
 finite-difference Jacobians, adversarial covariance validation, empirical process-noise
 covariance, and repeated-prediction probes verify the frame/sign convention and numerical
 behavior. That initial milestone covered prediction; measurement correction is now implemented
-as described below. A bounded measurement-only replay runner is also implemented below;
-live-stream and closed-loop estimator integration remain outside the current scope.
+as described below. Measurement-only replay and a caller-driven online estimator are
+implemented; the bounded estimated-state mission integration is described below.
 It was published in
 [commit `104fdfc1902e968de283ec76e720220fba577320`](https://github.com/Gayles9/robust-quadrotor/commit/104fdfc1902e968de283ec76e720220fba577320),
 and hosted push CI
@@ -216,7 +216,7 @@ The **true-state position/velocity and baseline mission layer** is now implement
 It adds acceleration feedforward plus PD feedback, explicit acceleration/tilt/thrust
 limits, desired attitude construction, hold/quintic/step references, and sampled
 initialize/takeoff/track/land/complete/abort supervision. It reuses the unchanged
-attitude loop and motor/RK4 plant. The local full gate passes **2,859 tests**.
+attitude loop and motor/RK4 plant. At that checkpoint the local gate passed **2,859 tests**.
 All five fixed/refinement cases, three development runs and **10/10 held-out square
 missions** pass; held-out full-mission position RMSE is **0.01968–0.02292 m**, below
 the frozen 0.15 m target. The 60-second hover, vertical-step and mild-wind cases pass,
@@ -232,8 +232,29 @@ Published implementation
 passes [GitHub CI](https://github.com/Gayles9/robust-quadrotor/actions/runs/35993128185)
 with 2,859 tests; the published-tree comparison and clean-checkout smoke also pass.
 
+The **causal estimated-state feedback layer** now connects simulated measurements,
+the endpoint ESKF and the unchanged position/attitude cascade. An explicit prior is
+independent of the truth state. Every 400 Hz epoch acquires IMU data, delivers due
+slow measurements, predicts/corrects the filter and supplies posterior estimates to
+the due controllers. Rate feedback subtracts both posterior gyro bias and conditional
+sample-noise mean. Estimated state also drives mission completion; a separately
+labeled truth safety oracle remains a simulation-only monitor.
+
+The preceding five fixed mission histories and metrics remain **bit-for-bit unchanged**.
+The new local full gate passes **2,952 tests** with warnings as errors. Development
+passes 3/3 and held-out square validation **10/10**, with true tracking RMSE
+**0.04721–0.07089 m** and no limiting. Fixed-case acceptance is **4/5, not an
+unqualified pass**. The noisy
+60-second hover completes without limiting but reaches **0.10756 m** hold error
+against the unchanged **0.08 m** target. This measured transient limitation is retained
+without changing gains, seeds, scoring windows or thresholds. See the
+[estimated-feedback guide](docs/estimated-feedback.md),
+[ADR 0013](docs/decisions/0013-estimated-state-mission-feedback.md) and
+[verification record](docs/progress/2026-09-24-estimated-state-feedback.md) for
+the paired evidence, full measurement/replay audit and scope qualifications.
+
 The repository does not yet contain a reusable physically conditional invariant-monitoring
-API, a live estimator/control integration, adaptive integration, or a completed
+API, a hardware/real-time estimator-control service, adaptive integration, or a completed
 ROS 2/PX4 integration layer. The implemented delay
 strategy rejects stale observations; delayed fusion/rewind remains outside this basic ESKF.
 

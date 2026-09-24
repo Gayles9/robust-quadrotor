@@ -1,5 +1,6 @@
 """Fixed-grid true-state position/attitude cascade with sampled mission guards."""
 
+from collections.abc import Callable
 from dataclasses import dataclass, replace
 from math import ceil, hypot, isfinite
 
@@ -224,6 +225,40 @@ def simulate_mission(
     without returning a partial result. Initial motors are explicit, not inferred
     from truth mass. Every plan endpoint must lie inside the declared geofence.
     """
+    return _simulate_mission(
+        initial_state,
+        initial_actual_rotor_omega,
+        truth_body,
+        truth_rotors,
+        truth_world,
+        position_controller,
+        attitude_controller,
+        plan,
+        safety,
+        numerics,
+        None,
+    )
+
+
+def _simulate_mission(
+    initial_state: RigidBodyInitialState,
+    initial_actual_rotor_omega: NDArray[np.float64],
+    truth_body: RigidBodyParameters,
+    truth_rotors: RotorParameters,
+    truth_world: WorldParameters,
+    position_controller: PositionControllerParameters,
+    attitude_controller: AttitudeControllerParameters,
+    plan: MissionPlan,
+    safety: MissionSafetyLimits,
+    numerics: MissionNumerics,
+    observer: Callable[[int, float, State, NDArray[np.float64]], State] | None,
+) -> MissionResult:
+    """Shared private execution; observer is a truth-to-sensor integration boundary.
+
+    None preserves the original true-state path exactly. Otherwise controllers
+    and completion use only the returned feedback state; the separate numerical
+    truth guard is labelled truth_*, and feedback guards estimate_* (ADR 0013).
+    """
     for argument, kind in (
         (initial_state, RigidBodyInitialState),
         (truth_body, RigidBodyParameters),
@@ -313,17 +348,25 @@ def simulate_mission(
             )
             for target, value in zip(history, values, strict=True):
                 target[k] = value
+            feedback = state if observer is None else observer(k, float(time), state, actual)
             reason = mission_guard_reason(state[0], state[2], safety)
-            supervisor = advance_mission(supervisor, plan, float(time), state[0], state[1], reason)
+            if observer is not None:
+                reason = f"truth_{reason}" if reason is not None else None
+                estimated_reason = mission_guard_reason(feedback[0], feedback[2], safety)
+                if reason is None and estimated_reason is not None:
+                    reason = f"estimate_{estimated_reason}"
+            supervisor = advance_mission(
+                supervisor, plan, float(time), feedback[0], feedback[1], reason
+            )
             phases[k] = supervisor.phase
             if supervisor.phase in (MissionPhase.COMPLETE, MissionPhase.ABORT):
                 break
             if k == n:
                 raise RuntimeError("mission timeout was not reached on the plant grid")
             if k % numerics.position_stride == 0:
-                held = compute_position_control(state[0], state[1], reference, outer)
+                held = compute_position_control(feedback[0], feedback[1], reference, outer)
             if (
-                hypot(*attitude_error_body(state[2], held.q_reference_WB))
+                hypot(*attitude_error_body(feedback[2], held.q_reference_WB))
                 > inner.maximum_attitude_error_rad
             ):
                 supervisor = MissionState(MissionPhase.ABORT, float(time), reason="attitude_domain")
@@ -338,7 +381,7 @@ def simulate_mission(
                 )
             if k % numerics.attitude_stride == 0:
                 output = compute_attitude_control(
-                    state[2], state[3], held.q_reference_WB, held.collective_thrust, inner
+                    feedback[2], feedback[3], held.q_reference_WB, held.collective_thrust, inner
                 )
                 command = output.allocation.commanded_rotor_omega
                 control_indices.append(k)

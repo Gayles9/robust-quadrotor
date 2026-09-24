@@ -12,6 +12,11 @@ This repository supports a six-month Robust Autonomous Quadrotor project. Build 
 
 ## Engineering Practice
 
+- Begin every new scoped implementation step by auditing the preceding milestone
+  against current source, tests, documentation and fresh relevant checks. Record
+  the audited commit and findings; fix demonstrated in-scope defects, otherwise
+  leave the existing design intact. Define the next step and its acceptance
+  criteria before implementing it.
 - Work in small, testable increments.
 - Add or update tests with every behavioral code change.
 - Use deterministic random-number generators with explicit seeds.
