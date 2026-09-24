@@ -250,3 +250,7 @@ hover shortfall. Any startup-transient or feedback-performance improvement needs
 an explicit design rationale, separate development evidence, frozen criteria and
 new held-out seeds. The measured miss must not be erased by changing its scoring
 window or claiming that every fixed target passed.
+
+That subsequent audit and explicitly versioned design are recorded in
+[the feedback qualification record](2026-09-24-feedback-design.md). The original
+profile, failed metric and complete history above remain the integration baseline.

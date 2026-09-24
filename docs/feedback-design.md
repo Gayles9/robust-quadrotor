@@ -49,14 +49,12 @@ the underlying controller implementation has the wrong sign or frame.
 
 ## Coefficient-matched profile and sampled implementation
 
-The selected target is
+Version 2 uses the all-real target
 
 ```text
-D(s) = .025*(s+3)^2*(s+6)*(s^2+28*s+392).
-kp = 3528/1003 = 3.517447657... s^-2
-kv = 3192/1003 = 3.182452642... s^-1
-ka = 6018/773  = 7.785252264... s^-1
-kr = 773/40   = 19.325         s^-1.
+D2(s) = .025*(s+8)^5
+      = .025*s^5+s^4+16*s^3+128*s^2+512*s+819.2.
+kp = 6.4 s^-2, kv = 4 s^-1, ka = 8 s^-1, kr = 16 s^-1.
 ```
 
 The sum of the desired pole decay rates is 40 s^-1, exactly `1/tau`, making
@@ -64,6 +62,22 @@ the s^4 coefficient compatible with the fixed physical motor lag. All remaining
 coefficients map directly to the four gains. Only the horizontal position gains
 and roll/pitch attitude/rate gains change. Vertical and yaw settings and all
 actuator, acceleration, tilt and geofence limits remain unchanged.
+
+For five positive real decay rates `ai` summing to `1/tau=40`, coefficient
+matching gives `kp=1/sum(i<j,1/(ai*aj))`. Cauchy-Schwarz bounds the denominator
+below by `100/sum(i<j,ai*aj)`, while the fixed sum bounds the pair-product sum
+above by 640. Hence `kp<=6.4`, attained by five equal rates of 8 s^-1. This is
+maximum position stiffness within the stated all-real continuous pole family,
+not a global optimum over arbitrary controllers. The sampled implementation
+and nonlinear stochastic performance must still be checked independently.
+
+Version 1 remains available with target
+`.025*(s+3)^2*(s+6)*(s^2+28*s+392)` and gains `3528/1003`, `3192/1003`,
+`6018/773`, `773/40`. Its 29/30 held-out result is an explicitly retained failed
+qualification. The observed miss is startup settling at the unchanged 5-s hold
+entry. Version 2 changes only these four gains relative to version 1; its
+moment-matched prior is identical. The earlier failed batch is not reused as
+fresh validation for the revised design.
 
 `cascade_analysis.HorizontalCascade` constructs both the continuous generator
 and a sampled-data transition. Its state is `[p,v,eta,r,a]`. The latter is sampled
@@ -76,7 +90,9 @@ to floating-point precision using a bounded augmented-matrix exponential.
 
 All five discrete poles lie inside the unit circle for this profile. Their
 equivalent continuous values `log(z)/.02` differ from the design poles because
-of sampling: approximately -2.460, -4.365 +/- 1.129j and -12.284 +/- 16.327j.
+of sampling: approximately -3.927, -4.685 +/- 3.781j and -11.590 +/- 9.660j.
+The minimum damping ratio is .7682 and slowest decay rate 3.9267 s^-1, compared
+with .6012 and 2.4599 s^-1 for version 1.
 These establish local stability of the specified linear controller/plant model.
 They do **not** establish nonlinear closed-loop stability with an ESKF, saturation,
 large attitudes or arbitrary mismatch.
@@ -89,7 +105,7 @@ D(d/dt)*p = -kr*ka*(kp*e_p + kv*e_v + g*e_eta) - g*kr*e_r.
 
 Thus the static sensitivity to tilt error is `-g/kp`; the sensitivity to velocity
 error is `-kv/kp`. The joint design reduces these magnitudes from 9.81 to about
-2.789, and from 1.8 to about .9048, respectively. Position-estimation error still
+1.533, and from 1.8 to .625, respectively. Position-estimation error still
 has unit static sensitivity. Faster feedback also passes more measurement noise
 to commands, which is why the evidence records moment effort and limiting along
 with tracking accuracy. No integral state or zero-offset robustness claim is added.
@@ -127,8 +143,9 @@ regime; they cannot establish indefinite heading accuracy without excitation.
 ## Interfaces and verification
 
 The runtime remains `simulate_estimated_mission` with explicitly supplied
-parameters. The new experiment's `make_configuration(job)` creates an independent
-configuration for a declared trial. `designed_horizontal_cascade()` returns the
+parameters. The experiment's `make_configuration(job, design_version=2)` creates
+an independent configuration for a declared trial.
+`designed_horizontal_cascade(2)` returns the
 local design assumptions; no controller silently selects gains based on seed,
 mission phase, estimated covariance or observed performance.
 
@@ -153,6 +170,16 @@ paired true-state audit now also reconstructs every inner command and limit flag
 Corruption tests demonstrate that changed commands, covariances, metrics, profiles,
 trial identities or archive bytes cannot be silently accepted.
 
+Design version 1 remains the default so existing calls and all three frozen
+protocol hashes are preserved. Select version 2 explicitly. The experiment
+uses new held-out hover seeds 93000..93019 and square seeds 94000..94009.
+Its thirteen development jobs explicitly include four already observed hover
+seeds as diagnostics. The five fixed identities and every acceptance condition
+are inherited unchanged. Report validation can use independent worker processes;
+every full-history check must finish before publication. Tests prove exact
+serial/parallel saved bytes for identical report metadata and failure propagation
+from later workers. CLI provenance separately records the chosen worker count.
+
 ## Reproduction
 
 Use Python 3.12, uv 0.12.3 and the existing lockfile. Output directories must be new.
@@ -163,12 +190,12 @@ opening the held-out partition; a previously observed seed set is no longer fres
 uv sync --locked
 PYTEST_ADDOPTS='-W error' make check
 EVIDENCE=/tmp/quadrotor-feedback-design
-uv run python -m experiments.feedback_bandwidth_validation --partition development --workers 3 --output "$EVIDENCE/development"
-uv run python -m experiments.feedback_bandwidth_validation --partition fixed --workers 3 --output "$EVIDENCE/fixed"
+uv run python -m experiments.feedback_bandwidth_validation --design-version 2 --partition development --workers 3 --output "$EVIDENCE/development"
+uv run python -m experiments.feedback_bandwidth_validation --design-version 2 --partition fixed --workers 3 --output "$EVIDENCE/fixed"
 # Freeze source/protocol and development/fixed evidence before this command.
-uv run python -m experiments.feedback_bandwidth_validation --partition validation --workers 3 --output "$EVIDENCE/validation"
-uv run python -m experiments.plot_feedback_bandwidth --input "$EVIDENCE/fixed" --output "$EVIDENCE/fixed-plots"
-uv run python -m experiments.plot_feedback_bandwidth --input "$EVIDENCE/validation" --output "$EVIDENCE/validation-plots"
+uv run python -m experiments.feedback_bandwidth_validation --design-version 2 --partition validation --workers 3 --output "$EVIDENCE/validation"
+uv run python -m experiments.plot_feedback_bandwidth --workers 3 --input "$EVIDENCE/fixed" --output "$EVIDENCE/fixed-plots"
+uv run python -m experiments.plot_feedback_bandwidth --workers 3 --input "$EVIDENCE/validation" --output "$EVIDENCE/validation-plots"
 ```
 
 The [verification record](progress/2026-09-24-feedback-design.md) distinguishes

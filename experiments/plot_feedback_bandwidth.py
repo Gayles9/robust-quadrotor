@@ -24,7 +24,7 @@ from experiments.plot_estimated_feedback import _render as render_histories  # n
 
 def _render(report: dict[str, Any], output: Path) -> list[str]:
     names = render_histories(report, output)
-    design = designed_horizontal_cascade()
+    design = designed_horizontal_cascade(report["protocol"]["version"])
     original = replace(
         design, position_gain=1.0, velocity_gain=1.8, attitude_gain=3.0, rate_gain=12.0
     )
@@ -105,10 +105,11 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--input", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--workers", type=int, default=1)
     args = parser.parse_args(argv)
     if args.output.exists():
         raise FileExistsError(args.output)
-    report = load_report(args.input)
+    report = load_report(args.input, workers=args.workers)
     print(json.dumps(_render(report, args.output)))
     return 0
 

@@ -2,7 +2,7 @@
 
 - Date: 2026-09-24
 - Audited commit: `94c074ef20d6e862f7143c39b00418799b5c4c6e`
-- Status: First frozen design unqualified: 29/30 validation passes; revision required
+- Status: Versions 1 and 2 unqualified (29/30 and 28/30); further revision required
 
 ## Scope
 
@@ -152,3 +152,67 @@ still accept explicit caller-supplied parameters; this profile is an
 illustrative, documented configuration rather than a hidden change to
 every caller. Full histories remain outside Git; source, tests, derivation,
 commands and verified result summaries are versioned.
+
+## Version 2: settling-margin revision
+
+Version 1 is preserved in commit `6eadfa0438663f2fd26bee6298b62ff3b4e0e11d`,
+including all frozen definitions and the recorded 29/30 held-out result. Seed
+91001 misses at the unchanged 5.0-s hold entry, with .0813936606 m error; after
+10 s its error stays below .039612 m. All attitude conditions pass. This points
+to insufficient startup settling margin, not a reason to move the scoring window,
+relax the target or change estimator noise. The independent physical audit passes
+all 30 histories, including the failed performance case.
+
+The first all-real development candidate, roots -5,-5,-8,-11,-11, reduces
+seed 91001's startup peak to .0706366 m. This meets the original .08 m criterion
+but narrowly misses the stricter .07 m development margin. Its failed test log
+is retained; the .07 m check is not relaxed. No version-2 held-out seed was opened.
+
+Use the real-pole stiffness bound to select the final version-2 target. Write
+positive real decay rates as a1..a5 with sum 1/tau=40. Coefficient matching gives
+kp = 1 / sum(i<j, 1/(ai*aj)). Cauchy-Schwarz gives
+
+    sum(i<j, ai*aj) * sum(i<j, 1/(ai*aj)) >= 100,
+    sum(i<j, ai*aj) <= ((sum ai)^2 - (sum ai)^2/5)/2 = 640.
+
+Consequently kp<=6.4 s^-2, with equality for five equal rates of 8 s^-1.
+This maximizes static position stiffness within the stated all-real continuous
+pole family, not over arbitrary nonlinear controllers or complex-pole designs:
+
+    D2(s) = .025*(s+8)^5
+          = .025*s^5+s^4+16*s^3+128*s^2+512*s+819.2.
+    kp=6.4, kv=4, ka=8, kr=16.
+
+The decay rates still sum to 40 s^-1, preserving the physical motor time constant.
+The same held-clock local model has slowest equivalent decay rate about
+3.92665 s^-1 and minimum damping ratio .76816, compared with 2.45992 and .60122
+for version 1. Static tilt sensitivity falls from about 2.789 to 1.533 and
+velocity-error sensitivity from .9048 to .625. The rate gain decreases and the
+attitude-times-rate gain product falls from 150.45 to 128; the attitude gain
+increases slightly from 7.785 to 8. Horizontal position/velocity feedback
+increases. These are local mathematical predictions;
+the nonlinear campaigns decide whether the profile is acceptable.
+
+Keep the version-1 moment-matched prior, all plant/sensor/noise definitions,
+vertical/yaw settings, limits, references, timers and acceptance thresholds.
+The new `--design-version 2` is explicit; version 1 remains the default for
+backward compatibility and its three existing protocol hashes remain unchanged.
+
+Before opening any new held-out result, require the original five fixed identities
+and thirteen development identities to pass: hover 8200..8205, square 8206..8208,
+and observed diagnostic hover seeds 91001, 91011, 91016, 91019. The latter four
+are reused observed data, not fresh validation. The startup CI regressions for
+30 and 91001 also require a .07 m development margin with takeoff/hold start
+unchanged. Full acceptance still scores the entire 60-second hold against .08 m.
+
+Freeze source, tests, protocols and prerequisites again. The second held-out
+batch is hover **93000..93019** and square **94000..94009**. Retain all outcomes
+and require all inherited conditions for each of the 30 planned trials. Do not
+present the first failed batch as a successful version-2 validation.
+
+Full-history audits may execute independently in separate worker processes.
+Every existing replay, command, phase, clock and metric check still runs; the
+entire iterator must complete before any report directory is created. Tests
+require exact serial/parallel histories and saved bytes and prove that corruption
+in a later worker prevents publication. This changes scheduling of verification,
+not numerical execution, mathematical criteria or evidence completeness.

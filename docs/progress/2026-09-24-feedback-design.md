@@ -43,7 +43,7 @@ independent alternative closed-loop run or proof that one error channel is the
 sole cause. Changing takeoff thrust, nonlinear rotations and yaw coupling are
 among the linear model's approximations.
 
-The selected profile matches coefficients of
+The first profile matches coefficients of
 `.025*(s+3)^2*(s+6)*(s²+28s+392)` and uses the declared initial uniform population's
 exact second moments for P0. The prior mean and true population are unchanged;
 P0 is not computed from a trial's realized state. Sensor and process noise, gates,
@@ -55,12 +55,12 @@ analysis utility. The runtime controllers remain pure functions of explicit
 parameters; the selected profile is provided by the new experiment's configuration
 builder. The original experiment and its measured failure remain reproducible.
 
-## Verification record
+## Version 1 verification record
 
 All commands use Python 3.12.14 and the unchanged `uv.lock` with uv 0.12.3.
 `E` below denotes the external evidence directory; outputs are never overwritten
 or committed. The audited parent commit is recorded above; the exact execution
-SHA-256 for the new profile is
+SHA-256 for version 1 is
 `d5e38268c0dd396db157833d51923f32d9656245138ae6886ef303f230c9f398`.
 
 | Command (2026-09-24 UTC) | Confirmed outcome |
@@ -173,6 +173,163 @@ CRC checks, and all execution/test files still match the prevalidation freeze.
 This candidate remains **unqualified**, despite 43 of its 44 combined planned
 trials passing. The full failed batch is retained. A subsequent design revision
 must disclose these observed seeds as diagnostic data and use new held-out seeds.
+
+## Version 2: settling-margin revision
+
+The complete version-1 source and failed qualification are retained in commit
+`6eadfa0438663f2fd26bee6298b62ff3b4e0e11d`; its hosted CI run
+[36025423940](https://github.com/Gayles9/robust-quadrotor/actions/runs/36025423940)
+passed. Passing code checks did not qualify its failed performance result.
+
+The revision is scoped to the four horizontal/roll/pitch gains. The population
+prior, estimator equations, noise, plant, vertical/yaw settings, limits and
+complete hold window remain identical to version 1. Four observed hover seeds
+(91001, 91011, 91016, 91019) are explicitly added to development diagnostics;
+they cannot count as fresh validation. The new held-out identities are hover
+93000..93019 and square 94000..94009.
+
+The first all-real development target, roots -5,-5,-8,-11,-11, reaches
+.0706366 m on startup regression 91001. This clears the original .08 m target
+but fails the stricter .07 m development-margin test. That failure is retained
+in `design-v2-focused.log`. No held-out version-2 data had been examined.
+
+The final target `.025*(s+8)^5` attains the maximum `kp=6.4 s^-2` within the
+fixed-motor-lag, all-real continuous pole family, by the pair-product
+Cauchy-Schwarz bound in ADR 0014. Its other gains are `kv=4`, `ka=8`, `kr=16`
+in s^-1. The actual multirate local map has minimum damping ratio **.76816**
+and slowest equivalent decay **3.92665 s^-1**, versus .60122 and 2.45992 for
+version 1. These describe the local sampled controller/plant approximation;
+nonlinear stochastic acceptance is evaluated separately.
+
+`pytest -q -W error tests/unit/test_feedback_design_revision.py` passes all
+**24 revision tests in 48.21 s**. The full pinned
+`PYTEST_ADDOPTS='-W error' make check` passes **3,061 tests in 242.31 s**, Ruff
+lint/format (**159 files**) and mypy (**49 source files**). There are **109 new
+tests** relative to the audited 2,952-test integration checkpoint. The exact
+version-2 execution SHA-256 is
+`04d685799c357fb33df2120e6c35b9199ade8389de3e226dbca2a1f7bf59c017`.
+
+The revision tests independently expand the polynomial, compare both nonlinear
+horizontal Jacobians, verify that only the four gains change, preserve every
+version-1 protocol hash, enforce seed separation and retain the 7-cm startup
+checks at the original hold entry. Full-history audits now run independently in
+worker processes. Exact serial/parallel histories and saved bytes agree for
+identical report metadata (CLI worker-count provenance remains explicit); corrupt
+metrics, estimated commands, paired commands or covariance in a later worker
+propagate an exception before any report directory is created. The accelerated
+audit performs all original replay and physics/control-contract checks.
+
+### Fixed mission results
+
+`python -m experiments.feedback_bandwidth_validation --design-version 2 --partition fixed --workers 2 --output "$E/design-fixed-v2"`
+passes **5/5**, with zero numerical or acceptance failures. Every saved pair also
+passes the campaign's complete replay, command and metric validation before
+publication. All five cases complete without actuator limiting.
+
+| Fixed case | Full-mission true position RMSE [m] | Peak attitude-estimation error [deg] |
+| --- | ---: | ---: |
+| Noiseless square | .002113 | .000007169 |
+| Noisy 60-second hover, seed 30 | .026235 | 9.5736 |
+| Noisy square, seed 31 | .028593 | 2.6265 |
+| Vertical step, seed 32 | .110486 | 1.6941 |
+| Mild wind, seed 33 | .027089 | 4.4251 |
+
+The original hold-peak miss improves from **.1075633808 m** to
+**.0621390364 m**, about **42.2% lower**, measured over the identical 5–65 s
+window. The full-mission peak is .142110 m and is not confused with this
+hold-specific target. Full-mission hover RMSE falls from .044578 to .026235 m.
+Squared actual moment integrated over the mission rises from **.00162598** to
+**.0243405 N² m² s**, about **14.97×** the original profile and **2.00×**
+version 1. The gain design improves tracking at a substantial
+control-effort cost; that integral is not electrical energy. No rate, moment or
+allocation limiting occurs, but hardware suitability has not been established.
+
+The separately rendered `design-control-effort-comparison` figure shows the
+original, version-1 and version-2 trajectories for the identical fixed seed.
+It uses full-rate actual moments, without smoothing, and independently integrates
+their squared norm to reproduce each recorded effort value. The largest increase
+is concentrated in the startup transient; residual moment activity also increases.
+
+All five fixed pairs also pass the separate exact physics/sensor/control audit
+in `design-v2-fixed-paired-audit.json`. A fresh step-halving check of the revised
+noiseless square comparator keeps the same 10/20-ms control clocks while reducing
+the plant step from 2.5 to 1.25 ms. Aligned phases and control epochs agree
+exactly. Maximum component differences are **1.338e-10 m** position,
+**2.075e-10 m/s** velocity, **2.101e-11** quaternion, **3.418e-10 rad/s** body
+rate and **2.221e-8 rad/s** rotor speed. This establishes resolution for this
+deterministic trajectory, not stochastic discretization calibration.
+
+### Development results
+
+`python -m experiments.feedback_bandwidth_validation --design-version 2 --partition development --workers 3 --output "$E/design-development-v2"`
+passes **13/13**, with zero numerical or acceptance failures and no actuator
+limiting. The original six development hovers span **.039632–.059166 m** hold
+peak and **.023053–.025475 m** full-mission tracking RMSE. The three development
+squares span **.026203–.026735 m** RMSE. Maximum attitude-estimation error over
+all thirteen missions is **10.5007 degrees**.
+
+The four explicitly observed diagnostic hovers have hold peaks .065987 m
+(91001), .073130 m (91011), .071286 m (91016) and .065127 m (91019). Thus the
+first frozen candidate's failed seed now clears the unchanged full-hold target,
+and the largest development hold peak is .073130 m. These are development
+results and are not counted as fresh held-out evidence.
+
+The independent artifact audit detected three post-write digest mismatches in
+the development directory, including one empty file. Qualification paused before
+any new held-out seed was used. The damaged bytes and original failed audit are
+retained separately. The three affected trials were regenerated from the same
+source and configuration; **all 21 regenerated archive parts** and every metric
+matched the original recorded values exactly. Only the three damaged files were
+restored, using their original SHA-256 values as acceptance conditions. The report,
+metrics and expected hashes were not edited. All **95 development NPZ files**
+then passed digest and ZIP CRC verification. The cause of the post-write damage
+is unverified; no numerical-source defect is inferred from it.
+
+A broader **472-file digest scan** also found one empty covariance chunk in the
+earlier baseline reproduction copy. Its original fixed-campaign archive was
+intact and matched the unchanged expected digest; the copy was restored from
+those authenticated original bytes. `design-original-reproduction-exact-recovery.json`
+and the separately retained empty file record that recovery. All version-1
+design archives and all restored version-2 prerequisites matched their hashes.
+
+`design-v2-development-exact-recovery.json` records the exact reproduction and
+retained damage. The held-out campaign uses the unchanged maintained CLI in a
+private output directory, checks every completed archive, then publishes the
+complete directory under its final name. Its execution receipt records the
+actual command and source hash. This is an evidence-publication measure, not a
+change to simulated dynamics, random realizations or scoring.
+
+The repeated independent physics audit passes all **13** development pairs.
+Together with the five fixed pairs, all **121 NPZ files** match their recorded
+SHA-256 values and pass ZIP CRC checks. The complete execution, test and toolchain
+freeze was recorded at **16:52:21 UTC**, after these prerequisites and before
+the first version-2 held-out trial.
+
+| Version-2 partition | Protocol SHA-256 |
+| --- | --- |
+| Fixed | `08fed2f9bded2462ae06991333e4f1449376a8dcbb77262d7c83e2f8db6864ec` |
+| Development | `e55ed6f3cef35f4e9baa1e062c489661f558393be7c83d580ba8c4d719a7b7fb` |
+| Validation | `7c4800d34d12b89d4476cbd9ca46d9e39df8ac2900789c148f37ca1ec76b7230` |
+
+### Second frozen validation outcome: not qualified
+
+The version-2 command used `--design-version 2 --partition validation --workers 8`
+and completed at **17:10:36 UTC** with **28/30 acceptance passes**, zero numerical
+failures and exit status 1. The two failed hovers are seed **93003**, with
+**.0914026857 m** hold error at **7.4125 s**, and seed **93012**, with
+**.0886861791 m** at **5.5200 s**. Both complete without limiting; all attitude
+criteria and all ten square missions pass. After 10 s those two hold errors stay
+below .038970 and .037034 m, respectively. Their complete records remain failures
+against the unchanged full 5–65 s criterion.
+
+The separate physical audit passes all 30 saved pairs. All **331 version-2 NPZ
+files** pass SHA-256 and ZIP CRC checks; execution, tests and toolchain still match
+the 16:52:21 freeze. Report SHA-256 is
+`86d2c651b31eaf7a4afada0c0987a16008d05c6dd2be7ce10f13fbec51cadf90`.
+The source is numerically reproducible, but this profile is **not qualified**.
+Its demonstrated startup response remains insufficient across the fresh batch.
+Further design work must retain this batch as observed evidence and use a new
+held-out seed set.
 
 ## Limits and next scope
 

@@ -240,8 +240,9 @@ the due controllers. Rate feedback subtracts both posterior gyro bias and condit
 sample-noise mean. Estimated state also drives mission completion; a separately
 labeled truth safety oracle remains a simulation-only monitor.
 
-The preceding five fixed mission histories and metrics remain **bit-for-bit unchanged**.
-The new local full gate passes **2,952 tests** with warnings as errors. Development
+The original integration preserves the preceding five true-state fixed mission
+histories and metrics **bit-for-bit**. Its recorded gate passes **2,952 tests**
+with warnings as errors. Development
 passes 3/3 and held-out square validation **10/10**, with true tracking RMSE
 **0.04721–0.07089 m** and no limiting. Fixed-case acceptance is **4/5, not an
 unqualified pass**. The noisy
@@ -466,7 +467,7 @@ This bias-only milestone added no accelerometer white noise, RNG behavior, bias 
 scale-factor or cross-axis error, saturation, quantization, latency, or sample scheduling.
 Its historical next action—reproducible accelerometer white noise with caller-owned RNG
 behavior—has now been completed as the separate measurement boundary documented below.
-Gate G1 remains open. The bias-only contract and evidence remain recorded in the
+The bias-only contract and evidence remain recorded in the
 [constant-accelerometer-bias progress record](docs/progress/2026-09-03-constant-accelerometer-bias.md).
 
 ### Reproducible accelerometer white noise
@@ -505,7 +506,7 @@ continuous-time noise-density conversion.
 
 This boundary adds no bias drift or random walk, scale-factor or cross-axis error,
 misalignment, saturation, quantization, latency, timestamps, sample scheduling, vibration,
-temperature, calibration, or simulator integration. Gate G1 remains open. The complete
+temperature, calibration, or simulator integration by itself. The complete
 contract and evidence are recorded in the
 [reproducible accelerometer white-noise progress record](docs/progress/2026-09-08-reproducible-accelerometer-white-noise.md).
 
@@ -595,9 +596,9 @@ test.
 
 This milestone deliberately adds no white noise, bias random walk, RNG use, sample time,
 scale factors, misalignment, saturation, quantization, latency, or generic sensor/configuration
-abstraction. Gate G1 remains open: deterministic truth/ideal/biased-measurement separation is
-now explicit, but stochastic reproducibility, sensor statistics, saved replay, estimation,
-robustness, and hardware realism remain unestablished. The detailed contract, TDD evidence,
+abstraction. It establishes deterministic truth/ideal/biased-measurement separation.
+Stochastic sampling, saved replay and estimation are provided by the separate boundaries
+described above; hardware realism is not established. The detailed contract, TDD evidence,
 decisions, and limitations are recorded in the
 [constant-gyroscope-bias progress record](docs/progress/2026-09-02-constant-gyroscope-bias.md).
 
@@ -633,7 +634,7 @@ sample standard deviations on all three axes using five-standard-error bounds. T
 does not establish perfect Gaussianity, sample independence, hardware fidelity, estimator
 performance, or continuous-time noise-density conversion. It adds no automatic sample-rate
 scaling, accelerometer noise, bias random walk, scale-factor or misalignment error,
-saturation, quantization, latency, or sample scheduling. Gate G1 remains open. The complete
+saturation, quantization, latency, or sample scheduling by itself. The complete
 contract and evidence are recorded in the
 [reproducible gyroscope white-noise progress record](docs/progress/2026-09-02-reproducible-gyroscope-white-noise.md).
 
@@ -679,8 +680,8 @@ Each function validates, in order, current-bias shape, density shape, current-bi
 finiteness, density finiteness, density nonnegativity, time-step finiteness, and strict
 time-step positivity before sampling. Invalid inputs raise input-specific `ValueError`
 messages. This boundary does not create hidden sensor state or promise identical random
-bitstreams across NumPy versions or different bit generators. Sprint 3, Week 6 remains in
-progress, and Gate G1 remains open. The full contract and evidence are recorded in the
+bitstreams across NumPy versions or different bit generators. The full contract and
+evidence are recorded in the
 [reproducible IMU bias-random-walk progress record](docs/progress/2026-09-09-reproducible-imu-bias-random-walk.md).
 
 ### Local position and barometric altitude
@@ -837,9 +838,9 @@ This scheduling boundary does not provide ROS 2 or PX4 integration, asynchronous
 truth interpolation, off-grid acquisition, variable or adaptive truth stepping, stochastic
 latency, packet loss or dropout, clock offsets or drift, bounded-buffer overflow policies,
 transactional recovery from producer exceptions, scheduler or RNG serialization, automatic
-end-of-run draining, or estimator or controller integration. It is a timing and ownership
-primitive, not a complete sensor layer, estimator, controller, or Monte Carlo program. Gate
-G1 remains open. The complete contract and development evidence are recorded in the
+end-of-run draining, or estimator/controller integration by itself. The mission harness
+composes that integration separately. The scheduler remains a timing and ownership
+primitive. The complete contract and development evidence are recorded in the
 [fixed-rate sensor-scheduling progress record](docs/progress/2026-09-11-fixed-rate-sensor-scheduling.md).
 
 ### Reproducible run configuration and named random streams
@@ -984,8 +985,9 @@ or Python versions, platforms, or future distribution implementations.
 
 Run 1 establishes structural truth/nominal separation. The complete-run generator test
 confirms that selected nominal perturbations leave all 35 generated arrays exactly
-unchanged. Wind, drag, deliberate mismatch effects, estimation, and control remain future
-work, and Gate G1 remains open. The Run 1 contract and historical TDD evidence are in the
+unchanged. Wind/drag, declared mismatch effects, estimation and baseline control are
+implemented in the separate boundaries described above. The Run 1 contract and historical
+TDD evidence are in the
 [run-configuration and named-stream progress record](docs/progress/2026-09-14-run-configuration-and-random-streams.md).
 
 ### Reproducible run manifests and authenticated artifacts
@@ -1276,7 +1278,7 @@ This proves that the implemented model recognizes and numerically preserves this
 exact hover equilibrium. It does not prove hover stability: without a feedback controller, a
 perturbed vehicle will not automatically return to equilibrium. Arbitrary yaw, tilted hover,
 motor dynamics, aerodynamic effects, disturbances, sensors, estimation, and uncertainty are
-not validated by this scenario. Gate G1 remains open. The scenario remains test-local because
+not validated by this scenario. The scenario remains test-local because
 there is not yet a second production consumer that would justify a reusable helper,
 configuration dataclass, or standalone experiment.
 
@@ -1303,7 +1305,7 @@ integration behavior, not a dynamics defect.
 
 These trajectory tests establish method-specific behavior independently of the separate
 conservation characterization below. They do not establish aerodynamic realism, stability,
-control, estimation, or robustness. Gate G1 remains open. The scenario remains test-local;
+control, estimation, or robustness. The scenario remains test-local;
 no helper, invariant module, energy metric, or standalone experiment has been added.
 
 ### Gravity-only mechanical-energy characterization
@@ -1362,7 +1364,6 @@ scenario and grid; it does not claim exact discrete conservation or make RK4 an
 invariant-preserving integrator. The detailed derivations, measured drift, ownership decision,
 and limitations are recorded in the
 [torque-free rotation invariants progress record](docs/progress/2026-08-31-torque-free-rotation-invariants.md).
-Gate G1 remains open.
 
 ### Trajectory-error and convergence metrics
 
@@ -1828,6 +1829,16 @@ The full convention, state shapes, signs, and hover sanity check are defined in 
   stages, fixed-rate command holds, supplied body disturbances and immutable diagnostics.
 - Frozen attitude step/recovery/limiting experiments, independent seed partitions,
   complete trial ledgers, validated metrics and headless scientific plots.
+- Position/velocity feedback with acceleration feedforward, bounded thrust/tilt mapping,
+  hold/step/quintic references and virtual takeoff/track/land/abort missions.
+- Endpoint ESKF propagation with retained sampled-IMU noise and its state cross-covariance,
+  conditional sample-noise means, measurement-only replay and caller-driven online updates.
+- Causal posterior-state mission feedback, bias/noise-corrected rate feedback, explicit
+  initial priors, canonical sensor/control timing and separately labeled truth safety guards.
+- Paired true/estimated-feedback histories with full measurement replay, command/metric
+  reconstruction, digest-authenticated covariance chunks and versioned validation protocols.
+- Continuous and multirate local hover-cascade analysis, explicit coefficient-matched
+  gain profiles, population-matched initial covariance and preserved historical profiles.
 
 - Deterministic NumPy random-number generator construction from explicit seeds.
 - An immutable, validated run-configuration schema with explicit truth and nominal parameter
@@ -2147,9 +2158,10 @@ qualification.
 - The local attitude/rate P/P controller uses true-state feedback in its test harness.
   The separate position/mission layer composes it with bounded translational feedback
   and sampled geofence/tilt guards. Neither loop has integral disturbance rejection
-  or angular-reference feedforward. There is no estimated-state feedback, continuous
-  safety guarantee, contact/disarming model or hardware abort policy. No generic
-  integration callback or adaptive step size exists.
+  or angular-reference feedforward. The separate causal estimated-state mission
+  harness supplies posterior feedback with an explicit prior and sensor schedule.
+  There is no continuous safety guarantee, contact/disarming model or hardware abort
+  policy. No generic integration callback or adaptive step size exists.
 - ESKF mathematical primitives require same-epoch observations. The replay runner now
   enforces this with explicit stale rejection; its recorded-run adapter requires full-rate,
   paired, zero-delay IMU and a supplied prior at the first sample time. No delayed
@@ -2159,8 +2171,10 @@ qualification.
 - The initial nominal ensemble covers two short matched-model cases. The completion
   campaign adds 100 randomized 30-second excited trajectories and bounded faults, with
   demonstrated bias convergence. It does not establish universal observability or
-  long-duration/hardware robustness. Full-state NEES coverage misses the investigation
-  band (88.84%); full uncertainty calibration is not claimed. Pointwise chi-square
+  long-duration/hardware robustness. The historical first-order full-state NEES coverage
+  missed its investigation band (88.84%); the separate endpoint campaign above records
+  the subsequent measured improvement. That estimator-only calibration is not a
+  closed-loop uncertainty-calibration guarantee. Pointwise chi-square
   comparisons are not simultaneous guarantees, and temporal samples are correlated.
 - Opt-in NIS diagnostics and gating require a finite, positive-definite innovation
   covariance. A gate can reject valid data under a poor prior/model and can leave the
@@ -2191,8 +2205,8 @@ qualification.
   not interpolate truth, acquire off-grid, vary or adapt the truth step, model stochastic
   latency, packet loss, dropouts, clock offset or drift, bound its pending queue, roll back
   caller state after producer exceptions, serialize scheduler or RNG state, drain pending
-  deliveries automatically at termination, or integrate with an estimator, controller,
-  ROS 2, or PX4.
+  deliveries automatically at termination, or provide middleware integration. Sensor,
+  estimator and controller composition is implemented separately by the mission harness.
 - Runs 1, 2A, 2B, and 2C established reproducible configuration, named streams, manifests,
   and authenticated artifacts. Published Run 3 adds motorized configuration and persistence;
   the published generator assembles one complete in-memory run. Saving remains explicit. No
@@ -2202,8 +2216,9 @@ qualification.
   truth-side changes alter physical propagation and accelerometer truth, while declared
   nominal-only changes leave all 35 artifact arrays exactly unchanged.
 - Nominal, fault and covariance-sensitivity estimator campaigns and the frozen true-state
-  attitude recovery campaign are implemented. Mission/position tracking, broad control
-  mismatch robustness and estimated-state closed-loop campaigns are not.
+  attitude recovery campaign are implemented. Mission/position tracking and bounded
+  estimated-state closed-loop campaigns are also implemented; broad control mismatch
+  robustness remains outside their evidence boundary.
 - No completed ROS 2/PX4 adapter exists yet.
 - The existing multi-step rigid-body simulators represent static quadratic rotor thrust,
   thrust-offset and yaw reaction moments, uniform gravity, rigid-body inertia, gyroscopic
@@ -2271,5 +2286,12 @@ the final high-accuracy simulation method, especially for larger time steps or l
     10/10 deterministic held-out missions below 0.15 m position RMSE, no sustained
     actuator saturation, explicit sampled guards, complete evidence and plots. See the
     [mission verification record](docs/progress/2026-09-24-position-control-and-missions.md).
-    Estimated-state feedback remains a separate integration task with an explicit
-    sensor/estimator/control timing and initialization contract; it is not implemented here.
+    Estimated-state feedback is implemented in the separate causal integration layer,
+    with an explicit sensor/estimator/control timing and initialization contract.
+13. Causal estimated-state mission feedback and its mathematical bandwidth design are
+    documented in the [feedback guide](docs/feedback-design.md) and
+    [qualification record](docs/progress/2026-09-24-feedback-design.md).
+    Historical failed profiles remain reproducible; versioned profiles and fresh
+    validation batches distinguish design evidence from observed development cases.
+    See the [scope snapshot](docs/status.md) for remaining packages and the next
+    bounded minimum-snap formulation step.
