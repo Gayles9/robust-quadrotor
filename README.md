@@ -193,12 +193,26 @@ improved from .06809 m to .06739 m. All 2,517 tests and static checks pass local
 and in [GitHub CI](https://github.com/Gayles9/robust-quadrotor/actions/runs/35926981124).
 This is evidence for the declared known-prior simulation distribution, not flight readiness.
 
+The baseline **attitude and body-rate inner loop** is now implemented. It composes a
+local quaternion attitude P loop, inertia-aware rate P feedback, explicit rate/moment
+limits and collective-preserving rotor allocation. A deterministic true-state harness
+evaluates motor response at every projected-RK4 stage and retains commands, actual motor
+states and all limiting diagnostics. The fixed campaign verifies signed reference steps,
+30-degree recovery, torque-pulse recovery, saturation recovery and the predicted nonzero
+offset under persistent torque. See the [control guide](docs/control.md),
+[ADR 0011](docs/decisions/0011-baseline-attitude-control.md) and
+[verification record](docs/progress/2026-09-24-baseline-attitude-control.md).
+The new harness is separate from sensor generation and ESKF replay. Position and altitude
+hold are not implemented; **G2 remains open** for the position/mission milestone.
+The local gate passes **2,659 tests**; all 14 fixed/refinement cases, five development
+cases and 30 held-out attitude recoveries pass their declared criteria.
+
 The repository does not yet contain a reusable physically conditional invariant-monitoring
-API, a closed-loop controller, a live estimator service, adaptive integration, or a completed
+API, a position/mission controller, a live estimator service, adaptive integration, or a completed
 ROS 2/PX4 integration layer. Gate G2 baseline control remains open. The implemented delay
 strategy rejects stale observations; delayed fusion/rewind remains outside this basic ESKF.
 
-## Current end-to-end pipeline
+## Recorded sensor-run pipeline
 
 ```mermaid
 flowchart TD
@@ -240,8 +254,9 @@ accelerometer truth calculation uses the same environmental derivative as propag
 Properly declared nominal-only wind or drag changes do not affect physical or stochastic
 artifact data. Actual rotor-speed history is reconstructed during generation but is not persisted.
 The allocator is not invoked because the configuration already supplies rotor-speed commands;
-allocation is upstream of this boundary when a future controller supplies thrust and moment
-demands. Saving a run directory remains an explicit separate call.
+allocation is upstream of this boundary. The new attitude controller uses allocation in its
+separate closed-loop harness; it does not change this generator's constant-command contract.
+Saving a run directory remains an explicit separate call.
 
 For compatible sensor schedules, `eskf_replay_input_from_run_artifact` extracts only clock
 and measurement/delivery information from an in-memory or loaded artifact. `replay_eskf`
@@ -267,6 +282,9 @@ existing multi-step rigid-body simulators still take rotor speeds directly. The 
 generator uses motor response, while allocation remains upstream.
 
 ## Mathematical model
+
+For the separate attitude controller's equations, input/output contracts, timing and
+gain rationale, see [Baseline attitude and body-rate control](docs/control.md).
 
 The propagated rigid-body state consists of world-frame position `position_W`, world-frame
 velocity `velocity_W`, body-to-world attitude `q_WB`, and body-frame angular velocity
@@ -1758,6 +1776,13 @@ The full convention, state shapes, signs, and hover sanity check are defined in 
 
 ## Implemented capabilities
 
+- Local quaternion attitude P and full-inertia body-rate P control, bounded rate/moment
+  demand, and collective-preserving feasible rotor allocation.
+- Deterministic true-state closed-loop execution with motor forcing at projected-RK4
+  stages, fixed-rate command holds, supplied body disturbances and immutable diagnostics.
+- Frozen attitude step/recovery/limiting experiments, independent seed partitions,
+  complete trial ledgers, validated metrics and headless scientific plots.
+
 - Deterministic NumPy random-number generator construction from explicit seeds.
 - An immutable, validated run-configuration schema with explicit truth and nominal parameter
   groups, initial truth state, fixed truth numerics, four sensor schedules, constant rotor
@@ -2036,18 +2061,22 @@ qualification.
   complete-run generation, ESKF prediction/measurement mathematics, measurement-only replay
   and run adapters, innovation diagnostics/gating, aligned consistency evaluation,
   independent-seed statistics, analytic ESKF verification motion, immutable observation
-  faults, and trajectory-error algorithms.
+  faults, trajectory-error algorithms, bounded attitude/rate control and true-state
+  closed-loop attitude execution.
 - `experiments/`: reproducible numerical studies built from the public mathematical core.
 - `tests/unit/`: focused unit and composition tests for the mathematical core.
 - `docs/architecture/`: architectural contracts, including frames and state conventions.
-- `docs/decisions/`: accepted workflow, frame, environment and ESKF mathematical/execution decisions.
+- `docs/decisions/`: workflow, frame, environment, ESKF and control execution decisions.
 - `docs/environment.md`: recorded host, toolchain, ROS 2, Gazebo, and PX4 environment details.
 - `docs/estimation.md`: complete basic ESKF contracts, interpretation and reproduction guide.
+- `docs/control.md`: attitude/rate law, allocation, timing, tuning rationale and reproduction.
 - `docs/progress/`: dated engineering progress records.
 
 ## Current limitations
 
-- Both simulators support constant rotor input and a fixed positive time step only.
+- The historical Euler/RK4 simulators support constant rotor input and a fixed positive
+  time step. The separate attitude harness supplies bounded feedback commands at a fixed
+  controller period and evaluates changing actual motor speed within each RK4 step.
 - Motor response is composed by the complete-run generator, while allocation remains a
   separate upstream boundary. The existing multi-step simulators still take rotor speeds
   directly and do not propagate motor state.
@@ -2067,8 +2096,10 @@ qualification.
 - The torque-free rotation evidence covers one identity-attitude, diagonal-inertia scenario
   and one 10-second RK4 grid. It does not establish exact discrete conservation, arbitrary
   inertia behavior, Euler drift, or long-duration stability.
-- No controller, scheduled rotor input, integration callback, dynamics event handling, or
-  adaptive step size exists.
+- The local attitude/rate P/P controller uses true-state feedback in its test harness.
+  It has no position/altitude loop, integral disturbance rejection, reference-rate
+  feedforward, estimated-state feedback or safety supervisor. No generic integration
+  callback, dynamics event handling or adaptive step size exists.
 - ESKF mathematical primitives require same-epoch observations. The replay runner now
   enforces this with explicit stale rejection; its recorded-run adapter requires full-rate,
   paired, zero-delay IMU and a supplied prior at the first sample time. No delayed
@@ -2120,8 +2151,9 @@ qualification.
   anisotropic FRD quadratic drag support declared truth/nominal differences; tested
   truth-side changes alter physical propagation and accelerometer truth, while declared
   nominal-only changes leave all 35 artifact arrays exactly unchanged.
-- Nominal, fault and covariance-sensitivity estimator Monte Carlo campaigns are implemented;
-  closed-loop controller/mission robustness campaigns are not.
+- Nominal, fault and covariance-sensitivity estimator campaigns and the frozen true-state
+  attitude recovery campaign are implemented. Mission/position tracking, broad control
+  mismatch robustness and estimated-state closed-loop campaigns are not.
 - No completed ROS 2/PX4 adapter exists yet.
 - The existing multi-step rigid-body simulators represent static quadratic rotor thrust,
   thrust-offset and yaw reaction moments, uniform gravity, rigid-body inertia, gyroscopic
@@ -2177,5 +2209,12 @@ the final high-accuracy simulation method, especially for larger time steps or l
     `39e27daeceef755cc1b12a54a3571e935b9d9c76`. G3 evidence includes an explicit full-state
     NEES undercoverage finding; it is not an unqualified statistical-consistency pass.
     Any changed estimator/calibration must use a new protocol and new held-out seeds.
-    G2 baseline control remains separate and open. Controller, live estimator transport,
+    G2 baseline control remains separate and open. Live estimator transport,
     delayed fusion, ROS 2, PX4 and C++ integration are not part of this completion boundary.
+11. The Week 7 baseline attitude/rate inner loop is implemented with explicit limits,
+    feasible allocation, deterministic motorized execution, independent physical tests
+    and frozen recovery/step/disturbance evidence. See the
+    [control verification record](docs/progress/2026-09-24-baseline-attitude-control.md).
+    The next bounded milestone is the master plan's position/velocity outer loop and
+    baseline hover/waypoint mission validation, using this inner loop. It must establish
+    the remaining G2 criteria before a G2-complete claim or estimated-state integration.

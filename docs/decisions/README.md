@@ -10,6 +10,11 @@ Record architectural or version changes here as numbered decision records, such 
 - [0007: Pre-update innovation diagnostics and outlier gating](0007-eskf-innovation-gating.md)
 - [0008: Aligned consistency evaluation and frozen nominal ensemble](0008-eskf-consistency-evaluation.md)
 - [0009: Estimator completion scope and frozen validation protocol](0009-eskf-completion-validation.md)
+- [0010: Endpoint integration and matched sample-noise covariance](0010-eskf-endpoint-propagation.md)
+
+## Control contracts
+
+- [0011: Bounded cascaded attitude and body-rate baseline](0011-baseline-attitude-control.md)
 
 ## Template
 
