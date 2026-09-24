@@ -202,9 +202,9 @@ states and all limiting diagnostics. The fixed campaign verifies signed referenc
 offset under persistent torque. See the [control guide](docs/control.md),
 [ADR 0011](docs/decisions/0011-baseline-attitude-control.md) and
 [verification record](docs/progress/2026-09-24-baseline-attitude-control.md).
-The new harness is separate from sensor generation and ESKF replay. Position and altitude
-hold are not implemented; **G2 remains open** for the position/mission milestone.
-The local gate passes **2,659 tests**; all 14 fixed/refinement cases, five development
+The attitude harness remains separate from sensor generation and ESKF replay; the
+position/mission composition is described below. At the inner-loop checkpoint the
+local gate passed **2,659 tests**; all 14 fixed/refinement cases, five development
 cases and 30 held-out attitude recoveries pass their declared criteria.
 Published implementation
 [`f589082e`](https://github.com/Gayles9/robust-quadrotor/commit/f589082e004e044aea05e9bbbc2ae9741474767e)
@@ -212,9 +212,25 @@ also passes [GitHub CI](https://github.com/Gayles9/robust-quadrotor/actions/runs
 The second audit verifies all published file objects, clean-checkout execution and
 physical consistency of every retained control trial.
 
+The **true-state position/velocity and baseline mission layer** is now implemented.
+It adds acceleration feedforward plus PD feedback, explicit acceleration/tilt/thrust
+limits, desired attitude construction, hold/quintic/step references, and sampled
+initialize/takeoff/track/land/complete/abort supervision. It reuses the unchanged
+attitude loop and motor/RK4 plant. The local full gate passes **2,859 tests**.
+All five fixed/refinement cases, three development runs and **10/10 held-out square
+missions** pass; held-out full-mission position RMSE is **0.01968–0.02292 m**, below
+the frozen 0.15 m target. The 60-second hover, vertical-step and mild-wind cases pass,
+with no actuator limiting in the mission campaign. See the
+[position/mission guide](docs/position-control.md),
+[ADR 0012](docs/decisions/0012-position-control-and-missions.md) and
+[verification record](docs/progress/2026-09-24-position-control-and-missions.md).
+These satisfy the declared G2 true-state numerical targets; they are not evidence of
+estimated-state flight, real ground contact or hardware readiness. Landing is virtual
+and a guard abort stops the simulation, not a physical emergency maneuver.
+
 The repository does not yet contain a reusable physically conditional invariant-monitoring
-API, a position/mission controller, a live estimator service, adaptive integration, or a completed
-ROS 2/PX4 integration layer. Gate G2 baseline control remains open. The implemented delay
+API, a live estimator/control integration, adaptive integration, or a completed
+ROS 2/PX4 integration layer. The implemented delay
 strategy rejects stale observations; delayed fusion/rewind remains outside this basic ESKF.
 
 ## Recorded sensor-run pipeline
@@ -2051,8 +2067,8 @@ tests** in the full gate and warnings-as-errors run. Hosted code CI also passes,
 missed NEES investigation target are documented in the
 [completion record](docs/progress/2026-09-23-eskf-completion.md).
 
-The subsequent [post-merge audit](docs/progress/2026-09-23-eskf-post-merge-audit.md) adds
-22 regression cases. The current suite has **2,449 passing tests**, including the full
+The subsequent [post-merge audit](docs/progress/2026-09-23-eskf-post-merge-audit.md) added
+22 regression cases. At that checkpoint the suite had **2,449 passing tests**, including the full
 warnings-as-errors run; lint, formatting and strict typing pass. Report validation and
 diagnostic timing are strengthened without changing the estimator or its measured NEES
 qualification.
@@ -2066,8 +2082,8 @@ qualification.
   complete-run generation, ESKF prediction/measurement mathematics, measurement-only replay
   and run adapters, innovation diagnostics/gating, aligned consistency evaluation,
   independent-seed statistics, analytic ESKF verification motion, immutable observation
-  faults, trajectory-error algorithms, bounded attitude/rate control and true-state
-  closed-loop attitude execution.
+  faults, trajectory-error algorithms, bounded attitude/rate and position control,
+  mission references/supervision and true-state closed-loop execution.
 - `experiments/`: reproducible numerical studies built from the public mathematical core.
 - `tests/unit/`: focused unit and composition tests for the mathematical core.
 - `docs/architecture/`: architectural contracts, including frames and state conventions.
@@ -2075,6 +2091,8 @@ qualification.
 - `docs/environment.md`: recorded host, toolchain, ROS 2, Gazebo, and PX4 environment details.
 - `docs/estimation.md`: complete basic ESKF contracts, interpretation and reproduction guide.
 - `docs/control.md`: attitude/rate law, allocation, timing, tuning rationale and reproduction.
+- `docs/position-control.md`: position/velocity law, feasibility mapping, references,
+  sampled mission guards, evidence format and reproduction.
 - `docs/progress/`: dated engineering progress records.
 
 ## Current limitations
@@ -2102,9 +2120,11 @@ qualification.
   and one 10-second RK4 grid. It does not establish exact discrete conservation, arbitrary
   inertia behavior, Euler drift, or long-duration stability.
 - The local attitude/rate P/P controller uses true-state feedback in its test harness.
-  It has no position/altitude loop, integral disturbance rejection, reference-rate
-  feedforward, estimated-state feedback or safety supervisor. No generic integration
-  callback, dynamics event handling or adaptive step size exists.
+  The separate position/mission layer composes it with bounded translational feedback
+  and sampled geofence/tilt guards. Neither loop has integral disturbance rejection
+  or angular-reference feedforward. There is no estimated-state feedback, continuous
+  safety guarantee, contact/disarming model or hardware abort policy. No generic
+  integration callback or adaptive step size exists.
 - ESKF mathematical primitives require same-epoch observations. The replay runner now
   enforces this with explicit stale rejection; its recorded-run adapter requires full-rate,
   paired, zero-delay IMU and a supplied prior at the first sample time. No delayed
@@ -2214,12 +2234,17 @@ the final high-accuracy simulation method, especially for larger time steps or l
     `39e27daeceef755cc1b12a54a3571e935b9d9c76`. G3 evidence includes an explicit full-state
     NEES undercoverage finding; it is not an unqualified statistical-consistency pass.
     Any changed estimator/calibration must use a new protocol and new held-out seeds.
-    G2 baseline control remains separate and open. Live estimator transport,
+    G2 true-state baseline control is documented separately below. Live estimator transport,
     delayed fusion, ROS 2, PX4 and C++ integration are not part of this completion boundary.
 11. The Week 7 baseline attitude/rate inner loop is implemented with explicit limits,
     feasible allocation, deterministic motorized execution, independent physical tests
     and frozen recovery/step/disturbance evidence. See the
     [control verification record](docs/progress/2026-09-24-baseline-attitude-control.md).
-    The next bounded milestone is the master plan's position/velocity outer loop and
-    baseline hover/waypoint mission validation, using this inner loop. It must establish
-    the remaining G2 criteria before a G2-complete claim or estimated-state integration.
+    The subsequent position/mission milestone reuses this unchanged inner loop.
+12. The Week 8 true-state position/velocity cascade and baseline missions satisfy their
+    frozen numerical targets: full 60-second hover, square/vertical-step/mild-wind cases,
+    10/10 deterministic held-out missions below 0.15 m position RMSE, no sustained
+    actuator saturation, explicit sampled guards, complete evidence and plots. See the
+    [mission verification record](docs/progress/2026-09-24-position-control-and-missions.md).
+    Estimated-state feedback remains a separate integration task with an explicit
+    sensor/estimator/control timing and initialization contract; it is not implemented here.

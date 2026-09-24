@@ -15,6 +15,7 @@ Record architectural or version changes here as numbered decision records, such 
 ## Control contracts
 
 - [0011: Bounded cascaded attitude and body-rate baseline](0011-baseline-attitude-control.md)
+- [0012: True-state position control and baseline missions](0012-position-control-and-missions.md)
 
 ## Template
 

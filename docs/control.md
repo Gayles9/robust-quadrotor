@@ -6,8 +6,9 @@ true-state six-degree-of-freedom execution harness. The decision and acceptance 
 are in [ADR 0011](decisions/0011-baseline-attitude-control.md); measured outcomes are in the
 [verification record](progress/2026-09-24-baseline-attitude-control.md).
 
-This is the Week 7 baseline inner loop. It does not regulate position or altitude.
-G2 remains open until the separate position/mission milestone. The ESKF is not in this
+This page describes the Week 7 inner loop, which alone does not regulate position or altitude.
+The subsequent [position/mission layer](position-control.md) composes it with translational
+feedback and documents the G2 true-state numerical evidence. The ESKF is not in this
 feedback path, and the inner-loop evidence is not evidence of estimated-state flight.
 
 ## Frames, signals and interface boundaries

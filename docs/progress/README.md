@@ -4,6 +4,7 @@ Every work session records its objective, concepts learned, changes, verificatio
 
 ## Control verification
 
+- [2026-09-24: Position/velocity cascade and baseline mission evidence](2026-09-24-position-control-and-missions.md)
 - [2026-09-24: Baseline attitude/rate control and recovery evidence](2026-09-24-baseline-attitude-control.md)
 
 ## Recent estimator verification records
