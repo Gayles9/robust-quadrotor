@@ -206,6 +206,11 @@ The new harness is separate from sensor generation and ESKF replay. Position and
 hold are not implemented; **G2 remains open** for the position/mission milestone.
 The local gate passes **2,659 tests**; all 14 fixed/refinement cases, five development
 cases and 30 held-out attitude recoveries pass their declared criteria.
+Published implementation
+[`f589082e`](https://github.com/Gayles9/robust-quadrotor/commit/f589082e004e044aea05e9bbbc2ae9741474767e)
+also passes [GitHub CI](https://github.com/Gayles9/robust-quadrotor/actions/runs/35946303612).
+The second audit verifies all published file objects, clean-checkout execution and
+physical consistency of every retained control trial.
 
 The repository does not yet contain a reusable physically conditional invariant-monitoring
 API, a position/mission controller, a live estimator service, adaptive integration, or a completed

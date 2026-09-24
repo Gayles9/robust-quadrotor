@@ -197,6 +197,48 @@ regression testing also exercises every existing subsystem without altering its 
 The source hash is checked before and after each campaign; held-out outcomes were not
 used to tune gains, physical parameters or thresholds.
 
+## Published implementation and second audit
+
+Implementation commit:
+[f589082e004e044aea05e9bbbc2ae9741474767e](https://github.com/Gayles9/robust-quadrotor/commit/f589082e004e044aea05e9bbbc2ae9741474767e).
+Tree: ec133dfba722516e0ceb563f3ebf8bb40a970387.
+[Pull request 8](https://github.com/Gayles9/robust-quadrotor/pull/8) contains 13 scoped
+files. All 132 published file objects match the local tested checkout; the executable
+source digest remains identical to the prevalidation freeze.
+
+[GitHub CI run 35946303612](https://github.com/Gayles9/robust-quadrotor/actions/runs/35946303612)
+passed on 2026-09-24 against the implementation commit's pull-request merge candidate.
+The hosted locked install, Ruff, formatting and strict mypy checks passed, and
+**2,659 tests passed in 102.11 s**. The code was then reviewed against the published tree
+and the retained physical evidence.
+
+A clean checkout of that published commit ran:
+
+~~~bash
+.venv/bin/python -m experiments.attitude_control_validation --partition smoke --workers 2 --output "$ATTITUDE_EVIDENCE/published-smoke.json"
+~~~
+
+Both smoke jobs passed and the report revalidated. Its provenance records the exact
+implementation commit, a clean working tree and the frozen source hash. This verifies
+published execution/provenance, not the four-second recovery acceptance.
+
+The second audit independently reconstructs collective thrust and rotor moments with
+the numerical allocation matrix from all 49 retained fixed/development/held-out histories.
+It checks actual/commanded rotor bounds, moment clipping, allocation-ray consistency,
+unit quaternions and the complete report ledgers. Maximum absolute residuals are:
+
+| Check | Maximum residual |
+| --- | --- |
+| Quaternion squared-norm defect | 4.441×10⁻¹⁶ |
+| Commanded collective versus 9.81 N | 3.553×10⁻¹⁵ N |
+| Reconstructed allocated moment | 2.944×10⁻¹⁶ N m |
+| Reconstructed actual rotor moment | 3.174×10⁻¹⁶ N m |
+| Allocated versus scaled clipped moment | 4.997×10⁻¹⁶ N m |
+
+Every command and actual rotor speed remains in [0,900] rad/s. The review found no
+remaining scoped correctness defect. The accompanying documentation-only closeout
+does not change any executed source, test, dependency or CI byte.
+
 ## Remaining technical boundary
 
 The result supports the declared local, matched-model, true-state inner-loop baseline.
