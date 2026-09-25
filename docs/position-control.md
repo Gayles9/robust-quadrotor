@@ -8,7 +8,9 @@ loop. [ADR 0012](decisions/0012-position-control-and-missions.md) defines the sc
 and predeclared acceptance; the [verification record](progress/2026-09-24-position-control-and-missions.md)
 records actual results and limitations.
 
-This is **true-state simulation feedback**, not an ESKF/control integration. Truth
+This guide documents **true-state simulation feedback**. The separate
+[estimated-feedback integration](estimated-feedback.md) reuses the same control
+laws and plant with causal sensor/ESKF inputs. Truth
 plant parameters are separately supplied; the pure controller has only its own
 nominal mass/gravity, gains and limits. There is no hidden integral, RNG, sensor,
 truth-parameter lookup, drag compensation or reference-rate feedforward.

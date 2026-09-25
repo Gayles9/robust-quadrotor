@@ -23,6 +23,31 @@ Mean position RMSE was .06739 m versus .06809 m. There were no numerical failure
 nominal/gated divergences, and the declared bias/fault/recovery targets passed. This
 supports improved consistency for the tested distribution; it is not a universal guarantee.
 
+## Causal online execution and mission feedback
+
+`EskfOnlineEstimator` in `eskf_online.py` exposes the same prediction/correction
+mathematics as caller-driven, measurement-only epochs. `step` receives time,
+paired IMU samples and the current epoch's delivered slow observations. Its first
+sample must coincide with the explicit prior; subsequent times strictly increase.
+Invalid or numerically failed calls do not consume an epoch or partially update
+continuation state. Returned snapshots own their arrays independently.
+
+Both propagation modes remain supported. Endpoint mode preserves the full
+21-coordinate joint covariance and six conditional sample-noise means privately
+between calls. The returned `EskfOnlineEstimate` contains the 15-state physical
+covariance and the posterior instantaneous rate estimate: measured gyro minus
+estimated gyro bias minus conditional current gyro sample-noise mean. First-order
+mode has no sample-noise mean. The online/offline shared correction path preserves
+position-before-altitude fusion, innovation gates and stale/disabled dispositions.
+
+`simulate_estimated_mission` connects endpoint estimates to the unchanged cascade
+without truth-derived controller inputs or completion. See the
+[integration guide](estimated-feedback.md) for exact timing, sensor generation,
+independent prior, ownership, evidence format and the separate truth safety oracle.
+This synchronous numerical integration is not a real-time flight service and adds
+neither automatic startup alignment nor delayed-state rewind. Its performance
+record remains separate from the known-prior statistical-calibration campaign above.
+
 ## State, prediction and correction
 
 The nominal state is `(position_W, velocity_W, q_WB, accelerometer_bias_B,

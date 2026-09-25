@@ -25,7 +25,11 @@ from experiments.attitude_control_validation import (
     canonical_json,
     source_sha256,
 )
-from quadrotor_math.attitude_control import AttitudeControllerParameters, attitude_error_body
+from quadrotor_math.attitude_control import (
+    AttitudeControllerParameters,
+    attitude_error_body,
+    compute_attitude_control,
+)
 from quadrotor_math.mission_simulation import MissionNumerics, MissionResult, simulate_mission
 from quadrotor_math.missions import (
     MissionPhase,
@@ -400,8 +404,17 @@ def _execute(job: dict[str, Any]) -> dict[str, Any]:
         }
 
 
-def _validate_history(job: dict[str, Any], result: MissionResult) -> None:
+def _validate_history(
+    job: dict[str, Any],
+    result: MissionResult,
+    *,
+    position_controller: PositionControllerParameters | None = None,
+    attitude_controller: AttitudeControllerParameters | None = None,
+) -> None:
     initial, _, _, outer, inner, plan, safety, numerics = make_case(job)
+    # Explicit alternate experiment profiles; historical defaults stay unchanged.
+    outer = outer if position_controller is None else position_controller
+    inner = inner if attitude_controller is None else attitude_controller
     n = len(result.time_s)
     expected = np.arange(n) * numerics.time_step_s
     if (
@@ -463,6 +476,31 @@ def _validate_history(job: dict[str, Any], result: MissionResult) -> None:
                     or result.collective_thrust[j] != held.collective_thrust
                 ):
                     raise ValueError("stored held attitude/thrust does not match outer law")
+                command = compute_attitude_control(
+                    result.q_WB[index],
+                    result.omega_B[index],
+                    held.q_reference_WB,
+                    held.collective_thrust,
+                    inner,
+                )
+                expected_inner: dict[str, Any] = {
+                    "commanded_rotor_omega": command.allocation.commanded_rotor_omega,
+                    "desired_omega_B": command.desired_omega_B,
+                    "moment_requested_B": command.moment_requested_B,
+                    "moment_limited_B": command.moment_limited_B,
+                    "allocated_moment_B": command.allocation.allocated_moment_B,
+                    "moment_scale": command.allocation.moment_scale,
+                    "inner_limit_flags": [
+                        command.rate_limited,
+                        command.moment_limited,
+                        command.allocation.moment_scale < 1,
+                    ],
+                }
+                if any(
+                    not np.array_equal(getattr(result, name)[j], value)
+                    for name, value in expected_inner.items()
+                ):
+                    raise ValueError("stored true-feedback inner command does not match its law")
             if (
                 supervisor.phase != MissionPhase.ABORT
                 and index < n - 1

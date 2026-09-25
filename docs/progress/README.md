@@ -2,10 +2,21 @@
 
 Every work session records its objective, concepts learned, changes, verification evidence, blockers, and next exact action.
 
+## Current closeout
+
+- [2026-09-25: Repository audit and feedback baseline selection](2026-09-25-repository-audit.md)
+- [2026-09-25: Fixed-duration minimum-snap trajectories](2026-09-25-minimum-snap.md)
+
 ## Control verification
 
+- [2026-09-24: Joint feedback design and qualification](2026-09-24-feedback-design.md)
+- [2026-09-24: Causal ESKF feedback and paired mission evidence](2026-09-24-estimated-state-feedback.md)
 - [2026-09-24: Position/velocity cascade and baseline mission evidence](2026-09-24-position-control-and-missions.md)
 - [2026-09-24: Baseline attitude/rate control and recovery evidence](2026-09-24-baseline-attitude-control.md)
+
+- [2026-09-24: Bounded joint-design rejection](2026-09-24-feedback-codesign.md)
+- [2026-09-24: Translational feedback diagnosis](2026-09-24-translational-feedback-design.md)
+- [2026-09-24: Startup channel substitutions](2026-09-24-feedback-startup-diagnostic.md)
 
 ## Recent estimator verification records
 

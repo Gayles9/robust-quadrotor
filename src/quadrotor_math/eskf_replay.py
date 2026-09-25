@@ -21,6 +21,7 @@ from .eskf import (
     update_eskf_local_position,
 )
 from .eskf_endpoint import (
+    EskfEndpointState,
     EskfSampledImuNoise,
     initialize_eskf_endpoint,
     predict_eskf_endpoint,
@@ -377,6 +378,105 @@ class EskfReplayResult:
         object.__setattr__(self, "events", tuple(events))
 
 
+def _correct_eskf_epoch(
+    state: EskfNominalState,
+    covariance: NDArray[np.float64],
+    endpoint: EskfEndpointState | None,
+    observations: tuple[EskfReplayObservation, ...],
+    index: int,
+    configuration: EskfReplayConfiguration,
+) -> tuple[
+    EskfNominalState,
+    NDArray[np.float64],
+    EskfEndpointState | None,
+    tuple[EskfReplayEvent, ...],
+]:
+    """Shared ordered correction; replay/online callers validate delivery identities."""
+    events: list[EskfReplayEvent] = []
+    for observation in observations:
+        if observation.acquisition_index != index:
+            events.append(EskfReplayEvent(observation, EskfReplayStatus.STALE))
+            continue
+        position = observation.kind is EskfObservationKind.LOCAL_POSITION
+        enabled = (
+            configuration.fuse_local_position
+            if position
+            else configuration.fuse_barometric_altitude
+        )
+        if not enabled:
+            events.append(EskfReplayEvent(observation, EskfReplayStatus.DISABLED))
+            continue
+        innovation = None
+        threshold = None
+        if configuration.innovation_policy is not None:
+            policy = configuration.innovation_policy
+            if position:
+                predicted, jacobian = eskf_local_position_measurement_model(
+                    state, configuration.local_position_bias_W
+                )
+                noise = configuration.local_position_noise_covariance_W
+                threshold = policy.local_position_nis_threshold
+            else:
+                predicted, jacobian = eskf_barometric_altitude_measurement_model(
+                    state,
+                    configuration.barometric_reference_altitude,
+                    configuration.barometric_altitude_bias,
+                )
+                noise = np.array([[configuration.barometric_altitude_noise_variance]])
+                threshold = policy.barometric_altitude_nis_threshold
+            innovation = compute_eskf_linear_innovation(
+                covariance, observation.measurement, predicted, jacobian, noise
+            )
+            if threshold is not None and innovation.normalized_innovation_squared > threshold:
+                events.append(
+                    EskfReplayEvent(
+                        observation,
+                        EskfReplayStatus.REJECTED,
+                        innovation=innovation,
+                        nis_threshold=threshold,
+                    )
+                )
+                continue
+        if endpoint is not None:
+            if position:
+                predicted, jacobian = eskf_local_position_measurement_model(
+                    state, configuration.local_position_bias_W
+                )
+                noise = configuration.local_position_noise_covariance_W
+            else:
+                predicted, jacobian = eskf_barometric_altitude_measurement_model(
+                    state,
+                    configuration.barometric_reference_altitude,
+                    configuration.barometric_altitude_bias,
+                )
+                noise = np.array([[configuration.barometric_altitude_noise_variance]])
+            endpoint, update = update_eskf_endpoint(
+                endpoint, observation.measurement, predicted, jacobian, noise
+            )
+        elif position:
+            update = update_eskf_local_position(
+                state,
+                covariance,
+                observation.measurement,
+                configuration.local_position_noise_covariance_W,
+                configuration.local_position_bias_W,
+            )
+        else:
+            update = update_eskf_barometric_altitude(
+                state,
+                covariance,
+                float(observation.measurement[0]),
+                configuration.barometric_altitude_noise_variance,
+                configuration.barometric_reference_altitude,
+                configuration.barometric_altitude_bias,
+            )
+        state, covariance = update.nominal_state, update.covariance
+        events.append(
+            EskfReplayEvent(observation, EskfReplayStatus.FUSED, update, innovation, threshold)
+        )
+    return state, covariance, endpoint, tuple(events)
+
+
 def replay_eskf(data: EskfReplayInput, configuration: EskfReplayConfiguration) -> EskfReplayResult:
     """Execute a causal replay with the explicitly configured IMU propagation.
 
@@ -432,87 +532,10 @@ def replay_eskf(data: EskfReplayInput, configuration: EskfReplayConfiguration) -
                 configuration.continuous_noise_covariance,
                 float(time_s - data.time_s[index - 1]),
             )
-        for observation in delivered.get(index, ()):
-            if observation.acquisition_index != index:
-                events.append(EskfReplayEvent(observation, EskfReplayStatus.STALE))
-                continue
-            position = observation.kind is EskfObservationKind.LOCAL_POSITION
-            enabled = (
-                configuration.fuse_local_position
-                if position
-                else configuration.fuse_barometric_altitude
-            )
-            if not enabled:
-                events.append(EskfReplayEvent(observation, EskfReplayStatus.DISABLED))
-                continue
-            innovation = None
-            threshold = None
-            if configuration.innovation_policy is not None:
-                policy = configuration.innovation_policy
-                if position:
-                    predicted, jacobian = eskf_local_position_measurement_model(
-                        state, configuration.local_position_bias_W
-                    )
-                    noise = configuration.local_position_noise_covariance_W
-                    threshold = policy.local_position_nis_threshold
-                else:
-                    predicted, jacobian = eskf_barometric_altitude_measurement_model(
-                        state,
-                        configuration.barometric_reference_altitude,
-                        configuration.barometric_altitude_bias,
-                    )
-                    noise = np.array([[configuration.barometric_altitude_noise_variance]])
-                    threshold = policy.barometric_altitude_nis_threshold
-                innovation = compute_eskf_linear_innovation(
-                    covariance, observation.measurement, predicted, jacobian, noise
-                )
-                if threshold is not None and innovation.normalized_innovation_squared > threshold:
-                    events.append(
-                        EskfReplayEvent(
-                            observation,
-                            EskfReplayStatus.REJECTED,
-                            innovation=innovation,
-                            nis_threshold=threshold,
-                        )
-                    )
-                    continue
-            if endpoint is not None:
-                if position:
-                    predicted, jacobian = eskf_local_position_measurement_model(
-                        state, configuration.local_position_bias_W
-                    )
-                    noise = configuration.local_position_noise_covariance_W
-                else:
-                    predicted, jacobian = eskf_barometric_altitude_measurement_model(
-                        state,
-                        configuration.barometric_reference_altitude,
-                        configuration.barometric_altitude_bias,
-                    )
-                    noise = np.array([[configuration.barometric_altitude_noise_variance]])
-                endpoint, update = update_eskf_endpoint(
-                    endpoint, observation.measurement, predicted, jacobian, noise
-                )
-            elif position:
-                update = update_eskf_local_position(
-                    state,
-                    covariance,
-                    observation.measurement,
-                    configuration.local_position_noise_covariance_W,
-                    configuration.local_position_bias_W,
-                )
-            else:
-                update = update_eskf_barometric_altitude(
-                    state,
-                    covariance,
-                    float(observation.measurement[0]),
-                    configuration.barometric_altitude_noise_variance,
-                    configuration.barometric_reference_altitude,
-                    configuration.barometric_altitude_bias,
-                )
-            state, covariance = update.nominal_state, update.covariance
-            events.append(
-                EskfReplayEvent(observation, EskfReplayStatus.FUSED, update, innovation, threshold)
-            )
+        state, covariance, endpoint, epoch_events = _correct_eskf_epoch(
+            state, covariance, endpoint, tuple(delivered.get(index, ())), index, configuration
+        )
+        events.extend(epoch_events)
         states.append(state)
         covariances[index] = covariance
     events.extend(EskfReplayEvent(o, EskfReplayStatus.PENDING) for o in delivered.get(-1, ()))

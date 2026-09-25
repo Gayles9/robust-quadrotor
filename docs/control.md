@@ -8,8 +8,10 @@ are in [ADR 0011](decisions/0011-baseline-attitude-control.md); measured outcome
 
 This page describes the Week 7 inner loop, which alone does not regulate position or altitude.
 The subsequent [position/mission layer](position-control.md) composes it with translational
-feedback and documents the G2 true-state numerical evidence. The ESKF is not in this
-feedback path, and the inner-loop evidence is not evidence of estimated-state flight.
+feedback and documents the G2 true-state numerical evidence. The separate
+[estimated-feedback integration](estimated-feedback.md) now supplies ESKF outputs
+to the same controller interfaces. The original true-state inner-loop evidence is
+not evidence of estimated-state or hardware flight.
 
 ## Frames, signals and interface boundaries
 

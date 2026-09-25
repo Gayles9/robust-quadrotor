@@ -1,0 +1,396 @@
+"""Causal sensor -> endpoint ESKF -> existing cascade, with explicit truth isolation."""
+
+from dataclasses import dataclass, replace
+
+import numpy as np
+from numpy.typing import NDArray
+
+from .attitude_control import AttitudeControllerParameters
+from .attitude_simulation import State, _wrench
+from .dynamics import quadratic_drag_force_body, translational_acceleration_world_from_body_force
+from .eskf_online import EskfOnlineEstimator
+from .eskf_replay import (
+    EskfObservationKind,
+    EskfReplayConfiguration,
+    EskfReplayEvent,
+    EskfReplayInput,
+    EskfReplayObservation,
+    EskfReplayResult,
+    EskfReplayStatus,
+    _owned_array,
+    _scalar,
+)
+from .eskf_run_replay import _first_delivery_index
+from .imu import (
+    accelerometer_bias_random_walk_step_body,
+    accelerometer_specific_force_measurement_body,
+    gyroscope_angular_velocity_measurement_body,
+    gyroscope_bias_random_walk_step_body,
+    ideal_accelerometer_specific_force_body,
+)
+from .mission_simulation import MissionNumerics, MissionResult, _simulate_mission
+from .missions import MissionPlan, MissionSafetyLimits
+from .position_control import PositionControllerParameters
+from .position_sensors import (
+    barometric_altitude_measurement,
+    ideal_barometric_altitude_from_position_world,
+    position_measurement_world,
+)
+from .randomness import create_run_random_streams
+from .rotations import rotation_matrix_body_to_world
+from .run_configuration import (
+    ImuParameters,
+    PositionSensorParameters,
+    RigidBodyInitialState,
+    RigidBodyParameters,
+    RotorParameters,
+    SensorSchedule,
+    WorldParameters,
+)
+from .sensor_scheduling import FixedRateSensorScheduler, _time_comparison_tolerance_s
+
+
+@dataclass(frozen=True, slots=True, eq=False)
+class MissionSensors:
+    """Truth measurement distributions and slow schedules, never estimator assumptions.
+
+    IMU is paired at every plant epoch including zero, without delivery delay.
+    Slow schedules start at their first positive period, using the existing
+    scheduler. Bias walks advance once per completed plant interval. All six
+    independent named streams derive from root_seed under randomness version 1.
+    """
+
+    imu: ImuParameters
+    position: PositionSensorParameters
+    local_position_schedule: SensorSchedule
+    barometric_altitude_schedule: SensorSchedule
+    root_seed: int
+
+    def __post_init__(self) -> None:
+        for name, kind in (
+            ("imu", ImuParameters),
+            ("position", PositionSensorParameters),
+            ("local_position_schedule", SensorSchedule),
+            ("barometric_altitude_schedule", SensorSchedule),
+        ):
+            value = getattr(self, name)
+            if not isinstance(value, kind):
+                raise TypeError(f"{name} must be {kind.__name__}")
+            object.__setattr__(self, name, replace(value))
+        for name in ("local_position_schedule", "barometric_altitude_schedule"):
+            value = getattr(self, name)
+            _scalar("sample_period_s", value.sample_period_s, nonnegative=True)
+            _scalar("delivery_delay_s", value.delivery_delay_s, nonnegative=True)
+        if type(self.root_seed) is not int or not 0 <= self.root_seed < 2**128:
+            raise ValueError("root_seed must be a non-Boolean integer in [0, 2**128)")
+
+
+@dataclass(frozen=True, slots=True, eq=False)
+class EstimatedMissionResult:
+    """Owned full-grid truth, sensor and online estimate evidence (ADR 0013).
+
+    mission retains true state, but commands and completion used estimates.
+    Slow timestamps are aligned with measurements.observations (canonical
+    delivery order, then pending). True biases are evaluation-only FRD SI values.
+    The 6-column noise mean is endpoint accelerometer/gyro conditional sample
+    noise; rate feedback subtracts its final three columns and the estimated bias.
+    No physical ground contact or deployable safety guarantee is represented.
+    """
+
+    mission: MissionResult
+    measurements: EskfReplayInput
+    estimates: EskfReplayResult
+    angular_velocity_estimate_B: NDArray[np.float64]
+    imu_noise_mean_B: NDArray[np.float64]
+    true_accelerometer_bias_B: NDArray[np.float64]
+    true_gyroscope_bias_B: NDArray[np.float64]
+    scheduled_observation_delivery_time_s: NDArray[np.float64]
+
+    def __post_init__(self) -> None:
+        for name, kind in (
+            ("mission", MissionResult),
+            ("measurements", EskfReplayInput),
+            ("estimates", EskfReplayResult),
+        ):
+            value = getattr(self, name)
+            if not isinstance(value, kind):
+                raise TypeError(f"{name} must be {kind.__name__}")
+            object.__setattr__(self, name, replace(value))
+        times = self.mission.time_s
+        if not (
+            np.array_equal(times, self.measurements.time_s)
+            and np.array_equal(times, self.estimates.time_s)
+        ):
+            raise ValueError("truth, measurement and estimate clocks must exactly agree")
+        n = len(times)
+        for name, width in (
+            ("angular_velocity_estimate_B", 3),
+            ("imu_noise_mean_B", 6),
+            ("true_accelerometer_bias_B", 3),
+            ("true_gyroscope_bias_B", 3),
+        ):
+            object.__setattr__(self, name, _owned_array(name, getattr(self, name), (n, width)))
+        obs = self.measurements.observations
+        scheduled = _owned_array(
+            "scheduled_observation_delivery_time_s",
+            self.scheduled_observation_delivery_time_s,
+            (len(obs),),
+        )
+        if len(self.estimates.events) != len(obs):
+            raise ValueError("every acquired slow observation requires exactly one disposition")
+        for o, event, delivery_time in zip(obs, self.estimates.events, scheduled, strict=True):
+            e = event.observation
+            if (o.kind, o.observation_index, o.acquisition_index, o.delivery_index) != (
+                e.kind,
+                e.observation_index,
+                e.acquisition_index,
+                e.delivery_index,
+            ) or not np.array_equal(o.measurement, e.measurement):
+                raise ValueError("event ledger must match the complete acquisition ledger")
+            if delivery_time < times[o.acquisition_index] or (
+                _first_delivery_index(times, float(delivery_time)) != o.delivery_index
+            ):
+                raise ValueError("scheduled delivery must match the actual causal arrival")
+        object.__setattr__(self, "scheduled_observation_delivery_time_s", scheduled)
+        with np.errstate(over="ignore", invalid="ignore"):
+            rate = (
+                self.measurements.angular_velocity_measurements_B
+                - np.array([s.gyroscope_bias_B for s in self.estimates.states])
+                - self.imu_noise_mean_B[:, 3:]
+            )
+        if not np.array_equal(rate, self.angular_velocity_estimate_B):
+            raise ValueError("rate feedback must equal measured gyro minus posterior bias/noise")
+
+
+@dataclass(slots=True)
+class _SlowRecord:
+    kind: EskfObservationKind
+    source_index: int
+    acquisition_index: int
+    scheduled_time_s: float
+    value: NDArray[np.float64]
+    delivery_index: int = -1
+
+    def observation(self) -> EskfReplayObservation:
+        return EskfReplayObservation(
+            self.kind, self.source_index, self.acquisition_index, self.delivery_index, self.value
+        )
+
+
+def simulate_estimated_mission(
+    initial_state: RigidBodyInitialState,
+    initial_actual_rotor_omega: NDArray[np.float64],
+    truth_body: RigidBodyParameters,
+    truth_rotors: RotorParameters,
+    truth_world: WorldParameters,
+    position_controller: PositionControllerParameters,
+    attitude_controller: AttitudeControllerParameters,
+    plan: MissionPlan,
+    safety: MissionSafetyLimits,
+    numerics: MissionNumerics,
+    sensors: MissionSensors,
+    estimator_configuration: EskfReplayConfiguration,
+) -> EstimatedMissionResult:
+    """Execute measurements and ESKF before same-epoch feedback, without lookahead.
+
+    The explicit prior must be at t=0 and endpoint noise must be configured.
+    Inputs are snapshotted. The truth plant, safety oracle and sensor producer
+    are separate from the measurement-only estimator and pure controllers.
+    Every epoch including an immediate abort is sampled and recorded. Sensor
+    or estimator arithmetic failures raise without returning a partial mission;
+    sampled safety/domain/timeout aborts retain their entire terminal history.
+    """
+    if not isinstance(sensors, MissionSensors) or not isinstance(
+        estimator_configuration, EskfReplayConfiguration
+    ):
+        raise TypeError("sensors and estimator configuration must use their dataclasses")
+    if not isinstance(numerics, MissionNumerics) or not isinstance(plan, MissionPlan):
+        raise TypeError("numerics and plan must use their dataclasses")
+    sensors, config, numerics, plan = (
+        replace(sensors),
+        replace(estimator_configuration),
+        replace(numerics),
+        replace(plan),
+    )
+    if config.initial_time_s != 0 or config.sampled_imu_noise is None:
+        raise ValueError("estimated mission requires an endpoint ESKF prior at zero")
+    for value, kind in (
+        (truth_body, RigidBodyParameters),
+        (truth_rotors, RotorParameters),
+        (truth_world, WorldParameters),
+    ):
+        if not isinstance(value, kind):
+            raise TypeError("truth models must use their dataclasses")
+    body, rotors, world = replace(truth_body), replace(truth_rotors), replace(truth_world)
+    dt = numerics.time_step_s
+    horizon = plan.reference_duration_s + plan.completion_timeout_s + dt
+    if dt <= 2 * _time_comparison_tolerance_s(horizon, horizon):
+        raise ValueError("plant clock must resolve sensor scheduler tolerance")
+    schedules = (sensors.local_position_schedule, sensors.barometric_altitude_schedule)
+    schedulers = tuple(
+        FixedRateSensorScheduler[NDArray[np.float64]](
+            sample_period_s=s.sample_period_s,
+            truth_time_step_s=dt,
+            delivery_delay_s=s.delivery_delay_s,
+        )
+        for s in schedules
+    )
+    records: tuple[list[_SlowRecord], list[_SlowRecord]] = ([], [])
+    stream = EskfOnlineEstimator(config)
+    rng = create_run_random_streams(sensors.root_seed)
+    imu, position = sensors.imu, sensors.position
+    bias_a, bias_g = imu.initial_accelerometer_bias_B, imu.initial_gyroscope_bias_B
+    force_rows: list[NDArray[np.float64]] = []
+    gyro_rows: list[NDArray[np.float64]] = []
+    bias_a_rows: list[NDArray[np.float64]] = []
+    bias_g_rows: list[NDArray[np.float64]] = []
+    states = []
+    covariance_rows: list[NDArray[np.float64]] = []
+    rate_rows: list[NDArray[np.float64]] = []
+    noise_rows: list[NDArray[np.float64]] = []
+    events: list[EskfReplayEvent] = []
+
+    def observe(k: int, time: float, truth: State, actual: NDArray[np.float64]) -> State:
+        nonlocal bias_a, bias_g
+        if k:
+            bias_a = accelerometer_bias_random_walk_step_body(
+                bias_a,
+                imu.accelerometer_bias_random_walk_density_B,
+                dt,
+                rng.accelerometer_bias_random_walk,
+            )
+            bias_g = gyroscope_bias_random_walk_step_body(
+                bias_g,
+                imu.gyroscope_bias_random_walk_density_B,
+                dt,
+                rng.gyroscope_bias_random_walk,
+            )
+        R_WB = rotation_matrix_body_to_world(truth[2])
+        force_B = _wrench(actual, rotors)[0] + quadratic_drag_force_body(
+            truth[1], R_WB, world.wind_velocity_W, body.quadratic_drag_coefficient_B
+        )
+        acceleration_W = translational_acceleration_world_from_body_force(
+            force_B, R_WB, body.mass, world.gravity_acceleration
+        )
+        specific_force = ideal_accelerometer_specific_force_body(
+            acceleration_W, R_WB, world.gravity_acceleration
+        )
+        measured_force = accelerometer_specific_force_measurement_body(
+            specific_force,
+            bias_a,
+            imu.accelerometer_noise_standard_deviation_B,
+            rng.accelerometer_measurement_noise,
+        )
+        measured_rate = gyroscope_angular_velocity_measurement_body(
+            truth[3],
+            bias_g,
+            imu.gyroscope_noise_standard_deviation_B,
+            rng.gyroscope_measurement_noise,
+        )
+
+        def acquire_local(index: int, acquired: float) -> NDArray[np.float64]:
+            if index != k:
+                raise ValueError("slow acquisition must use only the current truth epoch")
+            value = position_measurement_world(
+                truth[0],
+                position.local_position_bias_W,
+                position.local_position_noise_standard_deviation_W,
+                rng.local_position_measurement_noise,
+            )
+            records[0].append(
+                _SlowRecord(
+                    EskfObservationKind.LOCAL_POSITION,
+                    len(records[0]),
+                    k,
+                    acquired + schedules[0].delivery_delay_s,
+                    value,
+                )
+            )
+            return value
+
+        def acquire_altitude(index: int, acquired: float) -> NDArray[np.float64]:
+            if index != k:
+                raise ValueError("slow acquisition must use only the current truth epoch")
+            value = np.array(
+                [
+                    barometric_altitude_measurement(
+                        ideal_barometric_altitude_from_position_world(
+                            truth[0], position.barometric_reference_altitude
+                        ),
+                        position.barometric_altitude_bias,
+                        position.barometric_altitude_noise_standard_deviation,
+                        rng.barometric_altitude_measurement_noise,
+                    )
+                ]
+            )
+            records[1].append(
+                _SlowRecord(
+                    EskfObservationKind.BAROMETRIC_ALTITUDE,
+                    len(records[1]),
+                    k,
+                    acquired + schedules[1].delivery_delay_s,
+                    value,
+                )
+            )
+            return value
+
+        delivered: list[EskfReplayObservation] = []
+        for scheduler, source, acquire in zip(
+            schedulers, records, (acquire_local, acquire_altitude), strict=True
+        ):
+            for delivery in scheduler.update(time, acquire):
+                record = source[delivery.sequence_index]
+                record.delivery_index = k
+                delivered.append(record.observation())
+        estimate = stream.step(time, measured_force, measured_rate, tuple(delivered))
+        force_rows.append(measured_force)
+        gyro_rows.append(measured_rate)
+        bias_a_rows.append(bias_a)
+        bias_g_rows.append(bias_g)
+        states.append(estimate.nominal_state)
+        covariance_rows.append(estimate.covariance)
+        rate_rows.append(estimate.angular_velocity_estimate_B)
+        noise_rows.append(estimate.imu_noise_mean_B)
+        events.extend(estimate.events)
+        state = estimate.nominal_state
+        return state.position_W, state.velocity_W, state.q_WB, estimate.angular_velocity_estimate_B
+
+    mission = _simulate_mission(
+        initial_state,
+        initial_actual_rotor_omega,
+        body,
+        rotors,
+        world,
+        position_controller,
+        attitude_controller,
+        plan,
+        safety,
+        numerics,
+        observe,
+    )
+    all_records = [r for source in records for r in source]
+    measurements = EskfReplayInput(
+        mission.time_s,
+        np.asarray(force_rows),
+        np.asarray(gyro_rows),
+        tuple(r.observation() for r in all_records),
+    )
+    events.extend(
+        EskfReplayEvent(o, EskfReplayStatus.PENDING)
+        for o in measurements.observations
+        if o.delivery_index == -1
+    )
+    estimates = EskfReplayResult(
+        mission.time_s, tuple(states), np.asarray(covariance_rows), tuple(events)
+    )
+    delivery_times = {(r.kind, r.source_index): r.scheduled_time_s for r in all_records}
+    return EstimatedMissionResult(
+        mission,
+        measurements,
+        estimates,
+        np.asarray(rate_rows),
+        np.asarray(noise_rows),
+        np.asarray(bias_a_rows),
+        np.asarray(bias_g_rows),
+        np.array([delivery_times[o.kind, o.observation_index] for o in measurements.observations]),
+    )
