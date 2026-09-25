@@ -1,5 +1,11 @@
 # 0014: Damped Estimated-Feedback Cascade
 
+Status update (2026-09-25): Luke authorized retaining the stronger existing
+reference with its measured limitations and proceeding to independent planning.
+The [same-case closeout](../progress/2026-09-25-repository-audit.md) selects explicit
+version 2. The historical instructions and failed qualification below describe
+the original design cycle; acceptance as a reference does not pass that gate.
+
 - Date: 2026-09-24
 - Audited commit: `94c074ef20d6e862f7143c39b00418799b5c4c6e`
 - Status: Versions 1 and 2 unqualified (29/30 and 28/30); further revision required

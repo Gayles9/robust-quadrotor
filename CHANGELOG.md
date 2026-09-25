@@ -4,6 +4,21 @@ All notable changes to this project will be documented in this file following a 
 
 ## [Unreleased]
 
+### 2026-09-25 audit and planning
+
+- Add a fixed-duration seventh-degree minimum-snap position solver with C3
+  continuity, prescribed endpoint derivatives, checked scaled optimization,
+  exact integrated cost and a fixed-yaw position-reference adapter.
+- Retain estimated-feedback version 2 as an explicitly limited numerical
+  reference after a same-case full-hover comparison. Original 8 cm qualification
+  failures and both historical profiles remain unchanged.
+- Condense the front page, preserve foundational mathematics in its own guide,
+  and add a current documentation map and status.
+- Remove the unused initial `vectors.squared_norm` scaffold and its sole test;
+  no active production caller existed.
+
+### Earlier milestones (partial historical list)
+
 ### Added
 
 - Pre-update ESKF innovation whitening and normalized innovation squared diagnostics;

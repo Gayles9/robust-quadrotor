@@ -1,80 +1,51 @@
-# Technical scope snapshot — 2026-09-24
+# Technical scope — 2026-09-25
 
-This is a scope estimate, not a release certification, a measure of elapsed time,
-or a claim of hardware readiness. The [latest verification record](progress/2026-09-24-feedback-design.md)
-is authoritative for the actual tested profile and results. Historical baselines
-remain reproducible and must not be confused with that separately named profile.
+The repository audit and baseline selection are recorded in the
+[closeout](progress/2026-09-25-repository-audit.md). Current development proceeds
+with a limited baseline; estimated-feedback hover qualification remains open.
 
-**Qualification is open.** The two frozen estimated-feedback profiles pass 29/30
-and 28/30 fresh cases. Both miss the unchanged .08 m hover target. Later gain and
-integral prototypes do not resolve the observed failures and are not promoted.
-The implemented numerical integration and its passing software checks must not
-be presented as completed hover-performance qualification.
-
-| Area | Implemented technical capability | Important boundary or remaining work |
+| Area | Implemented capability | Remaining boundary |
 | --- | --- | --- |
-| Physical and numerical foundation | NED/FRD rigid-body dynamics, quaternion utilities, rotor allocation and lag, wind/drag, Euler/RK4 histories and analytic/convergence checks | Illustrative parameters and numerical physics, not hardware identification or contact dynamics |
-| Sensors and reproducibility | IMU/position/altitude models, scheduled delivery, bias walks, named random streams, configurations, provenance, manifests and authenticated artifacts | Defined sensor/timing contracts; no claim that arbitrary hardware streams are supported |
-| Basic ESKF | Prediction, position/altitude correction, right-local reset, gating, replay, consistency/fault experiments and causal online execution | Explicit initial prior; full-rate paired zero-delay IMU for the supported composition; stale data rejected rather than rewound; weak hover heading observability |
-| Baseline feedback and missions | Attitude/rate and position/velocity cascade, feedforward, explicit limits, true/estimated-state execution, virtual takeoff/track/land/abort and paired evidence | Bounded numerical profiles; truth safety oracle is labeled separately; not a real emergency-flight policy |
-| Optimized trajectory generation | Existing hold, step and quintic mission references | Minimum-snap optimization, general waypoint constraint assembly and feasibility/time allocation are not implemented |
-| Advanced control | Baseline controller and test interfaces are available | Geometric tracking controller and fair advanced-versus-baseline comparison remain |
-| System fault tolerance | Estimator outlier gates and bounded mission guards exist | General fault scenarios, persistent health monitoring and degraded-mode policies remain; estimator rejection alone is not system fault tolerance |
-| Middleware and deployment | The mathematical package remains middleware-independent | ROS 2 wrappers, tested C++ component and PX4/Gazebo mission integration remain |
-| Final system evidence | Reproducible subsystem and bounded closed-loop campaigns exist | Broad cross-controller/fault evaluation, integrated demonstration and complete final technical report remain |
+| Plant and numerical foundation | NED/FRD dynamics, quaternions, motors/allocation, wind/drag, Euler/RK4 and analytical/convergence checks | Illustrative hardware parameters; no contact model |
+| Sensors and reproducibility | IMU, position/altitude, bias walks, scheduled delivery, truth/nominal models, authenticated artifacts and replay | Defined scheduling and numerical-backend contracts |
+| ESKF | Prediction, correction/reset, gates, replay, endpoint calibration and causal online execution | Explicit prior; full-rate paired zero-delay IMU in the supported composition; stale data rejected; weak hover heading observability |
+| Baseline control and missions | Attitude/rate and position/velocity cascade, true/estimated feedback, virtual takeoff/track/land/abort | Truth safety oracle is separate; no hardware emergency-flight policy |
+| Minimum-snap planning | Fixed-duration seventh-degree position optimization, C3 knots, prescribed endpoint derivatives, exact cost, checked evaluation through snap | Feasibility/time allocation and mission integration remain |
+| Advanced control | Reusable baseline interfaces | Geometric tracking controller and fair comparison remain |
+| System fault tolerance | Estimator outlier gates and bounded mission guards | Persistent health monitoring and degraded-mode policy remain |
+| Middleware/deployment | Independent Python core and earlier compatibility spike | ROS 2/C++, PX4/Gazebo mission integration remain |
+| Final evidence/report | Reproducible subsystem campaigns and a frozen report v1 | Broad integrated evaluation and an updated final technical report remain |
 
-## Approximate progress
+## Feedback closeout
 
-- **Standalone numerical system: approximately 65–70%.** This denominator includes
-  the planned trajectory, advanced-control and system fault-handling packages,
-  not just the already implemented simulator/filter/baseline controller.
-- **Full original technical project: approximately 45–50%.** This additionally
-  includes middleware/integration, the broad final experiment matrix and the
-  report/release/demonstration package.
+Use explicit `design_version=2` as the numerical reference. On the same six
+observed full hovers it lowers worst peak from 10.4950 to 9.1403 cm and mean peak
+from 7.5504 to 6.9123 cm, at about 2.06 times the mean squared-moment effort.
+It is not better on every individual case.
 
-These are coarse deliverable-based estimates against the six-month master plan.
-The strongest coverage is in the foundations, baseline-control and basic-estimator
-groups; several later groups are wholly unimplemented. The range acknowledges
-unequal package sizes and partially completed cross-cutting validation work.
-It is not obtained by dividing passed tests by a target test count, and it should
-not be read as a forecast of remaining effort. Passing a bounded campaign does
-not turn all robustness/integration work into completed scope.
+Original fresh results remain **29/30 for version 1 and 28/30 for version 2**.
+The unchanged 8 cm full-hold condition is still missed. No threshold, scoring
+window, gain, prior or sensor distribution changed in this closeout. The original
+profiles and failed diagnostics remain reproducible. No additional gain search
+or fresh feedback-validation campaign is authorized by this planner milestone.
 
-## Feedback qualification and stop decision
+The reported startup-readiness attempt is not present in the published source.
+Its failed outcome was reported in the preceding chat; it is not an accepted
+runtime option. No filter defect or fundamental performance limit was proven.
 
-The startup estimation/control coupling remains unresolved under the existing
-hover, actuator and timing requirements. The current draft cannot be promoted
-using its failed results. Any subsequently authorized architecture change still
-needs observed-case regressions, full replay and physical audits, and fresh
-validation after its complete source freeze.
-The [bounded startup diagnostic](progress/2026-09-24-feedback-startup-diagnostic.md)
-now shows that replacing position/velocity feedback with truth reduces the two
-observed startup peaks below 1 cm, while replacing attitude/rate feedback leaves
-both above 8 cm. This narrows the next design target to translational
-estimation/control coupling; it is diagnostic evidence, not a production fix.
-The subsequent [uncertainty and motor-response study](progress/2026-09-24-translational-feedback-design.md)
-finds no clear noise-calibration defect in the observed population. One fixed
-causal candidate improves both misses but still fails at 8.386 cm. It remains
-an explicitly rejected experiment; it motivated evaluating tracking,
-measurement-error amplification and actuator effort together.
+## Current completed step and next scope
 
-The [bounded joint-design cycle](progress/2026-09-24-feedback-codesign.md)
-has now evaluated that joint objective within a frozen 542-evaluation budget.
-Its one nonlinear candidate fails at 9.140/9.038 cm in the two difficult
-observed prefixes despite zero actuator limiting. The cycle is closed without
-promotion or fresh validation. **Do not continue automatic gain sweeps.**
-The next decision is architectural: explicitly keep the measured unqualified
-baseline, or authorize a separately scoped information/initialization/control
-change with a technical justification. No filter defect or fundamental
-infeasibility has been established. Existing progress estimates are unchanged.
+[ADR 0015](decisions/0015-minimum-snap-trajectory.md) defines the fixed-duration
+position solver. Its [verification record](progress/2026-09-25-minimum-snap.md)
+covers interpolation, endpoint/knot constraints, analytic cost, independent
+optimization, scaling laws and explicit numerical failures.
 
-After that qualification, audit the feedback milestone before the minimum-snap
-formulation: normalized-time seventh-order segments,
-derivatives through snap, exact integrated snap cost, waypoint/boundary/continuity
-constraints and a checked equality-constrained solve. Its evidence must include
-constraint residuals, knot continuity, comparison against a feasible non-optimal
-trajectory, time-scaling laws and explicit ill-conditioning failure behavior.
+The next bounded package is **trajectory feasibility/time allocation and
+integration with the true-state mission runner**. Begin by auditing this solver.
+Define the allowed trajectory, thrust/tilt/rate and geofence checks, duration
+adjustment limits and end-to-end mission acceptance before implementation.
+Preserve the original feedback failure records. Geometric control, estimator
+redesign, fault accommodation and ROS/PX4 are separate milestones.
 
-Trajectory feasibility/time allocation and closed-loop trajectory integration
-follow as their own bounded package. Geometric control, fault accommodation and
-ROS/PX4 integration must not be silently folded into the minimum-snap solver.
+Progress is tracked by these deliverables. Historical percentage estimates and
+test counts do not establish performance qualification or remaining effort.

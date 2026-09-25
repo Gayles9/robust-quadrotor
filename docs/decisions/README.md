@@ -2,6 +2,12 @@
 
 Record architectural or version changes here as numbered decision records, such as `0001-short-title.md`.
 
+## Foundation contracts
+
+- [0001: Python workflow](0001-python-workflow.md)
+- [0002: Frames](0002-frame-conventions.md)
+- [0003: Wind and drag](0003-environmental-wind-and-drag.md)
+
 ## ESKF contracts
 
 - [0004: Error-state conventions](0004-eskf-error-state-conventions.md)
@@ -18,6 +24,10 @@ Record architectural or version changes here as numbered decision records, such 
 - [0012: True-state position control and baseline missions](0012-position-control-and-missions.md)
 - [0013: Causal online ESKF and estimated-state mission feedback](0013-estimated-state-mission-feedback.md)
 - [0014: Joint cascade bandwidth and moment-matched initialization](0014-estimated-feedback-bandwidth.md)
+
+## Planning contracts
+
+- [0015: Fixed-duration minimum-snap position trajectories](0015-minimum-snap-trajectory.md)
 
 ## Template
 

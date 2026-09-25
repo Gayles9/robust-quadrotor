@@ -1,5 +1,9 @@
 # Estimated-feedback cascade design
 
+Current reference decision (2026-09-25): retain explicit `design_version=2` as
+the limited numerical reference after the [same-case comparison](progress/2026-09-25-repository-audit.md).
+The historical 8 cm qualification failures below remain unchanged.
+
 This is the bounded numerical profile in
 `experiments.feedback_bandwidth_validation`, developed to address the noisy-hover
 qualification in [ADR 0013](decisions/0013-estimated-state-mission-feedback.md).

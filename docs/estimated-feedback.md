@@ -1,5 +1,9 @@
 # Estimated-State Mission Feedback
 
+For the current reference choice and retained hover limitation, see the
+[2026-09-25 closeout](progress/2026-09-25-repository-audit.md). This guide retains
+the original integration contract and historical campaign results.
+
 This layer connects the existing sensor models and endpoint error-state Kalman
 filter (ESKF) to the existing position/attitude cascade. The controller laws and
 gains are unchanged. The new work is the causal execution and information boundary,
