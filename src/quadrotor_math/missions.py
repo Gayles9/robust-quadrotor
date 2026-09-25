@@ -12,8 +12,10 @@ import numpy as np
 from numpy.typing import NDArray
 
 from .attitude_control import _array, _quaternion, _scalar
+from .minimum_snap import MinimumSnapTrajectory
 from .position_control import PositionReference, _finite_scalar
 from .rotations import rotation_matrix_body_to_world
+from .trajectory_feasibility import C3_TOLERANCE, validate_trajectory_continuity
 
 
 class MissionPhase(IntEnum):
@@ -29,6 +31,7 @@ class ReferenceKind(StrEnum):
     HOLD = "hold"
     SMOOTH = "smooth"
     STEP = "step"
+    MINIMUM_SNAP = "minimum_snap"
 
 
 @dataclass(frozen=True, slots=True, eq=False)
@@ -63,6 +66,35 @@ class MissionSegment:
             raise ValueError("step references are restricted to TRACK diagnostics")
         if self.phase == MissionPhase.INITIALIZE and self.kind != ReferenceKind.HOLD:
             raise ValueError("INITIALIZE requires a hold")
+        if self.kind == ReferenceKind.MINIMUM_SNAP and not isinstance(
+            self, MinimumSnapMissionSegment
+        ):
+            raise ValueError("minimum_snap requires MinimumSnapMissionSegment")
+
+
+@dataclass(frozen=True, slots=True, eq=False)
+class MinimumSnapMissionSegment(MissionSegment):
+    """Owned C3 rest-to-rest polynomial, possibly spanning several waypoints.
+
+    This separate subclass preserves the exact historical MissionSegment
+    dataclass/serialized schema. Continuity tolerance is 1e-7 in SI units.
+    Full-curve nominal feasibility is checked by the true-state runner preflight.
+    """
+
+    trajectory: MinimumSnapTrajectory
+
+    def __post_init__(self) -> None:
+        MissionSegment.__post_init__(self)
+        if self.kind != ReferenceKind.MINIMUM_SNAP:
+            raise ValueError("polynomial segments require minimum_snap kind")
+        validate_trajectory_continuity(self.trajectory, require_rest=True)
+        curve = replace(self.trajectory)
+        if self.duration_s != curve.knot_times_s[-1]:
+            raise ValueError("segment duration must equal the stored trajectory endpoint")
+        for time, point in ((0.0, self.start_position_W), (self.duration_s, self.end_position_W)):
+            if np.any(np.abs(curve.evaluate(time) - point) > C3_TOLERANCE):
+                raise ValueError("segment endpoints must match the trajectory")
+        object.__setattr__(self, "trajectory", curve)
 
 
 def sample_segment(segment: MissionSegment, elapsed_s: float, yaw_rad: float) -> PositionReference:
@@ -77,6 +109,12 @@ def sample_segment(segment: MissionSegment, elapsed_s: float, yaw_rad: float) ->
     yaw = _finite_scalar("yaw_rad", yaw_rad)
     if elapsed < 0:
         return PositionReference(segment.start_position_W, np.zeros(3), np.zeros(3), yaw)
+    if segment.kind == ReferenceKind.MINIMUM_SNAP:
+        assert isinstance(segment, MinimumSnapMissionSegment)
+        if 0 < elapsed < segment.duration_s:
+            return segment.trajectory.position_reference(elapsed, yaw)
+        point = segment.start_position_W if elapsed == 0 else segment.end_position_W
+        return PositionReference(point, np.zeros(3), np.zeros(3), yaw)
     if segment.kind != ReferenceKind.SMOOTH or elapsed >= segment.duration_s:
         return PositionReference(segment.end_position_W, np.zeros(3), np.zeros(3), yaw)
     if elapsed <= 0:

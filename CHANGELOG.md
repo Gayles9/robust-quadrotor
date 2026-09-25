@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file following a 
 
 ## [Unreleased]
 
+### 2026-09-25 trajectory missions
+
+- Add conservative Bernstein whole-curve geometry, speed, acceleration, nominal
+  thrust, tilt and fixed-yaw reference-rate bounds with explicit numerical padding.
+- Add bounded uniform retiming with retained attempts and explicit failure.
+- Integrate owned minimum-snap segments into the true-state mission runner with
+  preflight checks, preserving the historical mission serialization and protocol.
+- Add five fixed complete-flight cases and independent reference/retiming checks;
+  controller gains and original estimated-feedback failures remain unchanged.
+
 ### 2026-09-25 audit and planning
 
 - Add a fixed-duration seventh-degree minimum-snap position solver with C3

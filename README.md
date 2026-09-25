@@ -13,7 +13,7 @@ reproducible experiments and independent numerical checks.
 | Sensors and runs | Noisy IMU/position/altitude, bias walks, scheduled delivery, truth/nominal mismatch, named RNG streams, authenticated artifacts and replay | Explicit supported schedules and numerical backend |
 | Estimator | 15-state ESKF prediction, correction/reset, gating, endpoint propagation, replay and causal online execution | Explicit prior; stale data rejected; no automatic startup alignment |
 | Feedback | Attitude/rate and position/velocity cascade; true-state and estimated-state missions | Estimated-state **8 cm full-hold qualification remains open** |
-| Planning | Fixed-duration minimum-snap position solver, C3 knot continuity, derivatives through snap, fixed-yaw position-reference adapter | No automatic timing, flight-feasibility constraints or mission integration yet |
+| Planning | Minimum-snap position solver, whole-curve nominal bounds, bounded uniform retiming and true-state mission integration | No time-optimal allocation, obstacles, torque/motor feasibility proof or estimated-state trajectory qualification |
 | Integration | Prior PX4/Gazebo compatibility spike | ROS 2/C++ wrappers and integrated missions remain future work |
 
 The two frozen estimated-feedback profiles retain their historical **29/30** and
@@ -50,6 +50,8 @@ Test counts are recorded with their commits; they are not a flight certificate.
 - [Estimated feedback](docs/estimated-feedback.md) and
   [cascade design](docs/feedback-design.md).
 - [Minimum-snap trajectories](docs/trajectories.md): equations, usage and checks.
+- [Trajectory bounds and missions](docs/trajectory-missions.md): timing policy,
+  reference feasibility and measured flight results.
 - [Architecture decisions](docs/decisions/README.md),
   [dated verification records](docs/progress/README.md), and [changelog](CHANGELOG.md).
 
@@ -66,6 +68,6 @@ Generated histories, figures and large logs stay outside Git. Experiment output
 directories must be new. See [environment notes](docs/environment.md) for pinned
 tooling and the numerical-backend boundary on byte-identical historical replay.
 
-The next engineering package is trajectory feasibility/time allocation and
-integration with the existing true-state mission runner. Geometric control,
-system fault accommodation and ROS/PX4 integration remain separate milestones.
+The next engineering package is geometric tracking control and a fair true-state
+comparison against the existing trajectory baseline. System fault accommodation
+and ROS/PX4 integration remain separate milestones.

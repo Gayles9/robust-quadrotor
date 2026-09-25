@@ -28,6 +28,7 @@ Record architectural or version changes here as numbered decision records, such 
 ## Planning contracts
 
 - [0015: Fixed-duration minimum-snap position trajectories](0015-minimum-snap-trajectory.md)
+- [0016: Trajectory bounds, bounded timing and true-state missions](0016-trajectory-feasibility-and-missions.md)
 
 ## Template
 

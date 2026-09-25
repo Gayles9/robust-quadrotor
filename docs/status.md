@@ -10,7 +10,7 @@ with a limited baseline; estimated-feedback hover qualification remains open.
 | Sensors and reproducibility | IMU, position/altitude, bias walks, scheduled delivery, truth/nominal models, authenticated artifacts and replay | Defined scheduling and numerical-backend contracts |
 | ESKF | Prediction, correction/reset, gates, replay, endpoint calibration and causal online execution | Explicit prior; full-rate paired zero-delay IMU in the supported composition; stale data rejected; weak hover heading observability |
 | Baseline control and missions | Attitude/rate and position/velocity cascade, true/estimated feedback, virtual takeoff/track/land/abort | Truth safety oracle is separate; no hardware emergency-flight policy |
-| Minimum-snap planning | Fixed-duration seventh-degree position optimization, C3 knots, prescribed endpoint derivatives, exact cost, checked evaluation through snap | Feasibility/time allocation and mission integration remain |
+| Minimum-snap planning | Fixed-duration optimization, C3 knots, derivatives through snap, conservative whole-curve reference bounds, bounded uniform timing and true-state missions | No minimum-time claim, obstacles, rotor torque/motor feasibility proof or estimated-state polynomial qualification |
 | Advanced control | Reusable baseline interfaces | Geometric tracking controller and fair comparison remain |
 | System fault tolerance | Estimator outlier gates and bounded mission guards | Persistent health monitoring and degraded-mode policy remain |
 | Middleware/deployment | Independent Python core and earlier compatibility spike | ROS 2/C++, PX4/Gazebo mission integration remain |
@@ -40,12 +40,18 @@ position solver. Its [verification record](progress/2026-09-25-minimum-snap.md)
 covers interpolation, endpoint/knot constraints, analytic cost, independent
 optimization, scaling laws and explicit numerical failures.
 
-The next bounded package is **trajectory feasibility/time allocation and
-integration with the true-state mission runner**. Begin by auditing this solver.
-Define the allowed trajectory, thrust/tilt/rate and geofence checks, duration
-adjustment limits and end-to-end mission acceptance before implementation.
-Preserve the original feedback failure records. Geometric control, estimator
-redesign, fault accommodation and ROS/PX4 are separate milestones.
+The bounded trajectory package is complete under
+[ADR 0016](decisions/0016-trajectory-feasibility-and-missions.md): whole-curve
+reference bounds, uniform retiming and true-state execution. The five fixed
+[mission cases](progress/2026-09-25-trajectory-missions.md) complete with no
+limiting, 3.27–3.92 cm position RMSE and at most 7.74 cm peak error. Those are
+true-state trajectory results, not a new estimated-feedback hover campaign.
+
+The next bounded package is **geometric tracking control with a fair true-state
+comparison**. Begin by auditing the trajectory integration, then fix the controller
+equations, reference derivatives, actuator behavior and comparison criteria before
+implementation. Preserve the original estimated-feedback failures. Fault
+accommodation and ROS/PX4 remain separate milestones.
 
 Progress is tracked by these deliverables. Historical percentage estimates and
 test counts do not establish performance qualification or remaining effort.

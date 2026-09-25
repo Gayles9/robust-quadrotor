@@ -64,7 +64,8 @@ Evaluation covers the exact stored interval `[0, knot_times_s[-1]]` and orders
 from the last segment. Out-of-domain times raise rather than extrapolate. Use
 the stored final time: summing scaled durations and scaling an old sum can differ
 by one floating-point unit. The fixed-yaw adapter produces the existing
-`PositionReference`; connecting it to the mission runner is a separate milestone.
+`PositionReference`; [trajectory missions](trajectory-missions.md) adds the
+subsequent bounded feasibility, timing and true-state execution layer.
 
 ## Numerical boundary
 
@@ -110,9 +111,11 @@ Uniform time scaling by a gives derivative scaling a^-r and cost scaling a^-7.
 See [ADR 0015](decisions/0015-minimum-snap-trajectory.md) for the frozen scope and
 [the implementation record](progress/2026-09-25-minimum-snap.md) for verification.
 
-## Next package
+## Subsequent integration
 
-Add explicit trajectory feasibility/time allocation and a bounded integration
-with the true-state mission runner. Smooth interpolation alone does not constrain
-thrust, tilt, rate, geofence excursions or obstacles. Estimated-state performance,
-geometric control and ROS/PX4 remain separate work.
+The [trajectory mission layer](trajectory-missions.md) implements nominal
+whole-curve thrust/tilt/rate/geofence bounds, bounded uniform retiming and
+true-state mission execution. These capabilities are separate from the fixed-time
+solver's mathematical contract. Smooth interpolation alone does not establish
+flight feasibility. Estimated-state trajectory performance, geometric control,
+obstacles and ROS/PX4 remain separate work.
