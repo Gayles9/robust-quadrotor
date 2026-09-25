@@ -20,6 +20,7 @@ from .attitude_control import (
 )
 from .attitude_simulation import State, _motor, _plant_step, _wrench
 from .missions import (
+    MinimumSnapMissionSegment,
     MissionPhase,
     MissionPlan,
     MissionSafetyLimits,
@@ -35,6 +36,7 @@ from .run_configuration import (
     RotorParameters,
     WorldParameters,
 )
+from .trajectory_feasibility import TrajectoryLimits, check_trajectory_feasibility
 
 
 @dataclass(frozen=True, slots=True)
@@ -300,7 +302,27 @@ def _simulate_mission(
         allocate_limited_body_moment(thrust, np.zeros(3), nominal)
     if outer.maximum_tilt_rad >= safety.maximum_tilt_rad:
         raise ValueError("command tilt must be below actual tilt guard")
+    polynomial_limits = TrajectoryLimits(
+        safety.minimum_position_W,
+        safety.maximum_position_W,
+        None,
+        outer.maximum_acceleration_W,
+        outer.nominal_mass,
+        outer.nominal_gravity_acceleration,
+        outer.minimum_collective_thrust,
+        outer.maximum_collective_thrust,
+        outer.maximum_tilt_rad,
+        float(np.min(inner.maximum_body_rate_B)),
+    )
     for segment in plan.segments:
+        if isinstance(segment, MinimumSnapMissionSegment):
+            if observer is not None:
+                raise ValueError("minimum-snap missions currently require true-state feedback")
+            report = check_trajectory_feasibility(segment.trajectory, polynomial_limits)
+            if not report.accepted:
+                raise ValueError(
+                    "minimum-snap reference not accepted: " + ", ".join(report.violations)
+                )
         for point in (segment.start_position_W, segment.end_position_W):
             if np.any(point < safety.minimum_position_W) or np.any(
                 point > safety.maximum_position_W
