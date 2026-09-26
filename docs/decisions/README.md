@@ -43,3 +43,5 @@ Record architectural or version changes here as numbered decision records, such 
 - Consequences/Risks:
 - Revisit Trigger:
 ```
+
+- [0017: Geometric reimplementation](0017-geometric-reimplementation.md)

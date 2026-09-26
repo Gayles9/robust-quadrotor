@@ -12,7 +12,7 @@ reproducible experiments and independent numerical checks.
 | Plant | Six-degree-of-freedom dynamics, quaternion rotations, rotor allocation, motor lag, wind/drag, Euler and projected RK4 | Illustrative parameters; no ground-contact or identified hardware model |
 | Sensors and runs | Noisy IMU/position/altitude, bias walks, scheduled delivery, truth/nominal mismatch, named RNG streams, authenticated artifacts and replay | Explicit supported schedules and numerical backend |
 | Estimator | 15-state ESKF prediction, correction/reset, gating, endpoint propagation, replay and causal online execution | Explicit prior; stale data rejected; no automatic startup alignment |
-| Feedback | Attitude/rate and position/velocity cascade; true-state and estimated-state missions | Estimated-state **8 cm full-hold qualification remains open** |
+| Feedback | Cascade and opt-in geometric control; true-state and ESKF missions | Estimated-state **8 cm full-hold qualification remains open** |
 | Planning | Minimum-snap position solver, whole-curve nominal bounds, bounded uniform retiming and true-state mission integration | No time-optimal allocation, obstacles, torque/motor feasibility proof or estimated-state trajectory qualification |
 | Integration | Prior PX4/Gazebo compatibility spike | ROS 2/C++ wrappers and integrated missions remain future work |
 
@@ -49,6 +49,7 @@ Test counts are recorded with their commits; they are not a flight certificate.
   [position control and missions](docs/position-control.md).
 - [Estimated feedback](docs/estimated-feedback.md) and
   [cascade design](docs/feedback-design.md).
+- [Geometric control](docs/geometric-control.md): analytic reference jets and causal filtering.
 - [Minimum-snap trajectories](docs/trajectories.md): equations, usage and checks.
 - [Trajectory bounds and missions](docs/trajectory-missions.md): timing policy,
   reference feasibility and measured flight results.
@@ -68,7 +69,8 @@ Generated histories, figures and large logs stay outside Git. Experiment output
 directories must be new. See [environment notes](docs/environment.md) for pinned
 tooling and the numerical-backend boundary on byte-identical historical replay.
 
-The immediate task is recovering the unpublished geometric-controller source
-before tuning can continue. The [recovery audit](docs/progress/2026-09-26-source-recovery-audit.md)
-distinguishes retained flight evidence from code available in this repository.
-System fault accommodation and ROS/PX4 integration remain separate milestones.
+The geometric controller has been reimplemented and freshly tested. The
+[replacement record](docs/progress/2026-09-26-geometric-reimplementation.md) reports
+passing true-state comparisons and remaining noisy hover/effort failures. It stays
+experimental; the next step is a bounded diagnosis before tuning. System fault
+accommodation and ROS/PX4 integration remain separate milestones.

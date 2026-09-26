@@ -1,4 +1,4 @@
-"""Fixed-grid true-state position/attitude cascade with sampled mission guards."""
+"""Fixed-grid cascade or opt-in geometric control with sampled mission guards."""
 
 from collections.abc import Callable
 from dataclasses import dataclass, replace
@@ -19,12 +19,25 @@ from .attitude_control import (
     compute_attitude_control,
 )
 from .attitude_simulation import State, _motor, _plant_step, _wrench
+from .geometric_control import (
+    GeometricControllerParameters,
+    GeometricDomainError,
+    compute_geometric_control,
+)
+from .geometric_filter import FeedbackDerivativeFilter
+from .geometric_reference import (
+    GeometricPositionReference,
+    build_geometric_reference,
+    projected_collective_thrust,
+    reference_jerk_snap,
+)
 from .missions import (
     MinimumSnapMissionSegment,
     MissionPhase,
     MissionPlan,
     MissionSafetyLimits,
     MissionState,
+    ReferenceKind,
     advance_mission,
     mission_guard_reason,
     mission_reference,
@@ -219,15 +232,17 @@ def simulate_mission(
     plan: MissionPlan,
     safety: MissionSafetyLimits,
     numerics: MissionNumerics,
+    *,
+    geometric_controller: GeometricControllerParameters | None = None,
 ) -> MissionResult:
-    """True-state cascade; independent truth/nominal inputs, no sensor or ESKF.
+    """True-state cascade or opt-in geometric control; independent truth/nominal inputs.
 
     Guards -> supervisor -> outer -> inner -> existing plant step. Guard aborts
     retain the terminal state; malformed configuration/numerical failures raise
     without returning a partial result. Initial motors are explicit, not inferred
     from truth mass. Every plan endpoint must lie inside the declared geofence.
     """
-    return _simulate_mission(
+    arguments = (
         initial_state,
         initial_actual_rotor_omega,
         truth_body,
@@ -240,6 +255,9 @@ def simulate_mission(
         numerics,
         None,
     )
+    if geometric_controller is None:
+        return _simulate_mission(*arguments)
+    return _simulate_mission(*arguments, geometric_controller=geometric_controller)
 
 
 def _simulate_mission(
@@ -254,6 +272,9 @@ def _simulate_mission(
     safety: MissionSafetyLimits,
     numerics: MissionNumerics,
     observer: Callable[[int, float, State, NDArray[np.float64]], State] | None,
+    *,
+    geometric_controller: GeometricControllerParameters | None = None,
+    allow_minimum_snap: bool = False,
 ) -> MissionResult:
     """Shared private execution; observer is a truth-to-sensor integration boundary.
 
@@ -261,6 +282,12 @@ def _simulate_mission(
     and completion use only the returned feedback state; the separate numerical
     truth guard is labelled truth_*, and feedback guards estimate_* (ADR 0013).
     """
+    if geometric_controller is not None and not isinstance(
+        geometric_controller, GeometricControllerParameters
+    ):
+        raise TypeError("geometric_controller must be GeometricControllerParameters")
+    if type(allow_minimum_snap) is not bool:
+        raise ValueError("allow_minimum_snap must be bool")
     for argument, kind in (
         (initial_state, RigidBodyInitialState),
         (truth_body, RigidBodyParameters),
@@ -315,8 +342,10 @@ def _simulate_mission(
         float(np.min(inner.maximum_body_rate_B)),
     )
     for segment in plan.segments:
+        if geometric_controller is not None and segment.kind == ReferenceKind.STEP:
+            raise ValueError("geometric control does not support STEP references")
         if isinstance(segment, MinimumSnapMissionSegment):
-            if observer is not None:
+            if observer is not None and geometric_controller is None and not allow_minimum_snap:
                 raise ValueError("minimum-snap missions currently require true-state feedback")
             report = check_trajectory_feasibility(segment.trajectory, polynomial_limits)
             if not report.accepted:
@@ -355,6 +384,14 @@ def _simulate_mission(
     scales: list[float] = []
     inner_flags: list[list[bool]] = []
     outer_flags: list[list[bool]] = []
+    derivative_memory = (
+        None
+        if geometric_controller is None
+        else FeedbackDerivativeFilter(
+            numerics.time_step_s * numerics.position_stride, geometric_controller.filter_pole_rad_s
+        )
+    )
+    geometric_reference: GeometricPositionReference | None = None
     supervisor = MissionState()
     command = np.zeros(4)
     try:
@@ -385,8 +422,39 @@ def _simulate_mission(
                 break
             if k == n:
                 raise RuntimeError("mission timeout was not reached on the plant grid")
-            if k % numerics.position_stride == 0:
-                held = compute_position_control(feedback[0], feedback[1], reference, outer)
+            try:
+                if k % numerics.position_stride == 0:
+                    if geometric_controller is None:
+                        held = compute_position_control(feedback[0], feedback[1], reference, outer)
+                    else:
+                        assert derivative_memory is not None
+                        jerk, snap = reference_jerk_snap(plan, float(time))
+                        geometric_reference, derivative_memory = build_geometric_reference(
+                            feedback[0],
+                            feedback[1],
+                            reference,
+                            jerk,
+                            snap,
+                            outer,
+                            derivative_memory,
+                            k // numerics.position_stride,
+                        )
+                        held = geometric_reference.position_command
+                if k % numerics.attitude_stride == 0 and geometric_controller is not None:
+                    assert geometric_reference is not None
+                    projected = projected_collective_thrust(geometric_reference, feedback[2], outer)
+                    output = compute_geometric_control(
+                        feedback[2],
+                        feedback[3],
+                        geometric_reference.rotation,
+                        projected,
+                        inner,
+                        geometric_controller,
+                    )
+            except GeometricDomainError as error:
+                supervisor = MissionState(MissionPhase.ABORT, float(time), reason=str(error))
+                phases[k] = supervisor.phase
+                break
             if (
                 hypot(*attitude_error_body(feedback[2], held.q_reference_WB))
                 > inner.maximum_attitude_error_rad
@@ -402,9 +470,10 @@ def _simulate_mission(
                     [held.acceleration_limited, held.tilt_limited, held.thrust_limited]
                 )
             if k % numerics.attitude_stride == 0:
-                output = compute_attitude_control(
-                    feedback[2], feedback[3], held.q_reference_WB, held.collective_thrust, inner
-                )
+                if geometric_controller is None:
+                    output = compute_attitude_control(
+                        feedback[2], feedback[3], held.q_reference_WB, held.collective_thrust, inner
+                    )
                 command = output.allocation.commanded_rotor_omega
                 control_indices.append(k)
                 for control_rows, value in zip(
@@ -420,7 +489,9 @@ def _simulate_mission(
                     strict=True,
                 ):
                     control_rows.append(value)
-                thrusts.append(held.collective_thrust)
+                thrusts.append(
+                    held.collective_thrust if geometric_controller is None else projected
+                )
                 scales.append(output.allocation.moment_scale)
                 inner_flags.append(
                     [output.rate_limited, output.moment_limited, output.allocation.moment_scale < 1]

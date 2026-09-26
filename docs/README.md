@@ -12,6 +12,7 @@ implemented and measured; their historical next actions are not today's plan.
 | Attitude/rate control | [Control](control.md) | [Decision 0011](decisions/0011-baseline-attitude-control.md) |
 | Position control and missions | [Position control](position-control.md) | [Decision 0012](decisions/0012-position-control-and-missions.md) |
 | Estimated feedback | [Integration](estimated-feedback.md), [design](feedback-design.md) | [Closeout audit](progress/2026-09-25-repository-audit.md) |
+| Geometric control | [Geometric law and causal derivatives](geometric-control.md) | [Decision 0017](decisions/0017-geometric-reimplementation.md) |
 | Minimum-snap planning | [Trajectories](trajectories.md) | [Decision 0015](decisions/0015-minimum-snap-trajectory.md) |
 | Trajectory bounds and missions | [Timing and execution](trajectory-missions.md) | [Decision 0016](decisions/0016-trajectory-feasibility-and-missions.md), [verification](progress/2026-09-25-trajectory-missions.md) |
 
@@ -28,6 +29,7 @@ The module help and linked guides define input/output paths and frozen protocols
 - `feedback_baseline_comparison`: the fixed six observed full-hover comparisons.
 - `minimum_snap_example`: waypoint interpolation, continuity and cost example.
 - `trajectory_mission_validation`: bounded retiming and five true-state flights.
+- `geometric_reimplementation_validation`: fresh true/estimated geometric comparisons.
 - `kalman_sandbox`: small educational Kalman calculations.
 - `plot_*`: plots of the corresponding saved campaign evidence.
 
