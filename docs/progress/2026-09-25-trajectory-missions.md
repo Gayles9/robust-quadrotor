@@ -2,7 +2,7 @@
 
 ## Scope and preceding audit
 
-Luke authorized the next package after PR #12. Audited published main
+The trajectory-mission package followed PR #12. I audited published main
 `76db6eefea09aa25be236b1246cdc21ba44d1557`; post-merge CI `36142551257` passed and
 36 fresh minimum-snap tests passed in 1.54 s. Review found no new solver defect.
 Its representation constructor intentionally does not promise C3 continuity or

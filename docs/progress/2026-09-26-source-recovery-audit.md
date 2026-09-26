@@ -1,12 +1,16 @@
 # 2026-09-26: Published baseline and geometric source recovery audit
 
+This is a historical recovery record. The source blocker was subsequently
+resolved by the [rebuilt implementation](2026-09-26-geometric-reimplementation.md)
+and the [completed tuning audit](2026-09-26-geometric-project-audit.md).
+
 ## Outcome and scope
 
-Luke requested geometric-controller tuning, a project audit, testing, publication
-of acceptable work, and session closeout. Tuning is blocked because the later
-geometric implementation is unavailable in the accessible workspaces and was
-never published. This is a source-recovery blocker, not evidence that the
-controller has reached a performance limit. No gains, thresholds, scoring
+I audited the published baseline and retained evidence before resuming geometric
+controller tuning. At that point the later implementation was unavailable in
+the accessible workspaces and had never been published. Source recovery was
+required before further tuning; this did not establish a controller performance
+limit. No gains, thresholds, scoring
 windows, production algorithms or tests were changed in this audit.
 
 Audited main: `4ba53489dc02b0cef1035df9abc466d4308916b4`.
@@ -25,7 +29,7 @@ package, section 28. It records geometric work as uncommitted on
 All 14 current remote branch trees were inspected; none contains the geometric
 modules. No open pull request was present when recovery began. The previously
 recorded scratch checkout no longer contains project files in this environment;
-Luke's WSL checkout is not accessible here.
+The separate WSL checkout was not available to this audit.
 
 Three retained evidence ZIPs were inspected in full. Each explicitly excludes
 the controller source. They retain numerical histories, protocols, reports,
@@ -108,7 +112,6 @@ missing implementation's pass counts or qualification claims.
 
 Once source is available, audit it, freeze a bounded tuning campaign against the
 original startup, wind, effort and hover criteria, and retain every attempt.
-Luke's current request authorizes that tuning and publication of acceptable
-work; the older session's instruction to await publication approval is obsolete.
+The intended follow-up was to publish the tested implementation and its results.
 This audit makes no claim that tuning is complete or that further improvement
 is impossible.

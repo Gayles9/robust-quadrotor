@@ -4,8 +4,8 @@
 
 Audited base: `23936ebd8403a3620f755a53143fa7c9f641d491`. Main matched the live
 repository, and 238 fresh controller/mission checks passed before implementation.
-The original geometric source remained unavailable. Luke explicitly authorized
-reimplementation, testing and committing. [ADR 0017](../decisions/0017-geometric-reimplementation.md)
+The original geometric source remained unavailable, so I rebuilt the controller
+and required fresh verification. [ADR 0017](../decisions/0017-geometric-reimplementation.md)
 froze the fresh acceptance campaign before implementation. No gains were tuned.
 
 Implemented the twice-differentiated force-to-attitude map, geometric moving-frame
@@ -77,7 +77,7 @@ reconstruction, exact offline ESKF replay, abort clocks and fail-closed case acc
 
 ```bash
 OPENBLAS_NUM_THREADS=1 .venv/bin/python -m pytest tests/unit/test_geometric_control.py tests/unit/test_geometric_filter.py tests/unit/test_geometric_missions.py tests/unit/test_geometric_campaign.py -q -W error
-PATH=/workspace/scratch/c5ad3f6a945c/pinned-tools/bin:$PATH OPENBLAS_NUM_THREADS=1 PYTEST_ADDOPTS='-W error' make check
+PATH=/tmp/quadrotor-audit/pinned-tools/bin:$PATH OPENBLAS_NUM_THREADS=1 PYTEST_ADDOPTS='-W error' make check
 OPENBLAS_NUM_THREADS=1 uv run python -m experiments.geometric_reimplementation_validation --output NEW_DIR --workers 3
 ```
 

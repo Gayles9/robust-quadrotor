@@ -3,9 +3,9 @@
 ## Scope and mathematical work
 
 The preceding [repository audit](2026-09-25-repository-audit.md) starts from
-`cad64cf37d945fcf2f2186d070e8f845d19edf25`. Luke accepted retaining the stronger
-existing feedback reference with its measured limitations and completing the
-next bounded planning package. [ADR 0015](../decisions/0015-minimum-snap-trajectory.md)
+`cad64cf37d945fcf2f2186d070e8f845d19edf25`. I retained the stronger existing
+feedback reference with its measured limitations and completed the
+bounded planning package. [ADR 0015](../decisions/0015-minimum-snap-trajectory.md)
 was written before the solver implementation and fixes its acceptance criteria.
 
 `src/quadrotor_math/minimum_snap.py` implements seventh-degree position segments

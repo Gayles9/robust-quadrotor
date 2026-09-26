@@ -127,7 +127,7 @@ The following commands ran on 2026-09-23 against the content published as
 | `uvx --from uv==0.12.3 uv run make check` | **1,921 passed**; Ruff passed; 80 files already formatted at code publication; mypy passed over 21 source files |
 | `uvx --from uv==0.12.3 uv run pytest -W error -q` | **1,921 passed**, no warnings |
 | `uvx --from uv==0.12.3 uv run pytest --collect-only -q tests/unit/test_eskf_replay.py tests/unit/test_eskf_run_replay.py` | 246 cases: 117 core and 129 adapter/integration |
-| `GIT_INDEX_FILE=/workspace/scratch/f2c7111463b5/evidence/estimator-replay/code.index git diff --cached --check 2a42e3d522363daccc81d7b9bbd623240d688548` | Passed against the verified baseline tree using an isolated review index |
+| `GIT_INDEX_FILE=/tmp/quadrotor-audit/evidence/estimator-replay/code.index git diff --cached --check 2a42e3d522363daccc81d7b9bbd623240d688548` | Passed against the verified baseline tree using an isolated review index |
 | Hosted `uv sync --locked`, then `make check`, run 35884309624 | Successful; **1,921 passed**, Ruff/formatting/mypy clean |
 
 Normal repository usage remains `uv sync --locked` and `uv run make check` with the pinned

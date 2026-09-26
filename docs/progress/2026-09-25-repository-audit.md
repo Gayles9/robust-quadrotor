@@ -38,8 +38,8 @@ This is a bounded source-and-regression audit, not a proof of all code paths.
 
 ## Same-case baseline selection
 
-Luke asked to retain the best existing version and move on if the final idea did
-not improve it. The last recoverable chat update reports that the subsequent
+I decided to retain the best existing reference if the final idea did not
+improve it. The last recoverable session note reports that the subsequent
 startup-readiness attempt timed out at 12 s in all six cases. Its implementation
 is absent from the published tree; this audit neither reproduces nor promotes it.
 The unfinished baseline comparison is completed below using published code.

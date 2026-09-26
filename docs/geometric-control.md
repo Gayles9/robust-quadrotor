@@ -1,11 +1,26 @@
 # Geometric control and causal reference derivatives
 
-This is the September 26 replacement implementation under
-[ADR 0017](decisions/0017-geometric-reimplementation.md). It is an opt-in
-experimental controller. The original unpublished source was lost; historical
-results are not validation of this replacement. The fresh
-[verification record](progress/2026-09-26-geometric-reimplementation.md)
-separates software correctness, true-state performance and noisy performance.
+The geometric controller works directly with rotation error. It also uses the
+desired angular velocity and acceleration to anticipate the turning motion
+needed to follow a changing thrust direction. This feedforward helps in the
+tested true-state flights, but requires reliable derivatives of the desired
+force. With noisy estimated feedback, that derivative calculation is the main
+design difficulty.
+
+I keep this controller opt-in because it still fails the combined noisy hover,
+tracking and effort requirements. Read [controller problems and tradeoffs](controller-tradeoffs.md)
+for the explanation and measured comparison before the equations below.
+The [current implementation record](progress/2026-09-26-geometric-reimplementation.md)
+and [tuning audit](progress/2026-09-26-geometric-project-audit.md) document its
+fresh verification under [ADR 0017](decisions/0017-geometric-reimplementation.md).
+
+| Responsibility | Source |
+| --- | --- |
+| Rotation derivatives and moment law | [geometric_control.py](../src/quadrotor_math/geometric_control.py) |
+| Desired force and reference construction | [geometric_reference.py](../src/quadrotor_math/geometric_reference.py) |
+| Causal derivative-filter memory | [geometric_filter.py](../src/quadrotor_math/geometric_filter.py) |
+| Measurements and accepted-correction inputs | [estimated_mission.py](../src/quadrotor_math/estimated_mission.py) |
+| Declared comparison profiles and evidence gate | [geometric_correction_validation.py](../experiments/geometric_correction_validation.py) |
 
 ## Frames and force reference
 
@@ -53,8 +68,8 @@ abort because clipped references require different derivative equations.
 
 ## Causal filter
 
-`FeedbackDerivativeFilter(period_s, pole_rad_s=30)` estimates only the derivatives
-of `c`. The force value itself remains unfiltered; planned derivatives remain
+By default, `FeedbackDerivativeFilter(period_s, pole_rad_s=30)` estimates the
+derivatives of `c`. The force value itself remains unfiltered; planned derivatives remain
 analytic. Three cascaded sections implement the bilinear images of
 
 ```text
@@ -127,10 +142,13 @@ The geometric `attitude_error_B` diagnostic is the sine-axis error `eR`;
 ```python
 from quadrotor_math.geometric_control import GeometricControllerParameters
 
-# Existing arguments are unchanged. This keyword selects the new path:
-result = simulate_mission(..., geometric_controller=GeometricControllerParameters())
-estimated = simulate_estimated_mission(..., geometric_controller=GeometricControllerParameters())
+geometric = GeometricControllerParameters()
 ```
+
+Pass this object as `geometric_controller=geometric` to `simulate_mission` or
+`simulate_estimated_mission`, alongside that runner's explicit plant, mission,
+sensor and estimator inputs. This snippet constructs the controller selection;
+the complete experiment commands below construct and execute a flight.
 
 Use the existing `AttitudeControllerParameters` for nominal inertia, rotors and
 limits, and `PositionControllerParameters` for translational gains. The new
@@ -171,9 +189,11 @@ OPENBLAS_NUM_THREADS=1 uv run python -m experiments.geometric_correction_validat
 Declared horizontal natural frequencies are 1, 1.5 and 2 rad/s, with damping
 ratio 0.9 (`Kp=frequency**2`, `Kv=1.8*frequency`). Vertical/attitude gains,
 estimator prior, sensor distributions and the filter pole stay fixed.
-`--stage qualification` runs the original 28-case matrix plus twelve fresh
-cases after candidate selection. Candidate qualification is reported separately
-from known comparator hover failures; the original matrix outcome is retained.
+The implemented `--stage qualification` would run the original 28-case matrix
+plus twelve reserved cases after a candidate clears development. That stage
+was not run for these six rejected profiles. Keep the reserved cases unopened
+until the conditions in the [next-step plan](next-steps.md) are met. The runner
+reports candidate qualification separately from known comparator hover failures.
 
 ### Measured physical derivatives
 

@@ -1,12 +1,23 @@
 # Baseline Attitude and Body-Rate Control
 
+The inner loop answers a simple question: which rotor commands will turn the
+vehicle toward a desired orientation? I use a cascade so the attitude and rate
+responses can be checked separately, then tested together with motor delay.
+Position tracking is handled by the outer loop, not by this controller alone.
+
+Start with [system design](system-design.md) for the complete loop or
+[controller tradeoffs](controller-tradeoffs.md) for the current performance
+problem. The equations below are implemented in
+[attitude_control.py](../src/quadrotor_math/attitude_control.py) and exercised by
+[attitude_simulation.py](../src/quadrotor_math/attitude_simulation.py).
+
 The implemented inner loop converts an orientation reference and a collective-thrust
 demand into bounded rotor-speed commands. It includes a pure controller and a deterministic
 true-state six-degree-of-freedom execution harness. The decision and acceptance protocol
 are in [ADR 0011](decisions/0011-baseline-attitude-control.md); measured outcomes are in the
 [verification record](progress/2026-09-24-baseline-attitude-control.md).
 
-This page describes the Week 7 inner loop, which alone does not regulate position or altitude.
+This page describes the inner loop, which alone does not regulate position or altitude.
 The subsequent [position/mission layer](position-control.md) composes it with translational
 feedback and documents the G2 true-state numerical evidence. The separate
 [estimated-feedback integration](estimated-feedback.md) now supplies ESKF outputs

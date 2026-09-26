@@ -5,6 +5,12 @@ specified times. Snap is the fourth time derivative of position. The objective
 penalizes its squared magnitude integrated over time; it is not electrical
 energy or an actuator-feasibility certificate.
 
+I keep path optimization separate from timing and flight execution. This makes
+it possible to verify the polynomial solution independently before asking a
+controller to track it. The solver is in
+[minimum_snap.py](../src/quadrotor_math/minimum_snap.py); the next layer is
+[trajectory bounds and missions](trajectory-missions.md).
+
 ## Problem and solution
 
 For segment i with duration T_i and normalized coordinate s in [0,1],
@@ -117,5 +123,6 @@ The [trajectory mission layer](trajectory-missions.md) implements nominal
 whole-curve thrust/tilt/rate/geofence bounds, bounded uniform retiming and
 true-state mission execution. These capabilities are separate from the fixed-time
 solver's mathematical contract. Smooth interpolation alone does not establish
-flight feasibility. Estimated-state trajectory performance, geometric control,
-obstacles and ROS/PX4 remain separate work.
+flight feasibility. [Geometric tracking](geometric-control.md) and experimental
+estimated-state spline execution are implemented as separate consumers.
+Noisy-flight qualification, obstacle planning and ROS/PX4 integration remain open.

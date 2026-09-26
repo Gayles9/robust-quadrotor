@@ -71,7 +71,7 @@ definition; documentation-only changes do not change that digest.
 | --- | --- |
 | `.venv/bin/python -m pytest -q -W error tests/unit/test_eskf_online.py tests/unit/test_estimated_mission.py tests/unit/test_estimated_feedback_validation.py` | **93 passed in 52.16 s** |
 | `make check` with the preexisting global launcher | Refused before checks: global uv 0.12.17 did not match required 0.12.3; no pin relaxed |
-| `env PATH=/workspace/scratch/f2c7111463b5/estimated-feedback-tools/bin:$PATH PYTEST_ADDOPTS='-W error' make check` | Exit 0: Ruff lint passes, **148 files formatted**, mypy **46 files**, **2952 tests passed in 150.72 s** |
+| `env PATH=/tmp/quadrotor-audit/estimated-feedback-tools/bin:$PATH PYTEST_ADDOPTS='-W error' make check` | Exit 0: Ruff lint passes, **148 files formatted**, mypy **46 files**, **2952 tests passed in 150.72 s** |
 | Fresh previous fixed campaign and exact NPZ/metric comparison | **5/5 unchanged bit-for-bit** |
 | Independent physical/sensor/control reconstruction, fixed/development/validation | **18/18 histories pass**, **288418 full-rate rows**; this verifies consistency, not each performance criterion |
 
@@ -91,10 +91,10 @@ off-grid stale/pending deliveries, and estimated-versus-true completion distinct
 Commands (each destination new):
 
 ```bash
-.venv/bin/python -m experiments.position_control_validation --partition fixed --workers 4 --output /workspace/scratch/f2c7111463b5/evidence/estimated-feedback/baseline-fixed
-.venv/bin/python -m experiments.position_control_validation --partition fixed --workers 4 --output /workspace/scratch/f2c7111463b5/evidence/estimated-feedback/compatibility-fixed
-.venv/bin/python -m experiments.estimated_feedback_validation --partition development --workers 3 --output /workspace/scratch/f2c7111463b5/evidence/estimated-feedback/development-v1
-.venv/bin/python -m experiments.estimated_feedback_validation --partition fixed --workers 3 --output /workspace/scratch/f2c7111463b5/evidence/estimated-feedback/fixed-v1
+.venv/bin/python -m experiments.position_control_validation --partition fixed --workers 4 --output /tmp/quadrotor-audit/evidence/estimated-feedback/baseline-fixed
+.venv/bin/python -m experiments.position_control_validation --partition fixed --workers 4 --output /tmp/quadrotor-audit/evidence/estimated-feedback/compatibility-fixed
+.venv/bin/python -m experiments.estimated_feedback_validation --partition development --workers 3 --output /tmp/quadrotor-audit/evidence/estimated-feedback/development-v1
+.venv/bin/python -m experiments.estimated_feedback_validation --partition fixed --workers 3 --output /tmp/quadrotor-audit/evidence/estimated-feedback/fixed-v1
 ```
 
 The fixed command exits **1**, correctly reporting **one acceptance failure and
@@ -147,7 +147,7 @@ the protocol.
 ## Held-out validation
 
 ```bash
-.venv/bin/python -m experiments.estimated_feedback_validation --partition validation --workers 3 --output /workspace/scratch/f2c7111463b5/evidence/estimated-feedback/validation-v1
+.venv/bin/python -m experiments.estimated_feedback_validation --partition validation --workers 3 --output /tmp/quadrotor-audit/evidence/estimated-feedback/validation-v1
 ```
 
 Exit 0: **10 planned, zero numerical failures, zero acceptance failures**.
@@ -230,8 +230,8 @@ Both plot commands below exit 0 after independently reloading and auditing their
 complete inputs:
 
 ```bash
-.venv/bin/python -m experiments.plot_estimated_feedback --input /workspace/scratch/f2c7111463b5/evidence/estimated-feedback/fixed-v1 --output /workspace/scratch/f2c7111463b5/evidence/estimated-feedback/fixed-plots
-.venv/bin/python -m experiments.plot_estimated_feedback --input /workspace/scratch/f2c7111463b5/evidence/estimated-feedback/validation-v1 --output /workspace/scratch/f2c7111463b5/evidence/estimated-feedback/validation-plots
+.venv/bin/python -m experiments.plot_estimated_feedback --input /tmp/quadrotor-audit/evidence/estimated-feedback/fixed-v1 --output /tmp/quadrotor-audit/evidence/estimated-feedback/fixed-plots
+.venv/bin/python -m experiments.plot_estimated_feedback --input /tmp/quadrotor-audit/evidence/estimated-feedback/validation-v1 --output /tmp/quadrotor-audit/evidence/estimated-feedback/validation-plots
 ```
 
 Generated full-rate evidence and plots stay outside Git. The repository contains

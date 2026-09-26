@@ -1,9 +1,28 @@
 # Plant, sensors and reproducible runs
 
-This guide collects the foundational model and usage material formerly embedded in
-the repository front page. See [current status](status.md) for current scope;
-historical test counts below describe their dated milestones. Commands run from
-the repository root.
+The plant converts rotor speeds into forces, moments and motion. The sensor
+models turn that motion into measurements; the run configuration and persistence
+layers make the experiment repeatable. This guide explains those pieces and
+their interfaces. For the complete feedback loop, start with
+[system design](system-design.md).
+
+## Reading this guide
+
+| Topic | Start here |
+| --- | --- |
+| Motion, forces and coordinate conventions | [Mathematical model](#mathematical-model) and [frame contract](architecture/frame-contract.md) |
+| Accelerometer and gyro measurements | [Specific force](#ideal-accelerometer-specific-force), [gyro](#ideal-gyroscope-angular-velocity) and [bias evolution](#reproducible-imu-bias-random-walk) |
+| Navigation sensors and clocks | [Position/altitude](#local-position-and-barometric-altitude), [scheduling](#fixed-rate-sensor-scheduling) |
+| Repeatable experiments | [Configuration and random streams](#reproducible-run-configuration-and-named-random-streams), [saved artifacts](#reproducible-run-manifests-and-authenticated-artifacts) |
+| Numerical integration | [Euler](#explicit-euler-propagation), [RK4](#fixed-step-projected-rk4-propagation), [convergence](#deterministic-euler-versus-rk4-convergence-study) |
+| Physical sanity checks | [Hover](#balanced-hover-equilibrium-characterization), [ballistics](#gravity-only-ballistic-trajectory-characterization), [torque-free rotation](#torque-free-rotation-invariants) |
+
+The source is grouped into [dynamics](../src/quadrotor_math/dynamics.py),
+[actuation](../src/quadrotor_math/actuation.py), [IMU](../src/quadrotor_math/imu.py),
+[scheduling](../src/quadrotor_math/sensor_scheduling.py),
+[run generation](../src/quadrotor_math/run_generation.py) and
+[artifact storage](../src/quadrotor_math/run_artifact.py). Historical test counts
+below belong to their linked records; [status](status.md) gives the current scope.
 
 ## Recorded sensor-run pipeline
 
@@ -47,7 +66,7 @@ accelerometer truth calculation uses the same environmental derivative as propag
 Properly declared nominal-only wind or drag changes do not affect physical or stochastic
 artifact data. Actual rotor-speed history is reconstructed during generation but is not persisted.
 The allocator is not invoked because the configuration already supplies rotor-speed commands;
-allocation is upstream of this boundary. The new attitude controller uses allocation in its
+allocation is upstream of this boundary. The attitude controller uses allocation in its
 separate closed-loop harness; it does not change this generator's constant-command contract.
 Saving a run directory remains an explicit separate call.
 
@@ -57,7 +76,7 @@ then combines this owned measurement-only input with an independently supplied e
 prior and nominal assumptions. Truth histories remain outside the filter, available to the
 caller for evaluation. Replay never regenerates sensor noise or changes the run artifact.
 
-**Practical interpretation.** Rotor speeds determine the force and turning effect on the
+Rotor speeds determine the force and turning effect on the
 vehicle; the dynamics convert those effects into rates of motion; integration turns those
 rates into a new state.
 
@@ -96,7 +115,7 @@ the historical zero-environment case and the combined rotor-plus-drag force othe
 FRD body frame in newtons. `R_WB` maps body-coordinate vectors into NED world
 coordinates, and `mass` is in kilograms.
 
-**Practical interpretation.** Gravity and the rotated rotor force determine how world-frame
+Gravity and the rotated rotor force determine how world-frame
 velocity changes. Position changes at the current world-frame velocity.
 
 ### Constant wind and anisotropic quadratic drag
@@ -134,7 +153,7 @@ coordinates, in kg·m². `moment_B` is the FRD body moment in N·m. The cross-pr
 gyroscopic coupling required by rigid-body rotational dynamics; the implementation solves the
 linear system rather than explicitly inverting the inertia matrix.
 
-**Practical interpretation.** Applied moments change the rotation rate, while the coupling
+Applied moments change the rotation rate, while the coupling
 term accounts for the fact that a rotating body's axes and angular momentum interact.
 
 ### Quaternion kinematics
@@ -147,7 +166,7 @@ quaternion_derivative_WB =
 The symbol `⊗` denotes the Hamilton quaternion product. `q_WB` uses scalar-first ordering
 `[w, x, y, z]`, and `omega_B` is expressed in the FRD body frame in rad/s.
 
-**Practical interpretation.** Body angular velocity determines the instantaneous rate of
+Body angular velocity determines the instantaneous rate of
 change of the vehicle's body-to-world attitude.
 
 ### Ideal accelerometer specific force
@@ -181,9 +200,9 @@ the [ideal-accelerometer specific-force progress record](progress/2026-09-01-ide
 
 ### Constant accelerometer bias
 
-The public IMU module now also provides:
+The public IMU module provides:
 
-```python
+```text
 accelerometer_specific_force_with_bias_body(
     ideal_specific_force_B: NDArray[np.float64],
     accelerometer_bias_B: NDArray[np.float64],
@@ -218,7 +237,7 @@ The bias-only contract and evidence remain recorded in the
 
 ### Reproducible accelerometer white noise
 
-The public IMU module now also provides
+The public IMU module provides
 `accelerometer_specific_force_measurement_body(...)`. Its measurement equation is:
 
 ```text
@@ -260,7 +279,7 @@ contract and evidence are recorded in the
 
 The same public IMU module provides:
 
-```python
+```text
 ideal_gyroscope_angular_velocity_body(
     omega_B: NDArray[np.float64],
 ) -> NDArray[np.float64]
@@ -295,7 +314,7 @@ TDD evidence, decisions, and limitations are recorded in the
 
 The public IMU module also provides:
 
-```python
+```text
 gyroscope_angular_velocity_with_bias_body(
     ideal_angular_velocity_B: NDArray[np.float64],
     gyroscope_bias_B: NDArray[np.float64],
@@ -350,7 +369,7 @@ decisions, and limitations are recorded in the
 
 ### Reproducible gyroscope white noise
 
-The public IMU module now also provides
+The public IMU module provides
 `gyroscope_angular_velocity_measurement_body(...)`. Its measurement equation is:
 
 ```text
@@ -388,7 +407,7 @@ contract and evidence are recorded in the
 
 The public IMU module provides two explicit bias-state update boundaries:
 
-```python
+```text
 accelerometer_bias_random_walk_step_body(
     current_accelerometer_bias_B: NDArray[np.float64],
     accelerometer_bias_random_walk_density_B: NDArray[np.float64],
@@ -435,7 +454,7 @@ evidence are recorded in the
 The public module `src/quadrotor_math/position_sensors.py` provides four pure measurement
 boundaries:
 
-```python
+```text
 ideal_position_measurement_world(
     position_W: NDArray[np.float64],
 ) -> NDArray[np.float64]
@@ -878,7 +897,7 @@ normalized:
 q_WB_next = normalize(q_WB + time_step * quaternion_derivative_WB)
 ```
 
-**Practical interpretation.** Euler integration projects the current rates forward over a
+Euler integration projects the current rates forward over a
 short interval. Quaternion normalization removes the norm drift introduced by that numerical
 update so the result remains a valid attitude representation.
 
@@ -922,7 +941,7 @@ evaluations are normalized. The final quaternion component of the classically we
 is normalized as well. This is a projected quaternion treatment within a fixed-step RK4
 method; it is neither exact nor adaptive.
 
-**Practical interpretation.** Euler samples one slope at the start of the step. RK4 samples
+Euler samples one slope at the start of the step. RK4 samples
 four slopes across the step and combines them to represent curved motion more accurately.
 
 ### Deterministic multi-step Euler and RK4 simulation
@@ -961,7 +980,7 @@ derivative stages per step and is expected to provide much better accuracy for a
 size. Because the RK4 stepper projects intermediate and final quaternions to unit norm, the
 observed order of the complete state update is measured rather than assumed.
 
-**Think about it this way.** The derivative says how the vehicle is changing now, a stepper
+The derivative says how the vehicle is changing now, a stepper
 chooses how carefully to advance one interval, and a simulator repeatedly feeds each new state
 into the next step to build a time-aligned history.
 
@@ -989,7 +1008,8 @@ accepted without preprocessing.
 This boundary establishes structural and numerical validity only. It does not prove that a
 trajectory is dynamically accurate, conserves energy or momentum, represents hover, or
 satisfies any scenario-specific physical invariant. Conditional conservation and equilibrium
-checks remain deferred to explicitly named reference-scenario and invariant work.
+checks are exercised by the named physical scenarios below, separately from
+structural history validation.
 
 Rotation-matrix orthogonality and determinant checks are not duplicated here because
 `R_WB` is not stored in the state history. Unit quaternion validity is checked at this
@@ -1025,8 +1045,8 @@ exact hover equilibrium. It does not prove hover stability: without a feedback c
 perturbed vehicle will not automatically return to equilibrium. Arbitrary yaw, tilted hover,
 motor dynamics, aerodynamic effects, disturbances, sensors, estimation, and uncertainty are
 not validated by this scenario. The scenario remains test-local because
-there is not yet a second production consumer that would justify a reusable helper,
-configuration dataclass, or standalone experiment.
+its assertions concern this exact equilibrium rather than a general mission or
+controller configuration.
 
 ### Gravity-only ballistic trajectory characterization
 
@@ -1150,7 +1170,7 @@ from `8.0402004144e-06 m` to `2.0267431351e-09 m`. The reported final-time and
 maximum-trajectory order tables contain no `NaN`, negative, or nonmonotonic measured orders
 for this scenario.
 
-**Think about it this way.** In this experiment, halving the time step reduces Euler error by
+In this experiment, halving the time step reduces Euler error by
 roughly a factor of two and RK4 error by roughly a factor of sixteen.
 
 Run the study with:
@@ -1158,4 +1178,3 @@ Run the study with:
 ```sh
 uv run python experiments/euler_rk4_convergence.py
 ```
-

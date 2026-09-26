@@ -64,7 +64,7 @@ ROS/PX4/Gazebo-independent scheduling layer.
 
 The public functions are:
 
-```python
+```text
 ideal_position_measurement_world(
     position_W: NDArray[np.float64],
 ) -> NDArray[np.float64]

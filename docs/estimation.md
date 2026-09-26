@@ -1,5 +1,17 @@
 # Measurement-Driven Error-State Kalman Filter
 
+The estimator combines fast but drifting IMU integration with slower position
+and altitude observations. It maintains both an estimated state and uncertainty
+about that state. I use a three-component local rotation error so attitude
+corrections respect the quaternion's unit-length constraint.
+
+The core is in [eskf.py](../src/quadrotor_math/eskf.py), with the sampled-IMU
+extension in [eskf_endpoint.py](../src/quadrotor_math/eskf_endpoint.py) and live
+epoch handling in [eskf_online.py](../src/quadrotor_math/eskf_online.py).
+[System design](system-design.md) explains how its output reaches control;
+[controller tradeoffs](controller-tradeoffs.md) explains why an accurate estimate
+at one instant does not guarantee a small physical tracking error.
+
 The estimator is a known-prior, fixed-gravity, 15-error-state inertial navigation filter.
 It estimates NED position and velocity, body-to-world attitude and FRD accelerometer and
 gyroscope biases from paired IMU samples, local Cartesian position and positive-up
@@ -40,8 +52,9 @@ estimated gyro bias minus conditional current gyro sample-noise mean. First-orde
 mode has no sample-noise mean. The online/offline shared correction path preserves
 position-before-altitude fusion, innovation gates and stale/disabled dispositions.
 
-`simulate_estimated_mission` connects endpoint estimates to the unchanged cascade
-without truth-derived controller inputs or completion. See the
+`simulate_estimated_mission` connects endpoint estimates to the cascade or the
+explicit geometric controller without truth-derived controller inputs or
+completion. See the
 [integration guide](estimated-feedback.md) for exact timing, sensor generation,
 independent prior, ownership, evidence format and the separate truth safety oracle.
 This synchronous numerical integration is not a real-time flight service and adds

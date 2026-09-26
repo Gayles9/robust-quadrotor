@@ -74,9 +74,10 @@ Reference: Lee, Leok, McClamroch, CDC 2010, DOI 10.1109/CDC.2010.5717652.
    Use the original geometric position gains and matched cascade gains for spline
    pairs; also report the established v2 cascade for full-hover context.
 6. Fresh full make check with warnings as errors. Commit tested experimental
-   code even if performance promotion fails, recording all failures. Luke's
-   explicit commit and push authorization applies. No new claim of qualification
-   based on historical test counts. No automatic gain search in this reconstruction.
+   code even if performance promotion fails, recording all failures. Qualification
+   requires fresh evidence for this implementation; historical test counts do not
+   transfer to it. No automatic gain search is part of this reconstruction.
 
 Generated histories/logs stay outside Git. Publish source and tests on the
-reimplementation branch so a future scratch cleanup cannot erase the work.
+reimplementation branch so the implementation remains recoverable independently
+of the local working directory.

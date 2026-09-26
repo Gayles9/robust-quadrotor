@@ -37,7 +37,7 @@ e4622c8b6fcc391f14320c92c9dc17a652bfd481dd973712938f8d1f6c794cac  tests/unit/tes
 
 The public functions are:
 
-```python
+```text
 accelerometer_bias_random_walk_step_body(
     current_accelerometer_bias_B: NDArray[np.float64],
     accelerometer_bias_random_walk_density_B: NDArray[np.float64],

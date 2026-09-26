@@ -129,7 +129,7 @@ sample time, process-noise units, and reproducibility decisions.
 
 For valid vectors, NumPy addition produces the independently owned result:
 
-```python
+```text
 return ideal_angular_velocity_B + gyroscope_bias_B
 ```
 

@@ -520,7 +520,7 @@ Success: no issues found in 15 source files
 uv run pytest
 ============================= test session starts ==============================
 platform linux -- Python 3.12.3, pytest-9.1.1, pluggy-1.6.0
-rootdir: /home/luke/projects/robust-quadrotor
+rootdir: /path/to/robust-quadrotor
 configfile: pyproject.toml
 testpaths: tests
 collected 645 items

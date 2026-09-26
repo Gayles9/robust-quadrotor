@@ -58,5 +58,5 @@ and the transient clock-discontinuity warnings require continued monitoring.
 
 ## Next Exact Action
 
-Review and commit the compatibility documentation after Luke's approval, then select the next
+Review and publish the compatibility documentation, then select the next
 bounded task from the six-month project plan.

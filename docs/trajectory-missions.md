@@ -1,10 +1,17 @@
 # Trajectory bounds, timing and true-state missions
 
-The fixed-duration minimum-snap solver now feeds the existing cascaded controller
-and mission supervisor. A bounded retimer selects a slower traversal using
-nominal reference limits. The closed-loop simulation then measures tracking,
-completion and limiting separately. [ADR 0016](decisions/0016-trajectory-feasibility-and-missions.md)
-records the scope and acceptance criteria set before implementation.
+This layer checks whether a planned path is reasonable to ask the controller to
+follow. A bounded retimer slows the minimum-snap trajectory until its nominal
+reference limits pass. The mission runner then measures actual tracking,
+completion and limiting separately. A feasible reference is only the first
+check; actuator lag and feedback error can still affect the flight.
+
+The implementation is in [trajectory_feasibility.py](../src/quadrotor_math/trajectory_feasibility.py)
+and [mission_simulation.py](../src/quadrotor_math/mission_simulation.py).
+[ADR 0016](decisions/0016-trajectory-feasibility-and-missions.md) defines the
+original true-state scope and acceptance criteria. The later
+[geometric integration](geometric-control.md) also supports experimental
+estimated-state spline missions, whose performance limitations remain explicit.
 
 ## Whole-curve reference bounds
 
@@ -97,8 +104,11 @@ mission box and nominal controller acceleration, thrust, tilt and rate bounds.
 The reference rate norm is bounded by the smallest configured component rate
 limit, which conservatively fits all three components. There is no speed limit
 in the historical controller, so that preflight omits speed; planning can impose
-its own tighter speed limit. Estimated-feedback polynomial missions are explicitly
-unsupported in this package and rejected before execution.
+its own tighter speed limit. `simulate_estimated_mission` accepts polynomial
+missions with an explicit geometric controller, or with
+`allow_minimum_snap=True` for a cascade comparison. The default estimated
+cascade call still rejects polynomial missions. These opt-ins support the
+comparison experiments; they do not imply noisy-flight qualification.
 
 ## Fixed evidence and reproduction
 
@@ -126,5 +136,7 @@ The report records whether source hashes remain unchanged throughout execution.
 These are bounded engineering cases, not a Monte Carlo qualification campaign.
 See the [verification record](progress/2026-09-25-trajectory-missions.md) for results.
 
-The next package is geometric tracking control with a fair true-state comparison
-against this baseline. Original estimated-feedback hover misses remain open.
+The subsequent [geometric comparison](geometric-control.md) is implemented and
+has passing bounded true-state results. Estimated-feedback hover and effort
+misses remain open; [controller tradeoffs](controller-tradeoffs.md) explains
+them and [the current plan](next-steps.md) defines the next task.

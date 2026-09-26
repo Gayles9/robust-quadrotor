@@ -139,7 +139,7 @@ published as `b674c716b4d2fff345e457b6f0ff247b40acd88c`.
 | `uvx --from uv==0.12.3 uv run make check` | **2,157 passed**; Ruff clean; 85 files already formatted; mypy clean over 22 source files |
 | `uvx --from uv==0.12.3 uv run pytest -W error -q` | **2,157 passed**, no warnings |
 | `uvx --from uv==0.12.3 uv run pytest --collect-only -q tests/unit/test_eskf_innovation.py tests/unit/test_eskf_gating.py tests/unit/test_eskf_run_replay.py` | 365 cases: 161 + 60 + 144; 129 adapter cases predate this increment |
-| `GIT_INDEX_FILE=/workspace/scratch/f2c7111463b5/evidence/innovation-gating/code.index git diff --cached --check 45f37491141d35b26e7a77abf6f9331d76615a8a` | Clean diff against the verified baseline tree using an isolated review index |
+| `GIT_INDEX_FILE=/tmp/quadrotor-audit/evidence/innovation-gating/code.index git diff --cached --check 45f37491141d35b26e7a77abf6f9331d76615a8a` | Clean diff against the verified baseline tree using an isolated review index |
 | Hosted `uv sync --locked`, then `make check`, run 35890398654 | Successful; **2,157 passed**, Ruff clean, 85 formatted files, mypy clean over 22 source files |
 
 The explicit launcher/index describe this audit environment. Normal repository setup is

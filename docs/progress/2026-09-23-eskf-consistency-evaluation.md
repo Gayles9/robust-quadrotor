@@ -174,7 +174,7 @@ Except for the baseline row, tests exercise the source/test bytes published as
 | `uvx --from uv==0.12.3 uv run python experiments/eskf_consistency.py --partition development --output ../evidence/eskf-consistency/development.json` | Exit 0; 20 complete trials |
 | `uvx --from uv==0.12.3 uv run python experiments/eskf_consistency.py --partition validation --output ../evidence/eskf-consistency/validation.json` | Exit 0; 200 complete trials; unchanged frozen protocol |
 | `uvx --from uv==0.12.3 uv run --locked python experiments/eskf_consistency.py --partition smoke --output ../published-smoke.json` in the clean published checkout | Exit 0; exact numerical agreement with prepublication smoke; source digest matches validation |
-| `GIT_INDEX_FILE=/workspace/scratch/f2c7111463b5/evidence/eskf-consistency/code.index git diff --cached --check d53dcf32ea534f22babd19235da1de2053f38d26` | Clean isolated code-publication diff |
+| `GIT_INDEX_FILE=/tmp/quadrotor-audit/evidence/eskf-consistency/code.index git diff --cached --check d53dcf32ea534f22babd19235da1de2053f38d26` | Clean isolated code-publication diff |
 | Hosted `uv sync --locked`, then `make check`, run 35896788372 | Successful; **2,358 passed** in 68.09 s; Ruff clean; 93 formatted files; mypy clean over 25 source files |
 
 The launcher and output paths identify this audit environment. Normal checkout usage is
