@@ -205,3 +205,13 @@ OPENBLAS_NUM_THREADS=1 uv run python -m experiments.geometric_correction_validat
 Development commands exit nonzero because their performance gates fail. The
 retained scripts and protocols reproduce the remaining profiles, original
 diagnosis, complete true-state regression and independent evidence audit.
+
+## Merge closeout
+
+[PR #16](https://github.com/Gayles9/robust-quadrotor/pull/16) was subsequently
+merged into `main` as `29a37b017114b58810ea8f7535448934365e39bc`.
+The reviewed head was `626dcca2a940249243c87d39040bd96f5c971659`.
+The post-merge [CI run](https://github.com/Gayles9/robust-quadrotor/actions/runs/36262451382)
+passed. The publication paragraph above records the earlier draft stage.
+The [documentation and project review](../project-review.md) audits that merged
+baseline; the [current plan](../next-steps.md) supersedes historical next actions.

@@ -1,5 +1,15 @@
 # Estimated-feedback cascade design
 
+This guide explains how the position loop, attitude loop and motors influence
+one another near hover. I used that model to choose a small number of explicit
+profiles rather than treating each gain as an independent knob. The local
+model helps explain damping, but the complete noisy simulation determines
+whether a profile meets the flight requirements.
+
+The model is implemented in [cascade_analysis.py](../src/quadrotor_math/cascade_analysis.py)
+and the profiles in [feedback_bandwidth_validation.py](../experiments/feedback_bandwidth_validation.py).
+For the broader interpretation, read [controller tradeoffs](controller-tradeoffs.md).
+
 Current reference decision (2026-09-25): retain explicit `design_version=2` as
 the limited numerical reference after the [same-case comparison](progress/2026-09-25-repository-audit.md).
 The historical 8 cm qualification failures below remain unchanged.

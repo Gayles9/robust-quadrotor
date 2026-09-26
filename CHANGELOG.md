@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file following a 
 
 ## [Unreleased]
 
+### 2026-09-26 documentation and project review
+
+- Simplify the README and organize guides around system design, implementation,
+  controller tradeoffs, current status and a bounded next-step plan.
+- Correct outdated estimated-trajectory support claims, complete the decision
+  and verification indexes, and remove personal names and machine-specific paths.
+- Preserve historical numerical results while distinguishing them from current
+  qualification. Add a project review and explain why noisy geometric feedback
+  still misses its combined hover and effort requirements.
+- Add documentation checks to the regular quality gate for local links, section
+  anchors, code fences and Python/JSON example syntax.
+
 ### 2026-09-26 geometric audit and bounded tuning
 
 - Add explicit experimental estimator-correction rebasing and measured physical

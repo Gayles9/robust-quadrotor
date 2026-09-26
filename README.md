@@ -1,80 +1,63 @@
 # Robust Autonomous Quadrotor
 
-A Python numerical system for quadrotor dynamics, sensing, state estimation,
-feedback control and trajectory generation. The mathematical core is independent
-of ROS 2 and PX4 and uses explicit coordinate frames, deterministic randomness,
-reproducible experiments and independent numerical checks.
+A Python project for simulating a quadrotor, estimating its motion from noisy
+sensors, and controlling it along a planned trajectory.
 
-## Current scope
+I am building the mathematical stack from the rigid-body model upward so I can
+inspect how modeling assumptions, estimation errors, and controller choices
+affect flight. The core runs independently of ROS 2 and PX4. Experiments use
+explicit parameters and random seeds, and retain failures alongside successes.
 
-| Subsystem | Implemented | Boundary |
-| --- | --- | --- |
-| Plant | Six-degree-of-freedom dynamics, quaternion rotations, rotor allocation, motor lag, wind/drag, Euler and projected RK4 | Illustrative parameters; no ground-contact or identified hardware model |
-| Sensors and runs | Noisy IMU/position/altitude, bias walks, scheduled delivery, truth/nominal mismatch, named RNG streams, authenticated artifacts and replay | Explicit supported schedules and numerical backend |
-| Estimator | 15-state ESKF prediction, correction/reset, gating, endpoint propagation, replay and causal online execution | Explicit prior; stale data rejected; no automatic startup alignment |
-| Feedback | Cascade and opt-in geometric control; true-state and ESKF missions | Estimated-state **8 cm full-hold qualification remains open** |
-| Planning | Minimum-snap position solver, whole-curve nominal bounds, bounded uniform retiming and true-state mission integration | No time-optimal allocation, obstacles, torque/motor feasibility proof or estimated-state trajectory qualification |
-| Integration | Prior PX4/Gazebo compatibility spike | ROS 2/C++ wrappers and integrated missions remain future work |
+## What works
 
-The two frozen estimated-feedback profiles retain their historical **29/30** and
-**28/30** fresh-case results. Neither satisfies every original hover condition.
-Software checks and accepting a numerical reference do not convert those failures
-into passes. The [closeout audit](docs/progress/2026-09-25-repository-audit.md)
-records the common-case comparison and chosen reference. Failed tuning studies
-remain reproducible; no further automatic gain search is planned.
+The repository contains a nonlinear flight model with motors, wind and drag;
+simulated IMU, position and altitude sensors; a 15-state error-state Kalman filter;
+cascaded and geometric controllers; and minimum-snap trajectory planning. A
+mission runner connects these pieces for virtual takeoff, tracking and landing.
+Saved measurements can be replayed to check the estimator independently.
 
-See [technical status](docs/status.md) for remaining scope and limitations.
+The current limitation is control using noisy state estimates. The geometric
+controller tracks well when supplied with the simulated true state, but it does
+not yet meet the combined hover and control-effort requirements with estimated
+feedback. The cascade remains the default. The
+[controller discussion](docs/controller-tradeoffs.md) explains the observed
+problems, tested alternatives, and why an improvement in one metric can make
+another worse. [Project status](docs/status.md) lists the evidence and remaining
+work.
 
-## Setup and checks
+## Run it
 
-Use Python 3.12 and uv 0.12.3, as pinned in `pyproject.toml`.
+Use Python 3.12, uv 0.12.3 and GNU Make. From the repository root:
 
 ```bash
 uv sync --locked
 PYTEST_ADDOPTS='-W error' make check
+uv run python -m experiments.minimum_snap_example --output results/minimum-snap-demo
 ```
 
-The gate runs Ruff lint/format, strict mypy and pytest. Tests cover analytical
-physics, frame/sign conventions, Jacobians, covariance algebra, causal data flow,
-numerical convergence, controller behavior, persistence and trajectory optimality.
-Test counts are recorded with their commits; they are not a flight certificate.
+The checks cover documentation, lint, formatting, types and tests. The small
+trajectory example writes a plot, numerical data and metrics; it does not run a
+flight. Choose a new output directory each time. See the
+[setup guide](docs/environment.md) for individual checks, headless execution and
+reproducibility details.
 
-## Start reading
+## Find an explanation or implementation
 
-- [Documentation map](docs/README.md): subsystem guides and evidence navigation.
-- [Frame contract](docs/architecture/frame-contract.md): NED world, FRD body,
-  body-to-world `R_WB`, scalar-first `q_WB`.
-- [Plant, sensors and reproducible runs](docs/foundations.md).
-- [Estimation](docs/estimation.md), [attitude control](docs/control.md),
-  [position control and missions](docs/position-control.md).
-- [Estimated feedback](docs/estimated-feedback.md) and
-  [cascade design](docs/feedback-design.md).
-- [Geometric control](docs/geometric-control.md): analytic reference jets and causal filtering.
-- [Minimum-snap trajectories](docs/trajectories.md): equations, usage and checks.
-- [Trajectory bounds and missions](docs/trajectory-missions.md): timing policy,
-  reference feasibility and measured flight results.
-- [Architecture decisions](docs/decisions/README.md),
-  [dated verification records](docs/progress/README.md), and [changelog](CHANGELOG.md).
+| If you want to understand… | Start here |
+| --- | --- |
+| How the complete system fits together | [System design](docs/system-design.md) |
+| Why the controller still misses its targets | [Controller problems and tradeoffs](docs/controller-tradeoffs.md) |
+| The equations, interfaces and source for a subsystem | [Technical documentation](docs/README.md) |
+| What has been demonstrated and what remains | [Current status](docs/status.md) |
+| The next bounded piece of work | [Next-step plan](docs/next-steps.md) |
+| Why a design was chosen, or how it was tested | [Design decisions](docs/decisions/README.md) and [verification records](docs/progress/README.md) |
 
-## Repository layout
+Core algorithms are in [`src/quadrotor_math`](src/quadrotor_math), experiments in
+[`experiments`](experiments), and tests in [`tests/unit`](tests/unit). Generated
+histories and plots are excluded from Git. The
+[frame contract](docs/architecture/frame-contract.md) defines NED world, FRD body,
+and body-to-world quaternion conventions used throughout.
 
-```text
-src/quadrotor_math/   Middleware-independent numerical algorithms
-tests/unit/          Mathematical, boundary and integration checks
-experiments/         Reproducible campaigns, diagnostics and plotting commands
-docs/                Technical guides, decisions and dated evidence
-```
-
-Generated histories, figures and large logs stay outside Git. Experiment output
-directories must be new. See [environment notes](docs/environment.md) for pinned
-tooling and the numerical-backend boundary on byte-identical historical replay.
-
-The geometric controller has been reimplemented and freshly tested. The
-[replacement record](docs/progress/2026-09-26-geometric-reimplementation.md) reports
-passing true-state comparisons and remaining noisy hover/effort failures. It stays
-experimental. The subsequent [project audit and tuning study](docs/progress/2026-09-26-geometric-project-audit.md)
-diagnoses estimator-update derivative spikes and retains six failed development
-profiles. Neither optional correction rebasing nor measured-acceleration
-feedforward clears every original hover/tracking/effort condition. Defaults and
-limits remain unchanged; fresh validation seeds remain unused. System fault
-accommodation and ROS/PX4 integration remain separate milestones.
+This is a simulation research project. Earlier PX4/Gazebo compatibility checks
+are recorded, but the custom estimator/controller stack has not been integrated
+into a deployed flight system or validated on hardware.

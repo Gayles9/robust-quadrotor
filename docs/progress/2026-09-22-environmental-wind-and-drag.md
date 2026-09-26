@@ -220,9 +220,8 @@ tested Python/NumPy environment, not cross-platform bitwise reproducibility, rea
 flight validation, or a safety/certification claim. Closed-loop control, estimation, ROS 2,
 PX4, and C++ integration remain outside this gate.
 
-Gate G1 is locally complete and publication-ready. It remains local and unpublished until
-Luke explicitly authorizes publication. Nothing in this closeout is staged, committed,
-pushed, or published.
+At this point Gate G1 was locally complete and ready for publication. The
+publication details are recorded in the closeout below.
 
 The exact next bounded milestone is state-estimation design, beginning with the 15-state
 error-state Kalman filter conventions, process/noise model, propagation equations, and
@@ -230,7 +229,7 @@ Jacobian verification.
 
 ## Publication closeout
 
-Luke explicitly authorized publication. Commit
+The implementation was published in commit
 [`32e4886c63b38b62f41aa236b4439ca22560f5b7`](https://github.com/Gayles9/robust-quadrotor/commit/32e4886c63b38b62f41aa236b4439ca22560f5b7)
 was created with parent `65a48da9ddd64bd98e4b2faf473c33cd514c3485` and exact subject
 `feat: add environmental wind and drag`. It contained exactly the audited 17 paths.

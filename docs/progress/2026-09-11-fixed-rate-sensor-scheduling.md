@@ -197,7 +197,7 @@ class SensorMeasurement[MeasurementT: (float, NDArray[np.float64])]:
 
 The scheduler constructor is keyword-only:
 
-```python
+```text
 FixedRateSensorScheduler[MeasurementT](
     *,
     sample_period_s: float,
@@ -208,7 +208,7 @@ FixedRateSensorScheduler[MeasurementT](
 
 Its update method is:
 
-```python
+```text
 update(
     current_time_s: float,
     acquire_measurement: Callable[[int, float], MeasurementT],
@@ -223,7 +223,7 @@ NumPy arrays.
 
 The held-value property is:
 
-```python
+```text
 latest_delivered_measurement
     -> SensorMeasurement[MeasurementT] | None
 ```
@@ -446,7 +446,7 @@ Success: no issues found in 14 source files
 uv run pytest
 ============================= test session starts ==============================
 platform linux -- Python 3.12.3, pytest-9.1.1, pluggy-1.6.0
-rootdir: /home/luke/projects/robust-quadrotor
+rootdir: /path/to/robust-quadrotor
 configfile: pyproject.toml
 testpaths: tests
 collected 460 items

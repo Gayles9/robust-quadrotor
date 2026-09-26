@@ -1,69 +1,71 @@
-# Technical scope — 2026-09-26
+# Project status
 
-The repository audit and baseline selection are recorded in the
-[closeout](progress/2026-09-25-repository-audit.md). Current development proceeds
-with a limited baseline; estimated-feedback hover qualification remains open.
+Updated 2026-09-26. The implemented Python stack covers simulation, estimation,
+planning and closed-loop virtual missions. The main open performance issue is
+hover and trajectory control with noisy estimated feedback.
 
-| Area | Implemented capability | Remaining boundary |
+## Implemented capabilities
+
+| Area | Implemented and checked | Remaining limitation |
 | --- | --- | --- |
-| Plant and numerical foundation | NED/FRD dynamics, quaternions, motors/allocation, wind/drag, Euler/RK4 and analytical/convergence checks | Illustrative hardware parameters; no contact model |
-| Sensors and reproducibility | IMU, position/altitude, bias walks, scheduled delivery, truth/nominal models, authenticated artifacts and replay | Defined scheduling and numerical-backend contracts |
-| ESKF | Prediction, correction/reset, gates, replay, endpoint calibration and causal online execution | Explicit prior; full-rate paired zero-delay IMU in the supported composition; stale data rejected; weak hover heading observability |
-| Baseline control and missions | Attitude/rate and position/velocity cascade, true/estimated feedback, virtual takeoff/track/land/abort | Truth safety oracle is separate; no hardware emergency-flight policy |
-| Minimum-snap planning | Fixed-duration optimization, C3 knots, derivatives through snap, conservative whole-curve reference bounds, bounded uniform timing and true-state missions | No minimum-time claim, obstacles, rotor torque/motor feasibility proof or estimated-state polynomial qualification |
-| Advanced control | Reimplemented geometric moments, analytic reference jets, causal derivative filter, true/ESKF missions | True-state campaign passes; noisy hover and effort gates fail; cascade stays default |
-| System fault tolerance | Estimator outlier gates and bounded mission guards | Persistent health monitoring and degraded-mode policy remain |
-| Middleware/deployment | Independent Python core and earlier compatibility spike | ROS 2/C++, PX4/Gazebo mission integration remain |
-| Final evidence/report | Reproducible subsystem campaigns and a frozen report v1 | Broad integrated evaluation and an updated final technical report remain |
+| Plant | Nonlinear six-degree-of-freedom dynamics, quaternion rotations, rotor allocation, motor lag, wind/drag, Euler and projected RK4 | Illustrative parameters; no contact, battery or identified airframe model |
+| Sensors and records | Noisy IMU, position and altitude; bias walks; scheduled acquisition/delivery; declared truth/nominal mismatch; authenticated artifacts and replay | Explicit timing and numerical-backend contracts |
+| State estimation | 15-state ESKF, measurement updates, attitude reset, innovation gates, endpoint propagation, online execution and replay | Explicit initial prior, no automatic alignment or delayed-state rewind; hover heading is weakly observable |
+| Baseline control | Cascaded position/velocity and attitude/rate feedback; supervised takeoff, tracking, landing and abort | True-state cases pass; original estimated-hover qualifications retain failures |
+| Planning | Fixed-duration minimum-snap splines, derivatives through snap, nominal reference bounds, bounded uniform retiming | No obstacle planning, time optimization or complete actuator-feasibility proof |
+| Geometric control | Rotation-based moment law, analytic force-to-attitude derivatives, causal filter, true/estimated missions and two optional derivative strategies | All six new noisy-feedback profiles fail the joint performance requirements |
+| Integration | Earlier ROS 2/PX4/Gazebo compatibility checks and an x500 takeoff/hover/landing spike | The custom Python stack is not integrated into PX4 or validated on hardware |
+| Fault handling | Innovation rejection, event diagnostics and mission guards | Persistent health monitoring, diagnosis and degraded flight policy remain |
 
-## Feedback closeout
+Estimated minimum-snap missions are available experimentally through the
+geometric controller or explicit cascade `allow_minimum_snap=True`. That support
+is an implementation capability, not a passing noisy-trajectory qualification.
 
-Use explicit `design_version=2` as the numerical reference. On the same six
-observed full hovers it lowers worst peak from 10.4950 to 9.1403 cm and mean peak
-from 7.5504 to 6.9123 cm, at about 2.06 times the mean squared-moment effort.
-It is not better on every individual case.
+## Evidence that matters
 
-Original fresh results remain **29/30 for version 1 and 28/30 for version 2**.
-The unchanged 8 cm full-hold condition is still missed. No threshold, scoring
-window, gain, prior or sensor distribution changed in this closeout. The original
-profiles and failed diagnostics remain reproducible. No additional gain search
-or fresh feedback-validation campaign is authorized by this planner milestone.
+The [geometric audit](progress/2026-09-26-geometric-project-audit.md) records the
+following results for the implementation merged in
+[PR #16](https://github.com/Gayles9/robust-quadrotor/pull/16):
 
-The reported startup-readiness attempt is not present in the published source.
-Its failed outcome was reported in the preceding chat; it is not an accepted
-runtime option. No filter defect or fundamental performance limit was proven.
+- The complete software gate passed 3,315 tests, lint, formatting and strict
+  typing. CI also passed on the final implementation and merged tree.
+- Fifteen true-state regression flights covered seven cascade/geometric pairs
+  and an exact repeat. All required comparisons passed; geometric RMSE ranged
+  from 0.20 to 3.75 cm.
+- The bounded tuning study rejected all six new profiles. None met the 8 cm
+  full-hover maximum, nonregressing spline RMSE and effort ratio of at most two
+  simultaneously. Defaults and thresholds were retained.
+- Across that session, 42 flight executions and 202 recorded payloads were
+  independently checked. Counts include repeated comparators and a repeat run;
+  they are not 42 independent validation cases.
 
-## Current completed step and next scope
+Seven damaged payloads were restored to their original expected hashes. Four
+recoveries used sensor-only estimator replay and three used byte-identical
+fixture data. The underlying damage cause is unknown. Qualification now also
+requires all saved payloads to pass authentication.
 
-[ADR 0015](decisions/0015-minimum-snap-trajectory.md) defines the fixed-duration
-position solver. Its [verification record](progress/2026-09-25-minimum-snap.md)
-covers interpolation, endpoint/knot constraints, analytic cost, independent
-optimization, scaling laws and explicit numerical failures.
+For the earlier baseline, version 1 passed 29/30 fresh hover cases and version 2
+passed 28/30. Version 2 is retained as an explicit limited numerical reference,
+not a universally better or fully qualified controller. Its same-case comparison
+and remaining misses are in the [baseline closeout](progress/2026-09-25-repository-audit.md).
 
-The bounded trajectory package is complete under
-[ADR 0016](decisions/0016-trajectory-feasibility-and-missions.md): whole-curve
-reference bounds, uniform retiming and true-state execution. The five fixed
-[mission cases](progress/2026-09-25-trajectory-missions.md) complete with no
-limiting, 3.27–3.92 cm position RMSE and at most 7.74 cm peak error. Those are
-true-state trajectory results, not a new estimated-feedback hover campaign.
+The [endpoint estimator study](progress/2026-09-23-eskf-endpoint-calibration.md)
+achieved 95.29% NEES coverage on its declared evaluation, with zero numerical
+failures across 380 replays. This supports the tested standalone estimator
+configuration. It does not establish observability in every maneuver or close
+the flight-control requirements.
 
-The [geometric replacement](progress/2026-09-26-geometric-reimplementation.md)
-implements the recorded corrected design and has fresh 3,282-test verification.
-All seven true-state comparisons pass. Four noisy spline cases meet physical
-tracking limits but require 10.86–11.80 times paired cascade moment effort;
-geometric full-hover peaks of 8.76 and 13.69 cm miss the original 8 cm limit.
-The implementation remains experimental and the cascade remains the default.
-The subsequent [project audit and bounded tuning study](progress/2026-09-26-geometric-project-audit.md)
-diagnoses estimator-correction derivative spikes and tests six explicit profiles:
-three position bandwidths with correction rebasing, two additional attitude
-stiffness choices derived from critical roll damping, and measured physical
-acceleration/jerk feedforward. None clears the unchanged hover/tracking/effort
-requirements. Both default controllers remain unchanged, and fresh validation
-seeds remain unopened. The next proposal needs a justified joint startup and
-feedback design; more selection on these same seeds is not qualification.
-Source is published and checkpointed. Historical missing-source failures remain
-in dated records and no longer describe the accessible implementation.
-Fault accommodation and ROS/PX4 remain separate milestones.
+## Gate interpretation
 
-Progress is tracked by these deliverables. Historical percentage estimates and
-test counts do not establish performance qualification or remaining effort.
+The plant/sensor/replay foundation (G1) is complete. The standalone estimation
+work (G3) is supported within its stated prior, motion and noise assumptions.
+The true-state baseline and trajectory packages pass their bounded cases, but
+estimated-feedback flight qualification (G2) remains open. Geometric control
+has the same distinction between implementation and qualified flight behavior.
+
+[Controller problems and tradeoffs](controller-tradeoffs.md) explains why the
+remaining failures can coexist with correct equations and good true-state
+tracking. [Project review](project-review.md) records the current audit, and
+[the next-step plan](next-steps.md) defines one bounded follow-up before further
+integration. Broad integrated evaluation and an updated technical report remain
+separate deliverables; the earlier report is a historical snapshot.

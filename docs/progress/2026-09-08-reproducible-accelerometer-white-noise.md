@@ -38,7 +38,7 @@ Nothing was staged. The protected source and test checksums were:
 
 The public API is:
 
-```python
+```text
 accelerometer_specific_force_measurement_body(
     ideal_specific_force_B: NDArray[np.float64],
     accelerometer_bias_B: NDArray[np.float64],

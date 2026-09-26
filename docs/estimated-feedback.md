@@ -1,20 +1,27 @@
 # Estimated-State Mission Feedback
 
-For the current reference choice and retained hover limitation, see the
-[2026-09-25 closeout](progress/2026-09-25-repository-audit.md). This guide retains
-the original integration contract and historical campaign results.
+This is the part of the project that closes the loop through measurements.
+It matters because a controller that tracks the simulated truth well may react
+poorly to estimation errors, measurement corrections and sampling delay. See
+[controller tradeoffs](controller-tradeoffs.md) for that behavior and
+[status](status.md) for the current evidence.
+
+The execution code is [estimated_mission.py](../src/quadrotor_math/estimated_mission.py),
+using [EskfOnlineEstimator](../src/quadrotor_math/eskf_online.py). The cascade
+reference choice is recorded in the [baseline closeout](progress/2026-09-25-repository-audit.md).
+The [geometric guide](geometric-control.md) describes the later optional path.
 
 This layer connects the existing sensor models and endpoint error-state Kalman
-filter (ESKF) to the existing position/attitude cascade. The controller laws and
-gains are unchanged. The new work is the causal execution and information boundary,
-not a new filter or controller. [ADR 0013](decisions/0013-estimated-state-mission-feedback.md)
-states the scope and frozen acceptance criteria. The
+filter (ESKF) to the position/attitude cascade or the selected geometric
+controller. It supplies the chosen controller's inputs without retuning its
+gains. [ADR 0013](decisions/0013-estimated-state-mission-feedback.md) states the
+original cascade integration scope and frozen acceptance criteria. The
 [verification record](progress/2026-09-24-estimated-state-feedback.md) records the
 actual audit and campaign results.
 
 The original profile described here remains reproducible. A separately named
-[joint bandwidth and prior design](feedback-design.md) addresses its noisy-hover
-qualification with explicit horizontal/roll/pitch gains and population-matched
+[joint bandwidth and prior design](feedback-design.md) investigated its noisy-hover
+failures with explicit horizontal/roll/pitch gains and population-matched
 initial covariance. It uses the same execution boundaries and retains the original
 thresholds, seeds, clocks and sensor noise. Its results must not be attributed to
 the original gains.

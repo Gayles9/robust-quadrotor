@@ -1,5 +1,15 @@
 # True-State Position Control and Baseline Missions
 
+To move sideways, a quadrotor must tilt its thrust vector. The outer loop turns
+position and velocity errors into a requested acceleration, then chooses the
+thrust and orientation that would produce it. The supervisor supplies the
+reference and decides when a virtual takeoff, tracking segment or landing ends.
+
+The implementation is split between [position control](../src/quadrotor_math/position_control.py),
+[mission definitions](../src/quadrotor_math/missions.py) and
+[execution](../src/quadrotor_math/mission_simulation.py). The
+[system overview](system-design.md) places these in the full flight loop.
+
 The position/velocity outer loop closes the translational part of the existing
 [attitude/rate cascade](control.md). It consumes NED position and velocity, a
 position/velocity/acceleration reference and constant mission yaw. It outputs a
