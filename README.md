@@ -68,6 +68,7 @@ Generated histories, figures and large logs stay outside Git. Experiment output
 directories must be new. See [environment notes](docs/environment.md) for pinned
 tooling and the numerical-backend boundary on byte-identical historical replay.
 
-The next engineering package is geometric tracking control and a fair true-state
-comparison against the existing trajectory baseline. System fault accommodation
-and ROS/PX4 integration remain separate milestones.
+The immediate task is recovering the unpublished geometric-controller source
+before tuning can continue. The [recovery audit](docs/progress/2026-09-26-source-recovery-audit.md)
+distinguishes retained flight evidence from code available in this repository.
+System fault accommodation and ROS/PX4 integration remain separate milestones.
