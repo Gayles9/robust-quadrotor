@@ -38,10 +38,11 @@ the [next-step plan](../next-steps.md) for the present scope.
 - [0017: Geometric reimplementation](0017-geometric-reimplementation.md)
 - [0018: Geometric estimator-correction study](0018-geometric-estimator-corrections.md)
 - [0019: Measured physical derivatives and development rejection](0019-measured-geometric-derivatives.md)
+- [0020: One coherent feedback-force shaping experiment](0020-coherent-geometric-force.md)
 
 ## Writing a new decision
 
-Use the next number and a descriptive filename, such as `0020-short-title.md`.
+Use the next number and a descriptive filename, such as `0021-short-title.md`.
 Explain the problem before the equations. State the evidence needed to accept
 the change and the limits that remain afterward.
 

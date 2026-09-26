@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file following a 
 
 ## [Unreleased]
 
+### 2026-09-26 geometric startup/hover closeout
+
+- Reproduce the known spline and hover failures and reconstruct their complete
+  force, moment, estimator-correction and actuator histories.
+- Check a sampled geometric/filter/motor model against nonlinear perturbations
+  in both horizontal directions, and test one frozen coherent-force experiment.
+- Reject that candidate: lower spline effort does not compensate for both failed
+  full hovers. Preserve production defaults and all original requirements;
+  close this tuning study and define observation health monitoring as the next task.
+
 ### 2026-09-26 documentation and project review
 
 - Simplify the README and organize guides around system design, implementation,

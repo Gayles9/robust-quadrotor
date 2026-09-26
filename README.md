@@ -25,6 +25,11 @@ problems, tested alternatives, and why an improvement in one metric can make
 another worse. [Project status](docs/status.md) lists the evidence and remaining
 work.
 
+The bounded startup/hover investigation is now closed: its single candidate
+reduced spline effort but still failed hover, so the accepted controllers remain
+unchanged. The [closeout](docs/progress/2026-09-26-geometric-transient-closeout.md)
+records the result; observation health monitoring is the next separate task.
+
 ## Run it
 
 Use Python 3.12, uv 0.12.3 and GNU Make. From the repository root:
