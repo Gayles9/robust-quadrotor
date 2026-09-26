@@ -100,3 +100,47 @@ def test_impulse_noise_gains_below_raw_cubic_stencils():
     gains = np.linalg.norm(out, axis=0)
     raw = [np.linalg.norm([11, -18, 9, -2]) / (6 * 0.02), np.linalg.norm([2, -5, 4, -1]) / 0.02**2]
     assert np.all(gains / raw <= 0.1)
+
+
+def test_rebase_removes_only_estimate_jumps_and_preserves_physical_history():
+    original = FeedbackDerivativeFilter(0.02)
+    shifted = FeedbackDerivativeFilter(0.02)
+    offset = np.zeros(3)
+    for k in range(150):
+        # A smooth physical input continues through multiple estimator revisions.
+        c = np.array([0.001 * k, 0.01 * np.sin(k / 12), 0.002 * k])
+        if k in (15, 16, 71):
+            jump = np.array([0.03, -0.08, 0.02]) * (1 if k != 16 else -2)
+            before = shifted
+            shifted = shifted.rebase(jump)
+            offset += jump
+            assert shifted.next_index == before.next_index
+            assert not shifted.previous.flags.writeable
+            assert not shifted.sections.flags.writeable
+        d, dd, original = original.step(c, k)
+        actual_d, actual_dd, shifted = shifted.step(c + offset, k)
+        np.testing.assert_allclose(actual_d, d, atol=3e-15)
+        np.testing.assert_allclose(actual_dd, dd, atol=3e-13)
+    assert np.linalg.norm(d) > 0.01
+    np.testing.assert_allclose(shifted.previous - original.previous, offset, atol=1e-16)
+
+
+def test_rebase_is_owned_transactional_and_does_not_advance_clock():
+    f = FeedbackDerivativeFilter(0.02)
+    _, _, f = f.step(np.ones(3), 0)
+    before = f.sections.copy()
+    jump = np.array([0.1, 0.2, 0.3])
+    revised = f.rebase(jump)
+    jump[:] = 100
+    np.testing.assert_array_equal(f.sections, before)
+    np.testing.assert_array_equal(revised.previous, [1.1, 1.2, 1.3])
+    assert revised.next_index == f.next_index == 1
+    for invalid in (np.ones(2), np.full(3, np.inf), np.full(3, np.nan)):
+        with pytest.raises(ValueError):
+            f.rebase(invalid)
+    enormous = FeedbackDerivativeFilter(
+        0.02, previous=np.full(3, 1e308), sections=np.full((3, 3), 1e308)
+    )
+    with pytest.raises(ValueError, match="finite"):
+        enormous.rebase(np.full(3, 1e308))
+    np.testing.assert_array_equal(f.sections, before)

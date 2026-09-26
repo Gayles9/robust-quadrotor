@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file following a 
 
 ## [Unreleased]
 
+### 2026-09-26 geometric audit and bounded tuning
+
+- Add explicit experimental estimator-correction rebasing and measured physical
+  acceleration/jerk derivatives, preserving default controller behavior and
+  sensor-only feedback. Test immutable filter memory, physical kinematics,
+  correction accumulation, measured command reconstruction and exact ESKF replay.
+- Add a bounded, reproducible development/qualification runner with saved-payload
+  verification. Retain all six failed development profiles; no noisy-flight
+  performance promotion or threshold change is made.
+- Audit the complete project, repeat the original true-state regression,
+  document completed capabilities and remaining boundaries, and publish tested
+  source checkpoints to prevent loss of uncommitted implementation work.
+
 ### 2026-09-25 trajectory missions
 
 - Add conservative Bernstein whole-curve geometry, speed, acceleration, nominal

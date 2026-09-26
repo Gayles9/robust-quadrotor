@@ -72,5 +72,9 @@ tooling and the numerical-backend boundary on byte-identical historical replay.
 The geometric controller has been reimplemented and freshly tested. The
 [replacement record](docs/progress/2026-09-26-geometric-reimplementation.md) reports
 passing true-state comparisons and remaining noisy hover/effort failures. It stays
-experimental; the next step is a bounded diagnosis before tuning. System fault
+experimental. The subsequent [project audit and tuning study](docs/progress/2026-09-26-geometric-project-audit.md)
+diagnoses estimator-update derivative spikes and retains six failed development
+profiles. Neither optional correction rebasing nor measured-acceleration
+feedforward clears every original hover/tracking/effort condition. Defaults and
+limits remain unchanged; fresh validation seeds remain unused. System fault
 accommodation and ROS/PX4 integration remain separate milestones.

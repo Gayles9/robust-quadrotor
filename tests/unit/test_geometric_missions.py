@@ -135,14 +135,27 @@ def test_steady_position_error_has_no_artificial_feedforward_rate():
     np.testing.assert_allclose(R[:, 2], target.lift_W / np.linalg.norm(target.lift_W))
 
 
-def test_noisy_estimated_commands_reconstructed_without_truth_and_offline_replay():
+@pytest.mark.parametrize("mode", ["original", "rebase", "measured"])
+def test_noisy_estimated_commands_reconstructed_without_truth_and_offline_replay(mode):
     kwargs = args(noisy=True)
+    if mode != "original":
+        # Accepted corrections can occur between outer ticks and must accumulate.
+        sensors = kwargs["sensors"]
+        kwargs["sensors"] = replace(
+            sensors,
+            local_position_schedule=replace(sensors.local_position_schedule, sample_period_s=0.03),
+            barometric_altitude_schedule=replace(
+                sensors.barometric_altitude_schedule, sample_period_s=0.015
+            ),
+        )
     # Give enough time for slow observations and multiple outer updates.
     plan = kwargs["plan"]
     kwargs["plan"] = replace(
         plan, segments=tuple(replace(s, duration_s=0.1) for s in plan.segments)
     )
-    gains = GeometricControllerParameters()
+    gains = GeometricControllerParameters(
+        rebase_estimator_corrections=mode == "rebase", use_measured_acceleration=mode == "measured"
+    )
     r = simulate_estimated_mission(**kwargs, geometric_controller=gains)
     replay = replay_eskf(r.measurements, kwargs["estimator_configuration"])
     np.testing.assert_array_equal(replay.covariances, r.estimates.covariances)
@@ -153,10 +166,29 @@ def test_noisy_estimated_commands_reconstructed_without_truth_and_offline_replay
     h = kwargs["numerics"].time_step_s * kwargs["numerics"].position_stride
     memory = FeedbackDerivativeFilter(h)
     outer_i = 0
+    events = [e for e in r.estimates.events if e.update is not None]
+    event_i = 0
     for row, time in enumerate(r.mission.control_time_s):
         k = int(np.searchsorted(r.mission.time_s, time))
         state = r.estimates.states[k]
         if time in r.mission.position_control_time_s:
+            jump = np.zeros(3)
+            while event_i < len(events) and events[event_i].observation.delivery_index <= k:
+                delta = events[event_i].update.error_state_correction
+                outer = kwargs["position_controller"]
+                jump += outer.nominal_mass * (
+                    outer.position_gain_W * delta[:3] + outer.velocity_gain_W * delta[3:6]
+                )
+                event_i += 1
+            if mode == "rebase":
+                memory = memory.rebase(jump)
+            acceleration = None
+            if mode == "measured":
+                acceleration = rotation_matrix_body_to_world(state.q_WB) @ (
+                    r.measurements.specific_force_measurements_B[k]
+                    - state.accelerometer_bias_B
+                    - r.imu_noise_mean_B[k, :3]
+                ) + np.array([0.0, 0.0, kwargs["position_controller"].nominal_gravity_acceleration])
             ref, _ = mission_reference(kwargs["plan"], float(time))
             jerk, snap = reference_jerk_snap(kwargs["plan"], float(time))
             target, memory = build_geometric_reference(
@@ -168,6 +200,7 @@ def test_noisy_estimated_commands_reconstructed_without_truth_and_offline_replay
                 kwargs["position_controller"],
                 memory,
                 outer_i,
+                estimated_acceleration_W=acceleration,
             )
             outer_i += 1
         thrust = projected_collective_thrust(target, state.q_WB, kwargs["position_controller"])
@@ -187,6 +220,12 @@ def test_noisy_estimated_commands_reconstructed_without_truth_and_offline_replay
     repeat = simulate_estimated_mission(**kwargs, geometric_controller=gains)
     np.testing.assert_array_equal(repeat.mission.position_W, r.mission.position_W)
     assert r.mission.control_time_s[-1] < r.mission.time_s[-1]
+
+
+@pytest.mark.parametrize("value", [0, 1, "yes", None, np.bool_(True)])
+def test_estimator_rebase_option_requires_explicit_boolean(value):
+    with pytest.raises(ValueError, match="rebase_estimator_corrections"):
+        GeometricControllerParameters(rebase_estimator_corrections=value)
 
 
 def test_invalid_large_reference_leaves_filter_state_unchanged():

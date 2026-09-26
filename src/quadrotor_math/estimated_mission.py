@@ -256,9 +256,27 @@ def simulate_estimated_mission(
     rate_rows: list[NDArray[np.float64]] = []
     noise_rows: list[NDArray[np.float64]] = []
     events: list[EskfReplayEvent] = []
+    rebase_corrections = (
+        isinstance(geometric_controller, GeometricControllerParameters)
+        and geometric_controller.rebase_estimator_corrections
+    )
+    pending_force_jump = np.zeros(3)
+    measured_derivatives = (
+        isinstance(geometric_controller, GeometricControllerParameters)
+        and geometric_controller.use_measured_acceleration
+    )
+    feedback_acceleration = np.zeros(3)
+
+    def estimated_acceleration() -> NDArray[np.float64]:
+        return feedback_acceleration
+
+    def consume_estimator_force_jump() -> NDArray[np.float64]:
+        nonlocal pending_force_jump
+        jump, pending_force_jump = pending_force_jump, np.zeros(3)
+        return jump
 
     def observe(k: int, time: float, truth: State, actual: NDArray[np.float64]) -> State:
-        nonlocal bias_a, bias_g
+        nonlocal bias_a, bias_g, pending_force_jump, feedback_acceleration
         if k:
             bias_a = accelerometer_bias_random_walk_step_body(
                 bias_a,
@@ -350,6 +368,24 @@ def simulate_estimated_mission(
                 record.delivery_index = k
                 delivered.append(record.observation())
         estimate = stream.step(time, measured_force, measured_rate, tuple(delivered))
+        if measured_derivatives:
+            posterior = estimate.nominal_state
+            with np.errstate(over="raise", invalid="raise"):
+                feedback_acceleration = rotation_matrix_body_to_world(posterior.q_WB) @ (
+                    measured_force - posterior.accelerometer_bias_B - estimate.imu_noise_mean_B[:3]
+                ) + np.array([0.0, 0.0, position_controller.nominal_gravity_acceleration])
+        if rebase_corrections:
+            try:
+                with np.errstate(over="raise", invalid="raise"):
+                    for event in estimate.events:
+                        if event.update is not None:
+                            correction = event.update.error_state_correction
+                            pending_force_jump += position_controller.nominal_mass * (
+                                position_controller.position_gain_W * correction[:3]
+                                + position_controller.velocity_gain_W * correction[3:6]
+                            )
+            except FloatingPointError:
+                raise ValueError("estimator force correction must remain finite") from None
         force_rows.append(measured_force)
         gyro_rows.append(measured_rate)
         bias_a_rows.append(bias_a)
@@ -366,6 +402,10 @@ def simulate_estimated_mission(
     options: dict[str, Any] = {}
     if geometric_controller is not None:
         options["geometric_controller"] = geometric_controller
+    if rebase_corrections:
+        options["consume_estimator_force_jump"] = consume_estimator_force_jump
+    if measured_derivatives:
+        options["estimated_acceleration"] = estimated_acceleration
     if allow_minimum_snap:
         options["allow_minimum_snap"] = allow_minimum_snap
     if type(allow_minimum_snap) is not bool:

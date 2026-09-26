@@ -32,15 +32,23 @@ class GeometricDomainError(ValueError):
 
 @dataclass(frozen=True, slots=True)
 class GeometricControllerParameters:
-    """Positive scalar stiffness [N m], damping [N m s], filter pole [rad/s]."""
+    """Scalar SI gains/pole and mutually exclusive optional derivative modes."""
 
     attitude_stiffness: float = 0.64
     rate_damping: float = 0.32
     filter_pole_rad_s: float = 30.0
+    rebase_estimator_corrections: bool = False
+    use_measured_acceleration: bool = False
 
     def __post_init__(self) -> None:
         for name in ("attitude_stiffness", "rate_damping", "filter_pole_rad_s"):
             object.__setattr__(self, name, _scalar(name, getattr(self, name), positive=True))
+        if type(self.rebase_estimator_corrections) is not bool:
+            raise ValueError("rebase_estimator_corrections must be bool")
+        if type(self.use_measured_acceleration) is not bool:
+            raise ValueError("use_measured_acceleration must be bool")
+        if self.rebase_estimator_corrections and self.use_measured_acceleration:
+            raise ValueError("geometric derivative modes are mutually exclusive")
 
 
 @dataclass(frozen=True, slots=True, eq=False)

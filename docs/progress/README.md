@@ -4,6 +4,7 @@ Every work session records its objective, concepts learned, changes, verificatio
 
 ## Current closeout
 
+- [2026-09-26: Entire-project audit and bounded geometric tuning](2026-09-26-geometric-project-audit.md)
 - [2026-09-26: Geometric replacement implementation and fresh validation](2026-09-26-geometric-reimplementation.md)
 
 - [2026-09-26: Published baseline and geometric source recovery audit](2026-09-26-source-recovery-audit.md)

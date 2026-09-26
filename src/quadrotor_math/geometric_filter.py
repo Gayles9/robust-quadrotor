@@ -41,6 +41,26 @@ class FeedbackDerivativeFilter:
         object.__setattr__(self, "previous", _array("previous", self.previous, (3,)))
         object.__setattr__(self, "sections", _array("sections", self.sections, (3, 3)))
 
+    def rebase(self, correction_jump_W: NDArray[np.float64]) -> "FeedbackDerivativeFilter":
+        """Translate memory by an estimator's force revision [N], without a tick.
+
+        Apply only independently identified posterior position/velocity jumps.
+        Translating every section preserves their differences (the derivatives).
+        Physical input changes must still pass through step without rebasing.
+        """
+        jump = _array("correction_jump_W", correction_jump_W, (3,))
+        try:
+            with np.errstate(over="raise", invalid="raise"):
+                return FeedbackDerivativeFilter(
+                    self.period_s,
+                    self.pole_rad_s,
+                    self.next_index,
+                    self.previous + jump,
+                    self.sections + jump,
+                )
+        except FloatingPointError:
+            raise ValueError("filter rebase arithmetic must remain finite") from None
+
     def step(
         self,
         correction_W: NDArray[np.float64],
