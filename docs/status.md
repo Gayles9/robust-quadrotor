@@ -1,4 +1,4 @@
-# Technical scope — 2026-09-25
+# Technical scope — 2026-09-26
 
 The repository audit and baseline selection are recorded in the
 [closeout](progress/2026-09-25-repository-audit.md). Current development proceeds
@@ -11,7 +11,7 @@ with a limited baseline; estimated-feedback hover qualification remains open.
 | ESKF | Prediction, correction/reset, gates, replay, endpoint calibration and causal online execution | Explicit prior; full-rate paired zero-delay IMU in the supported composition; stale data rejected; weak hover heading observability |
 | Baseline control and missions | Attitude/rate and position/velocity cascade, true/estimated feedback, virtual takeoff/track/land/abort | Truth safety oracle is separate; no hardware emergency-flight policy |
 | Minimum-snap planning | Fixed-duration optimization, C3 knots, derivatives through snap, conservative whole-curve reference bounds, bounded uniform timing and true-state missions | No minimum-time claim, obstacles, rotor torque/motor feasibility proof or estimated-state polynomial qualification |
-| Advanced control | Reusable baseline interfaces | Geometric tracking controller and fair comparison remain |
+| Advanced control | Reusable baseline interfaces; retained external geometric true-state evidence | Unpublished geometric source is unavailable; recovery is required before tuning or rerunning it |
 | System fault tolerance | Estimator outlier gates and bounded mission guards | Persistent health monitoring and degraded-mode policy remain |
 | Middleware/deployment | Independent Python core and earlier compatibility spike | ROS 2/C++, PX4/Gazebo mission integration remain |
 | Final evidence/report | Reproducible subsystem campaigns and a frozen report v1 | Broad integrated evaluation and an updated final technical report remain |
@@ -47,11 +47,13 @@ reference bounds, uniform retiming and true-state execution. The five fixed
 limiting, 3.27–3.92 cm position RMSE and at most 7.74 cm peak error. Those are
 true-state trajectory results, not a new estimated-feedback hover campaign.
 
-The next bounded package is **geometric tracking control with a fair true-state
-comparison**. Begin by auditing the trajectory integration, then fix the controller
-equations, reference derivatives, actuator behavior and comparison criteria before
-implementation. Preserve the original estimated-feedback failures. Fault
-accommodation and ROS/PX4 remain separate milestones.
+The immediate task is **recovering the unpublished geometric implementation**.
+The [September 26 audit](progress/2026-09-26-source-recovery-audit.md) verifies the
+retained true-state flight data and documents the missing source and later
+reported ESKF qualification failures. Tuning is authorized but blocked by source
+availability; no performance limit has been established. Preserve the original
+estimated-feedback failures. Fault accommodation and ROS/PX4 remain separate
+milestones.
 
 Progress is tracked by these deliverables. Historical percentage estimates and
 test counts do not establish performance qualification or remaining effort.
