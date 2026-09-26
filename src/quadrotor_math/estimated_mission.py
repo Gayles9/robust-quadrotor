@@ -1,6 +1,7 @@
-"""Causal sensor -> endpoint ESKF -> existing cascade, with explicit truth isolation."""
+"""Causal sensor -> endpoint ESKF -> cascade/geometric control, with truth isolation."""
 
 from dataclasses import dataclass, replace
+from typing import Any
 
 import numpy as np
 from numpy.typing import NDArray
@@ -21,6 +22,7 @@ from .eskf_replay import (
     _scalar,
 )
 from .eskf_run_replay import _first_delivery_index
+from .geometric_control import GeometricControllerParameters
 from .imu import (
     accelerometer_bias_random_walk_step_body,
     accelerometer_specific_force_measurement_body,
@@ -190,9 +192,14 @@ def simulate_estimated_mission(
     numerics: MissionNumerics,
     sensors: MissionSensors,
     estimator_configuration: EskfReplayConfiguration,
+    *,
+    geometric_controller: GeometricControllerParameters | None = None,
+    allow_minimum_snap: bool = False,
 ) -> EstimatedMissionResult:
     """Execute measurements and ESKF before same-epoch feedback, without lookahead.
 
+    Geometric control is opt-in. For cascade minimum-snap comparison, explicitly
+    set allow_minimum_snap=True. Legacy calls and defaults remain unchanged.
     The explicit prior must be at t=0 and endpoint noise must be configured.
     Inputs are snapshotted. The truth plant, safety oracle and sensor producer
     are separate from the measurement-only estimator and pure controllers.
@@ -355,6 +362,14 @@ def simulate_estimated_mission(
         state = estimate.nominal_state
         return state.position_W, state.velocity_W, state.q_WB, estimate.angular_velocity_estimate_B
 
+    # Preserve the positional legacy adapter call when no new option is used.
+    options: dict[str, Any] = {}
+    if geometric_controller is not None:
+        options["geometric_controller"] = geometric_controller
+    if allow_minimum_snap:
+        options["allow_minimum_snap"] = allow_minimum_snap
+    if type(allow_minimum_snap) is not bool:
+        raise ValueError("allow_minimum_snap must be bool")
     mission = _simulate_mission(
         initial_state,
         initial_actual_rotor_omega,
@@ -367,6 +382,7 @@ def simulate_estimated_mission(
         safety,
         numerics,
         observe,
+        **options,
     )
     all_records = [r for source in records for r in source]
     measurements = EskfReplayInput(

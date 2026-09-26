@@ -4,6 +4,8 @@ Every work session records its objective, concepts learned, changes, verificatio
 
 ## Current closeout
 
+- [2026-09-26: Geometric replacement implementation and fresh validation](2026-09-26-geometric-reimplementation.md)
+
 - [2026-09-26: Published baseline and geometric source recovery audit](2026-09-26-source-recovery-audit.md)
 - [2026-09-25: Trajectory feasibility, timing and true-state missions](2026-09-25-trajectory-missions.md)
 - [2026-09-25: Repository audit and feedback baseline selection](2026-09-25-repository-audit.md)
