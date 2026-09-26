@@ -13,7 +13,7 @@ hover and trajectory control with noisy estimated feedback.
 | State estimation | 15-state ESKF, measurement updates, attitude reset, innovation gates, endpoint propagation, online execution and replay | Explicit initial prior, no automatic alignment or delayed-state rewind; hover heading is weakly observable |
 | Baseline control | Cascaded position/velocity and attitude/rate feedback; supervised takeoff, tracking, landing and abort | True-state cases pass; original estimated-hover qualifications retain failures |
 | Planning | Fixed-duration minimum-snap splines, derivatives through snap, nominal reference bounds, bounded uniform retiming | No obstacle planning, time optimization or complete actuator-feasibility proof |
-| Geometric control | Rotation-based moment law, analytic force-to-attitude derivatives, causal filter, true/estimated missions and two optional derivative strategies | All six new noisy-feedback profiles fail the joint performance requirements |
+| Geometric control | Rotation-based moment law, analytic force-to-attitude derivatives, causal filter, true/estimated missions and two optional derivative strategies | Six earlier profiles and one subsequent coherent-force candidate fail the joint requirements; the bounded study is closed |
 | Integration | Earlier ROS 2/PX4/Gazebo compatibility checks and an x500 takeoff/hover/landing spike | The custom Python stack is not integrated into PX4 or validated on hardware |
 | Fault handling | Innovation rejection, event diagnostics and mission guards | Persistent health monitoring, diagnosis and degraded flight policy remain |
 
@@ -22,6 +22,15 @@ geometric controller or explicit cascade `allow_minimum_snap=True`. That support
 is an implementation capability, not a passing noisy-trajectory qualification.
 
 ## Evidence that matters
+
+The latest [startup/hover closeout](progress/2026-09-26-geometric-transient-closeout.md)
+reproduces the original failures and rejects one frozen coherent-force candidate.
+It passes the seed-30 spline comparison at 6.77 cm RMSE and 0.85 times cascade
+effort, but its full-hover maxima are 10.87 and 17.33 cm against 8 cm. No production
+algorithm or controller default changed. The complete software gate passes
+3,338 tests; sampled-model checks include both horizontal frame directions.
+The reserved qualification seeds remain unopened, and observation health
+monitoring is the next separate task.
 
 The [geometric audit](progress/2026-09-26-geometric-project-audit.md) records the
 following results for the implementation merged in
@@ -66,6 +75,6 @@ has the same distinction between implementation and qualified flight behavior.
 [Controller problems and tradeoffs](controller-tradeoffs.md) explains why the
 remaining failures can coexist with correct equations and good true-state
 tracking. [Project review](project-review.md) records the current audit, and
-[the next-step plan](next-steps.md) defines one bounded follow-up before further
-integration. Broad integrated evaluation and an updated technical report remain
+[the next-step plan](next-steps.md) defines observation health monitoring before
+further integration. Broad integrated evaluation and an updated technical report remain
 separate deliverables; the earlier report is a historical snapshot.

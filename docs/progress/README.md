@@ -12,6 +12,7 @@ results, seeds, thresholds and commit identities are preserved.
 
 ## Controller and planning studies
 
+- [2026-09-26: Geometric startup/hover closeout](2026-09-26-geometric-transient-closeout.md)
 - [2026-09-26: Source recovery audit](2026-09-26-source-recovery-audit.md)
 - [2026-09-26: Geometric reimplementation](2026-09-26-geometric-reimplementation.md)
 - [2026-09-26: Geometric project audit](2026-09-26-geometric-project-audit.md)

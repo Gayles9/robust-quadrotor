@@ -129,9 +129,16 @@ estimated-feedback comparison profile. Its original 28/30 hover result and
 version 1's 29/30 result also retain their misses. No current profile satisfies
 every original estimated-hover condition.
 
-I stopped the six-candidate study before opening reserved validation seeds.
-The [next plan](next-steps.md) first examines startup, estimator correction
-timing, reference derivatives and actuator response together. It permits at
-most one new physically justified candidate, with a clear stopping rule.
+The subsequent [startup/hover investigation](progress/2026-09-26-geometric-transient-closeout.md)
+tested one further mechanism: filtering the force value together with its
+derivatives at a frozen 10 rad/s cutoff. Spline RMSE was 6.77 cm and effort fell
+to 0.85 times cascade, but full-hover maxima worsened to 10.87 and 17.33 cm.
+The shaped reference reduces sharp commands while adding delay to the physical
+recovery. This is a useful diagnosis, but fails the unchanged joint requirement.
+
+That bounded study is now closed, with no further gain or cutoff search and no
+reserved validation seeds opened. The cascade default and original geometric
+controller remain unchanged. The [next plan](next-steps.md) defines observation
+health monitoring as a separate task; qualification is still open.
 The [geometric guide](geometric-control.md) contains the equations and API, and
 [cascade design](feedback-design.md) explains the coupled local model.
