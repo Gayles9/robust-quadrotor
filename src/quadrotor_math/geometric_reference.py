@@ -87,8 +87,15 @@ def build_geometric_reference(
     parameters: PositionControllerParameters,
     memory: FeedbackDerivativeFilter,
     sample_index: int,
+    *,
+    estimated_acceleration_W: NDArray[np.float64] | None = None,
 ) -> tuple[GeometricPositionReference, FeedbackDerivativeFilter]:
-    """PD force plus filtered correction derivatives, without hidden plant inputs.
+    """PD force and causal derivatives, without hidden plant inputs.
+
+    With estimated_acceleration_W [m/s²], use physical kinematics and filter
+    nominal mass times measured acceleration [N] to obtain force rate [N/s].
+    Otherwise differentiate the correction force. Start fresh memory when
+    changing the input channel; mission mode is fixed for an entire run.
 
     Reject outer limiting: a clipped force would require different derivative
     equations. The cascade default continues to use its original clipping path.
@@ -109,7 +116,20 @@ def build_geometric_reference(
                 parameters.position_gain_W * (position - reference.position_W)
                 + parameters.velocity_gain_W * (velocity - reference.velocity_W)
             )
-            first, second, new_memory = memory.step(correction, sample_index)
+            if estimated_acceleration_W is None:
+                first, second, new_memory = memory.step(correction, sample_index)
+            else:
+                acceleration = _array("estimated_acceleration_W", estimated_acceleration_W, (3,))
+                force = m * acceleration
+                force_rate, _, new_memory = memory.step(force, sample_index)
+                force_error = force - m * reference.acceleration_W
+                first = (
+                    m * parameters.position_gain_W * (velocity - reference.velocity_W)
+                    + parameters.velocity_gain_W * force_error
+                )
+                second = parameters.position_gain_W * force_error + parameters.velocity_gain_W * (
+                    force_rate - m * jerk
+                )
             lift = (
                 m
                 * (

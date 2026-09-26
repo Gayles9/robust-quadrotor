@@ -72,6 +72,19 @@ def test_undeclared_candidates_rejected(value):
         configuration(jobs()[15], value)
 
 
+def test_measured_strategy_is_frozen_and_only_uses_sensor_adapter():
+    for job in jobs():
+        config = configuration(job, 1.0, strategy="measured")
+        if job["controller"] == "geometric":
+            gains = config["geometric_controller"]
+            assert not gains.rebase_estimator_corrections
+            assert gains.use_measured_acceleration == (job["mode"] != "true")
+            assert gains.attitude_stiffness == 0.64
+            assert gains.rate_damping == 0.32
+    with pytest.raises(ValueError, match="original gains"):
+        configuration(jobs()[15], 1.5, strategy="measured")
+
+
 def test_evidence_gate_detects_empty_missing_and_changed_payloads(tmp_path):
     import hashlib
 

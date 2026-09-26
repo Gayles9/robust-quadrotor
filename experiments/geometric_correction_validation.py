@@ -23,18 +23,25 @@ FREQUENCIES = (1.0, 1.5, 2.0)
 PROFILES = ((1.0, 0.64), (1.5, 0.64), (2.0, 0.64), (1.0, 1.28), (1.5, 1.28))
 
 
-def configuration(job: dict[str, Any], frequency: float, stiffness: float = 0.64) -> dict[str, Any]:
+def configuration(
+    job: dict[str, Any], frequency: float, stiffness: float = 0.64, strategy: str = "rebase"
+) -> dict[str, Any]:
     if (
         isinstance(frequency, (bool, np.bool_))
         or isinstance(stiffness, (bool, np.bool_))
         or (frequency, stiffness) not in PROFILES
     ):
         raise ValueError("frequency/stiffness must be a declared candidate")
+    if strategy not in ("rebase", "measured") or (
+        strategy == "measured" and (frequency, stiffness) != (1.0, 0.64)
+    ):
+        raise ValueError("measured strategy uses the original gains only")
     config = original_configuration(job)
     if job["controller"] == "geometric":
         config["geometric_controller"] = replace(
             config["geometric_controller"],
-            rebase_estimator_corrections=True,
+            rebase_estimator_corrections=strategy == "rebase",
+            use_measured_acceleration=strategy == "measured" and job["mode"] != "true",
             attitude_stiffness=stiffness,
         )
         outer = config["position_controller"]
@@ -158,10 +165,15 @@ def verify_payloads(rows: list[dict[str, Any]], output: Path) -> dict[str, Any]:
 
 
 def run_item(
-    item: tuple[int, dict[str, Any], str, float], *, stiffness: float = 0.64
+    item: tuple[int, dict[str, Any], str, float],
+    *,
+    stiffness: float = 0.64,
+    strategy: str = "rebase",
 ) -> dict[str, Any]:
     index, job, output, frequency = item
-    return execute((index, job, output), config_override=configuration(job, frequency, stiffness))
+    return execute(
+        (index, job, output), config_override=configuration(job, frequency, stiffness, strategy)
+    )
 
 
 def main() -> int:
@@ -169,6 +181,7 @@ def main() -> int:
     parser.add_argument("--stage", choices=("development", "qualification"), required=True)
     parser.add_argument("--frequency", type=float, choices=FREQUENCIES, required=True)
     parser.add_argument("--stiffness", type=float, choices=(0.64, 1.28), default=0.64)
+    parser.add_argument("--strategy", choices=("rebase", "measured"), default="rebase")
     parser.add_argument("--workers", type=int, choices=range(1, 5), default=3)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
@@ -177,17 +190,20 @@ def main() -> int:
     fingerprint = source_sha256(root)
     planned = planned_jobs(args.stage)
     protocol = dict(
-        version=1,
+        version=2,
         scope="ADR 0018; unchanged acceptance; no qualification from development cases",
         stage=args.stage,
         frequency_rad_s=args.frequency,
         attitude_stiffness_Nm=args.stiffness,
+        strategy=args.strategy,
         jobs=planned,
         configurations=[
             plain(
                 {
                     k: asdict(v) if hasattr(v, "__dataclass_fields__") else v
-                    for k, v in configuration(j, args.frequency, args.stiffness).items()
+                    for k, v in configuration(
+                        j, args.frequency, args.stiffness, args.strategy
+                    ).items()
                 }
             )
             for j in planned
@@ -207,7 +223,7 @@ def main() -> int:
     with ProcessPoolExecutor(max_workers=args.workers) as pool:
         rows = list(
             pool.map(
-                partial(run_item, stiffness=args.stiffness),
+                partial(run_item, stiffness=args.stiffness, strategy=args.strategy),
                 [(i, j, str(args.output), args.frequency) for i, j in enumerate(planned)],
             )
         )

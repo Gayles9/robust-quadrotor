@@ -174,3 +174,33 @@ estimator prior, sensor distributions and the filter pole stay fixed.
 `--stage qualification` runs the original 28-case matrix plus twelve fresh
 cases after candidate selection. Candidate qualification is reported separately
 from known comparator hover failures; the original matrix outcome is retained.
+
+### Measured physical derivatives
+
+[ADR 0019](decisions/0019-measured-geometric-derivatives.md) provides another
+explicit experiment: `use_measured_acceleration=True`, mutually exclusive with
+rebasing. The estimated adapter computes
+`a_hat=R_hat*(f_measured-bias_a-conditional_noise_a)+g*e3` from available IMU
+and posterior ESKF quantities. At outer ticks, the filter takes `F=m*a_hat`
+and estimates `F_dot`. It then constructs
+
+```text
+correction_rate         = m*Kp*(v_hat-vd) + Kv*(F-m*ad)
+correction_acceleration = Kp*(F-m*ad) + Kv*(F_dot-m*jd)
+```
+
+This avoids a second differentiation of corrected position/velocity. It uses
+the original gains and preserves raw PD force. True-state-only use is rejected
+because it has no measurement-derived acceleration input. Changing derivative
+channels requires fresh filter memory. This remains approximate feedforward.
+
+Use `--strategy measured --frequency 1` for its development reproduction.
+For the two additional rebasing profiles, `--stiffness 1.28` selects the gain
+derived from critical roll damping at frequencies 1 or 1.5. The original
+three profiles keep stiffness 0.64.
+
+**All six profiles were rejected for performance promotion.** The
+[project audit](progress/2026-09-26-geometric-project-audit.md) retains the
+complete results and explains the tradeoffs. Fresh validation cases remain
+unopened because no candidate clears the known development conditions.
+The cascade default and the original geometric defaults are unchanged.

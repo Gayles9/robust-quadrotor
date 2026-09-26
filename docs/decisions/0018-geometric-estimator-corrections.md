@@ -94,3 +94,11 @@ after successful original hashing. Exact sensor-only replay restored two to
 their original SHA-256 values; a third is being checked. The cause of truncation
 is not established. Add explicit saved-payload verification to the campaign gate,
 so an apparently successful flight can never qualify from damaged evidence.
+
+## Final disposition
+
+All five rebasing profiles failed development. ADR 0019 records one separate
+measured-derivative design, its failure, and early disqualification before fresh
+validation. No candidate or default gain change is promoted. The closeout audit
+authenticates 202 payloads across 42 executions after seven exact-hash recoveries;
+the cause of the original truncations remains unknown.

@@ -276,6 +276,7 @@ def _simulate_mission(
     geometric_controller: GeometricControllerParameters | None = None,
     allow_minimum_snap: bool = False,
     consume_estimator_force_jump: Callable[[], NDArray[np.float64]] | None = None,
+    estimated_acceleration: Callable[[], NDArray[np.float64]] | None = None,
 ) -> MissionResult:
     """Shared private execution; observer is a truth-to-sensor integration boundary.
 
@@ -289,6 +290,12 @@ def _simulate_mission(
         raise TypeError("geometric_controller must be GeometricControllerParameters")
     if type(allow_minimum_snap) is not bool:
         raise ValueError("allow_minimum_snap must be bool")
+    if (
+        geometric_controller is not None
+        and geometric_controller.use_measured_acceleration
+        and (observer is None or estimated_acceleration is None)
+    ):
+        raise ValueError("measured acceleration requires estimated feedback")
     for argument, kind in (
         (initial_state, RigidBodyInitialState),
         (truth_body, RigidBodyParameters),
@@ -443,6 +450,11 @@ def _simulate_mission(
                             outer,
                             derivative_memory,
                             k // numerics.position_stride,
+                            estimated_acceleration_W=(
+                                estimated_acceleration()
+                                if estimated_acceleration is not None
+                                else None
+                            ),
                         )
                         held = geometric_reference.position_command
                 if k % numerics.attitude_stride == 0 and geometric_controller is not None:

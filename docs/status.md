@@ -53,9 +53,16 @@ All seven true-state comparisons pass. Four noisy spline cases meet physical
 tracking limits but require 10.86–11.80 times paired cascade moment effort;
 geometric full-hover peaks of 8.76 and 13.69 cm miss the original 8 cm limit.
 The implementation remains experimental and the cascade remains the default.
-The next bounded action is diagnosing noisy torque effort and hover error before
-selecting a correction. Source is now reconstructed; the historical missing-source
-and failed experiments remain documented without inheriting their pass counts.
+The subsequent [project audit and bounded tuning study](progress/2026-09-26-geometric-project-audit.md)
+diagnoses estimator-correction derivative spikes and tests six explicit profiles:
+three position bandwidths with correction rebasing, two additional attitude
+stiffness choices derived from critical roll damping, and measured physical
+acceleration/jerk feedforward. None clears the unchanged hover/tracking/effort
+requirements. Both default controllers remain unchanged, and fresh validation
+seeds remain unopened. The next proposal needs a justified joint startup and
+feedback design; more selection on these same seeds is not qualification.
+Source is published and checkpointed. Historical missing-source failures remain
+in dated records and no longer describe the accessible implementation.
 Fault accommodation and ROS/PX4 remain separate milestones.
 
 Progress is tracked by these deliverables. Historical percentage estimates and

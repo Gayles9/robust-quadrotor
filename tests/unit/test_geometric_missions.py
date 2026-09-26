@@ -135,10 +135,10 @@ def test_steady_position_error_has_no_artificial_feedforward_rate():
     np.testing.assert_allclose(R[:, 2], target.lift_W / np.linalg.norm(target.lift_W))
 
 
-@pytest.mark.parametrize("rebase", [False, True])
-def test_noisy_estimated_commands_reconstructed_without_truth_and_offline_replay(rebase):
+@pytest.mark.parametrize("mode", ["original", "rebase", "measured"])
+def test_noisy_estimated_commands_reconstructed_without_truth_and_offline_replay(mode):
     kwargs = args(noisy=True)
-    if rebase:
+    if mode != "original":
         # Accepted corrections can occur between outer ticks and must accumulate.
         sensors = kwargs["sensors"]
         kwargs["sensors"] = replace(
@@ -153,7 +153,9 @@ def test_noisy_estimated_commands_reconstructed_without_truth_and_offline_replay
     kwargs["plan"] = replace(
         plan, segments=tuple(replace(s, duration_s=0.1) for s in plan.segments)
     )
-    gains = GeometricControllerParameters(rebase_estimator_corrections=rebase)
+    gains = GeometricControllerParameters(
+        rebase_estimator_corrections=mode == "rebase", use_measured_acceleration=mode == "measured"
+    )
     r = simulate_estimated_mission(**kwargs, geometric_controller=gains)
     replay = replay_eskf(r.measurements, kwargs["estimator_configuration"])
     np.testing.assert_array_equal(replay.covariances, r.estimates.covariances)
@@ -178,8 +180,15 @@ def test_noisy_estimated_commands_reconstructed_without_truth_and_offline_replay
                     outer.position_gain_W * delta[:3] + outer.velocity_gain_W * delta[3:6]
                 )
                 event_i += 1
-            if rebase:
+            if mode == "rebase":
                 memory = memory.rebase(jump)
+            acceleration = None
+            if mode == "measured":
+                acceleration = rotation_matrix_body_to_world(state.q_WB) @ (
+                    r.measurements.specific_force_measurements_B[k]
+                    - state.accelerometer_bias_B
+                    - r.imu_noise_mean_B[k, :3]
+                ) + np.array([0.0, 0.0, kwargs["position_controller"].nominal_gravity_acceleration])
             ref, _ = mission_reference(kwargs["plan"], float(time))
             jerk, snap = reference_jerk_snap(kwargs["plan"], float(time))
             target, memory = build_geometric_reference(
@@ -191,6 +200,7 @@ def test_noisy_estimated_commands_reconstructed_without_truth_and_offline_replay
                 kwargs["position_controller"],
                 memory,
                 outer_i,
+                estimated_acceleration_W=acceleration,
             )
             outer_i += 1
         thrust = projected_collective_thrust(target, state.q_WB, kwargs["position_controller"])
