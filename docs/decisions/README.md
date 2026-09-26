@@ -45,3 +45,4 @@ Record architectural or version changes here as numbered decision records, such 
 ```
 
 - [0017: Geometric reimplementation](0017-geometric-reimplementation.md)
+- [0018: Geometric estimator-correction study](0018-geometric-estimator-corrections.md)

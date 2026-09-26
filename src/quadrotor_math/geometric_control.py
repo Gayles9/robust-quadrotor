@@ -37,10 +37,13 @@ class GeometricControllerParameters:
     attitude_stiffness: float = 0.64
     rate_damping: float = 0.32
     filter_pole_rad_s: float = 30.0
+    rebase_estimator_corrections: bool = False
 
     def __post_init__(self) -> None:
         for name in ("attitude_stiffness", "rate_damping", "filter_pole_rad_s"):
             object.__setattr__(self, name, _scalar(name, getattr(self, name), positive=True))
+        if type(self.rebase_estimator_corrections) is not bool:
+            raise ValueError("rebase_estimator_corrections must be bool")
 
 
 @dataclass(frozen=True, slots=True, eq=False)

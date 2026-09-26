@@ -134,12 +134,16 @@ def metrics(result: MissionResult, hover: bool = False) -> dict[str, Any]:
     return score
 
 
-def execute(item: tuple[int, dict[str, Any], str]) -> dict[str, Any]:
+def execute(
+    item: tuple[int, dict[str, Any], str],
+    *,
+    config_override: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     index, job, output = item
     directory = Path(output) / name_of(job)
     directory.mkdir()
     try:
-        config = configuration(job)
+        config = configuration(job) if config_override is None else config_override
         estimated = None
         if job["mode"] == "true":
             mission = simulate_mission(**config)

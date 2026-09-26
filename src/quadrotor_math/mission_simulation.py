@@ -275,6 +275,7 @@ def _simulate_mission(
     *,
     geometric_controller: GeometricControllerParameters | None = None,
     allow_minimum_snap: bool = False,
+    consume_estimator_force_jump: Callable[[], NDArray[np.float64]] | None = None,
 ) -> MissionResult:
     """Shared private execution; observer is a truth-to-sensor integration boundary.
 
@@ -428,6 +429,10 @@ def _simulate_mission(
                         held = compute_position_control(feedback[0], feedback[1], reference, outer)
                     else:
                         assert derivative_memory is not None
+                        if consume_estimator_force_jump is not None:
+                            derivative_memory = derivative_memory.rebase(
+                                consume_estimator_force_jump()
+                            )
                         jerk, snap = reference_jerk_snap(plan, float(time))
                         geometric_reference, derivative_memory = build_geometric_reference(
                             feedback[0],

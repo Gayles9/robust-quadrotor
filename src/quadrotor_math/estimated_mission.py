@@ -256,9 +256,19 @@ def simulate_estimated_mission(
     rate_rows: list[NDArray[np.float64]] = []
     noise_rows: list[NDArray[np.float64]] = []
     events: list[EskfReplayEvent] = []
+    rebase_corrections = (
+        isinstance(geometric_controller, GeometricControllerParameters)
+        and geometric_controller.rebase_estimator_corrections
+    )
+    pending_force_jump = np.zeros(3)
+
+    def consume_estimator_force_jump() -> NDArray[np.float64]:
+        nonlocal pending_force_jump
+        jump, pending_force_jump = pending_force_jump, np.zeros(3)
+        return jump
 
     def observe(k: int, time: float, truth: State, actual: NDArray[np.float64]) -> State:
-        nonlocal bias_a, bias_g
+        nonlocal bias_a, bias_g, pending_force_jump
         if k:
             bias_a = accelerometer_bias_random_walk_step_body(
                 bias_a,
@@ -350,6 +360,18 @@ def simulate_estimated_mission(
                 record.delivery_index = k
                 delivered.append(record.observation())
         estimate = stream.step(time, measured_force, measured_rate, tuple(delivered))
+        if rebase_corrections:
+            try:
+                with np.errstate(over="raise", invalid="raise"):
+                    for event in estimate.events:
+                        if event.update is not None:
+                            correction = event.update.error_state_correction
+                            pending_force_jump += position_controller.nominal_mass * (
+                                position_controller.position_gain_W * correction[:3]
+                                + position_controller.velocity_gain_W * correction[3:6]
+                            )
+            except FloatingPointError:
+                raise ValueError("estimator force correction must remain finite") from None
         force_rows.append(measured_force)
         gyro_rows.append(measured_rate)
         bias_a_rows.append(bias_a)
@@ -366,6 +388,8 @@ def simulate_estimated_mission(
     options: dict[str, Any] = {}
     if geometric_controller is not None:
         options["geometric_controller"] = geometric_controller
+    if rebase_corrections:
+        options["consume_estimator_force_jump"] = consume_estimator_force_jump
     if allow_minimum_snap:
         options["allow_minimum_snap"] = allow_minimum_snap
     if type(allow_minimum_snap) is not bool:

@@ -79,6 +79,25 @@ It does not remove steady wind position error or estimator bias. Since the force
 is unfiltered while its derivatives are filtered, the jets approximate the raw
 feedback reference; they are not its exact continuous derivatives.
 
+### Optional estimator-correction rebasing
+
+[ADR 0018](decisions/0018-geometric-estimator-corrections.md) adds
+`GeometricControllerParameters(rebase_estimator_corrections=True)`.
+It separates accepted ESKF position/velocity revisions from physical motion.
+For an injected world-frame correction `(delta_p, delta_v)`, accumulate
+`delta_c=m*(Kp*delta_p+Kv*delta_v)` between outer ticks. Translate the filter's
+previous input and all three section states by that force revision before
+stepping. Their differences, hence existing derivatives, remain unchanged.
+
+The controller still uses the full posterior position and velocity for its raw
+PD force. Only derivative feedforward avoids the instantaneous estimator jump.
+No rejected event, true state, acceleration, rotor state or future observation
+enters this calculation. Multiple corrections between outer ticks accumulate;
+`rebase()` neither advances the sample index nor mutates existing memory.
+The option defaults to `False` to preserve the original experiment. With true
+state feedback it has no effect. This is an approximation for discontinuous
+posterior estimates, not an exact derivative or a new stability proof.
+
 ## Moment and bounds
 
 For desired-to-current transport `A=R_WB.T Rd`, define
@@ -141,3 +160,17 @@ The command records every configuration, source fingerprint, flight, failure,
 score and file hash. Estimated cases retain full covariance, sensor and event
 histories. Nonzero exit on failed performance is an expected, preserved outcome;
 passing software tests must not relabel a failed campaign as qualified.
+
+The bounded correction study uses the same physical and effort gates:
+
+```bash
+OPENBLAS_NUM_THREADS=1 uv run python -m experiments.geometric_correction_validation \
+  --stage development --frequency 1.5 --output /tmp/new-correction-evidence --workers 3
+```
+
+Declared horizontal natural frequencies are 1, 1.5 and 2 rad/s, with damping
+ratio 0.9 (`Kp=frequency**2`, `Kv=1.8*frequency`). Vertical/attitude gains,
+estimator prior, sensor distributions and the filter pole stay fixed.
+`--stage qualification` runs the original 28-case matrix plus twelve fresh
+cases after candidate selection. Candidate qualification is reported separately
+from known comparator hover failures; the original matrix outcome is retained.
