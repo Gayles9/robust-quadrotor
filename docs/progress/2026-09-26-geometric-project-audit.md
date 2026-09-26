@@ -176,7 +176,8 @@ independent verifier authenticates **202 payload files** and recomputes all
 42 flight scores directly from saved arrays, without importing the controller
 or production scorer.
 
-Seven payloads were found empty after their original digests had been recorded.
+Seven payloads were damaged after their original digests had been recorded:
+six were empty and one retained bytes that did not match its expected hash.
 Four were restored by sensor-only ESKF replay, matching every posterior state,
 event disposition and original payload SHA-256. Three were restored from
 independent identical-fixture payloads with the exact expected digest. No
