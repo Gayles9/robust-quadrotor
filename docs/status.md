@@ -61,8 +61,11 @@ Its 17.57 cm RMSE still exceeds the original 15 cm limit. Hover peak also rises
 slightly, from 10.7563 to 10.7596 cm, failing the frozen no-regression rule and
 remaining above 8 cm. The candidate is rejected; it remains an explicit
 research option, and the original cascade stays default. The complete software
-gate passes 3,575 tests. The next task is the technical report and explicit
-operating boundary, preserving these failures and the separate geometric limit.
+gate passes 3,575 tests. The [technical report and operating boundary](technical-report.md)
+now consolidate these results and the separate geometric limit. Its audit
+recomputed metrics from all 48 archived baseline/candidate executions, with
+182 payload references authenticated and no new flights. The next task is
+causal early-flight diagnosis, not another gain sweep.
 
 The latest [startup/hover closeout](progress/2026-09-26-geometric-transient-closeout.md)
 reproduces the original failures and rejects one frozen coherent-force candidate.
@@ -117,6 +120,7 @@ has the same distinction between implementation and qualified flight behavior.
 [Controller problems and tradeoffs](controller-tradeoffs.md) explains why the
 remaining failures can coexist with correct equations and good true-state
 tracking. [Project review](project-review.md) records the current audit, and
-[the next-step plan](next-steps.md) defines the technical-report and operating-
-boundary task. Broader qualification and middleware integration remain separate
-deliverables; the earlier report is a historical snapshot.
+[the next-step plan](next-steps.md) defines the bounded early-flight diagnosis.
+Broader qualification and middleware integration remain separate deliverables.
+The updated report is pinned to its declared source; historical report revisions
+and dated records remain snapshots, not instructions to repeat old studies.
