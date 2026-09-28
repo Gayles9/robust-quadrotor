@@ -56,6 +56,8 @@ landing is not touchdown/disarming, and numerical abort is not physical
 fallback flight.
 
 The [closeout](progress/2026-09-28-technical-report.md) records acceptance.
-The [next step](next-steps.md#next-bounded-task-causal-early-flight-diagnosis)
-is a causal diagnosis of the saved early-flight transient before any new
-controller candidate is proposed.
+The report's proposed [early-flight diagnosis](early-flight-diagnosis.md) is
+now complete in a subsequent, separately recorded milestone. The current
+[next step](next-steps.md#next-bounded-task-attitude-estimation-startup-audit)
+audits the attitude-estimation startup path before a measurement-only correction
+is selected. Those later diagnostic results are not part of report revision 2.0.

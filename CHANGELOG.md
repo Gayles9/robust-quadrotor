@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file following a 
 
 ## [Unreleased]
 
+### 2026-09-28 causal early-flight diagnosis
+
+- Reauthenticate and independently rescore the original and vertical campaigns;
+  reconstruct saved mass/hover estimation, commands, force and motor response.
+- Explain the mass transient with an unfitted scalar model and test one
+  attitude-only hover oracle with exact channel isolation and noise pairing.
+- Retain all flight failures and controller defaults; identify attitude-estimation
+  startup as the next bounded audit, with no production candidate in this step.
+
 ### 2026-09-28 bounded vertical compensation
 
 - Diagnose the heavier-mass offset against the PD equilibrium and saved
