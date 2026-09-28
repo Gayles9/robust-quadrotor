@@ -42,8 +42,10 @@ bounded experiment for the mass-induced offset. Its
 benefits and failed acceptance conditions; it does not replace the default.
 The [technical report](docs/technical-report.md) consolidates the mathematical
 architecture, verified results and operating boundary. The
-[next-step plan](docs/next-steps.md) scopes causal early-flight diagnosis using
-saved evidence; it does not authorize another gain sweep or default promotion.
+[early-flight diagnosis](docs/early-flight-diagnosis.md) now separates slow mass
+compensation from the hover transient and records one attitude-only oracle with
+7.23 cm hover peak. That is diagnostic headroom, not deployable feedback. The
+[next-step plan](docs/next-steps.md) scopes an attitude-estimation startup audit.
 
 ## Run it
 

@@ -64,31 +64,44 @@ controller defaults and numerical-abort limitations are explicit. The
 [verification record](progress/2026-09-28-technical-report.md) records the audit.
 No controller, threshold, seed or mission behavior changed.
 
-## Next bounded task: causal early-flight diagnosis
+## Completed: causal early-flight diagnosis
 
-Audit the report closeout and reauthenticate the original mass/hover histories.
-Reproduce their full-flight metrics before analyzing the startup interval.
-The mass candidate's first-five-second RMSE is 29.736 cm versus 3.286 cm over
-its last five seconds; this motivates a transient investigation, not a new
-scoring window. Hover causality must be established separately.
+The [investigation](early-flight-diagnosis.md) authenticates the saved campaigns
+and separates mass-load learning from the horizontal hover transient. An unfitted
+scalar model reproduces both mass-case vertical trajectories to about 8 mm RMS.
+One attitude-only oracle reduces the original hover peak from 10.7563 to
+7.2291 cm with unchanged sensor draws and full scoring. It shows useful headroom,
+but simulated truth is not an implementable controller input. The
+[verification record](progress/2026-09-28-early-flight-diagnosis.md) preserves the
+causal finding, limitations and explicit go/no-go.
 
-1. Decompose saved tracking error by axis, phase and declared diagnostic windows.
-   Distinguish reference-to-truth error from estimate-to-truth error.
-2. Reconstruct commanded and achieved force, attitude, motor lag, limits,
-   observation health and integral-learning timing. State a testable mechanism
-   with predicted signs, timing and magnitude.
-3. If needed, use an independently checked local model or a single-factor
-   counterfactual to distinguish causes. Mark altered initialization or oracle
-   inputs as diagnostic, not qualification.
-4. Return a causal finding with its uncertainty and an explicit go/no-go.
-   Only then scope one justified candidate with unchanged regression and
-   full-flight acceptance.
+## Next bounded task: attitude-estimation startup audit
 
-Acceptance is reproducible attribution and a bounded next experiment or a
-justified stop, not a promised controller pass. Do not sweep gains/cutoffs,
-open reserved seeds, discard startup, move the scoring clock, or relax limits.
-This task does not automatically reopen the closed geometric study or authorize
-implementation of a controller candidate.
+Audit the diagnostic closeout and reuse the authenticated original and oracle
+hover histories. Do not generate another controller trial first.
+
+1. Reconstruct roll/pitch error and covariance through the first second and the
+   subsequent approach to the hover peak. Separate IMU propagation from each
+   position/altitude correction; inspect coupled velocity and bias corrections.
+2. Explain why thrust-axis estimation error grows from 2.2941 degrees initially
+   to 3.1614 degrees at 0.2 s. Check innovation timing, Jacobian/reset signs and
+   covariance consistency against the declared initial prior and sensor model.
+   Fix a demonstrated in-scope defect if found; do not infer one from a failed
+   flight score alone.
+3. Assess which attitude information is available causally from existing
+   measurements during this freely flying initialization. Do not assume a
+   stationary gravity measurement, supply true attitude, silently tighten the
+   prior, change sensors or tune process/measurement noise to the observed run.
+4. Return one justified measurement-only correction design and freeze its
+   interface, independent tests and original full-flight regression acceptance
+   before implementation, or record a justified no-go and the missing information.
+
+Acceptance is an auditable estimator explanation and an implementable bounded
+design or justified stop. There is no gain/cutoff search, reserved seed access,
+startup removal, scoring shift, threshold relaxation or geometric reopening.
+The present step does not authorize implementing a flight-controller candidate.
+The separate mass transient remains open; attitude improvement must not be
+represented as a solution to the measured vertical force deficit.
 
 Any future project-completion percentage must declare an agreed weighted
 milestone denominator; campaign pass fractions are not project completion.

@@ -64,8 +64,13 @@ research option, and the original cascade stays default. The complete software
 gate passes 3,575 tests. The [technical report and operating boundary](technical-report.md)
 now consolidate these results and the separate geometric limit. Its audit
 recomputed metrics from all 48 archived baseline/candidate executions, with
-182 payload references authenticated and no new flights. The next task is
-causal early-flight diagnosis, not another gain sweep.
+182 payload references authenticated and no new flights. The subsequent
+[causal diagnosis](early-flight-diagnosis.md) reconstructs the four saved
+mass/hover histories and uses one new attitude-only oracle. An unfitted vertical
+model matches the mass trajectories to about 8 mm RMS; the oracle reduces hover
+peak to 7.2291 cm. That truth-assisted result demonstrates headroom and cannot
+qualify a flight controller. The next task is an attitude-estimation startup
+audit before selecting any measurement-only correction.
 
 The latest [startup/hover closeout](progress/2026-09-26-geometric-transient-closeout.md)
 reproduces the original failures and rejects one frozen coherent-force candidate.

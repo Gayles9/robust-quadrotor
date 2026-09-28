@@ -42,6 +42,7 @@ reproducibility. Run experiment modules from the repository root with
 | `geometric_correction_validation` | Reproduce the six rejected derivative/gain profiles |
 | `robustness_validation` | Frozen paired observation-fault and model-mismatch flights with complete evidence reconstruction |
 | `vertical_compensation_validation` | One frozen vertical candidate compared with the authenticated original robustness campaign |
+| `early_flight_diagnostic`, `early_flight_oracle` | Authenticated mass/hover decomposition and one attitude-only diagnostic intervention; never qualification |
 | `kalman_sandbox` | Small standalone Kalman calculations |
 
 The subsystem guides explain the supported arguments, expected outputs and
@@ -56,6 +57,7 @@ seed sets are reproduction cases, not fresh validation.
 - [Current status](status.md): implemented capabilities and measured limitations.
 - [Technical report](technical-report.md): consolidated LaTeX report, source/evidence identity and operating boundary.
 - [Controller tradeoffs](controller-tradeoffs.md): interpretation of the results.
+- [Early-flight diagnosis](early-flight-diagnosis.md): distinct mass and hover mechanisms, oracle limits and reproduction.
 - [Next-step plan](next-steps.md): the current bounded task and stopping rules.
 - [Project review](project-review.md): the September 26 documentation and source audit.
 - [Decision index](decisions/README.md): assumptions, alternatives and design rationale.
