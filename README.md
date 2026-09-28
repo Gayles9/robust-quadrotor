@@ -45,7 +45,10 @@ architecture, verified results and operating boundary. The
 [early-flight diagnosis](docs/early-flight-diagnosis.md) now separates slow mass
 compensation from the hover transient and records one attitude-only oracle with
 7.23 cm hover peak. That is diagnostic headroom, not deployable feedback. The
-[next-step plan](docs/next-steps.md) scopes an attitude-estimation startup audit.
+[startup audit](docs/attitude-startup-audit.md) reconstructs both estimator
+histories exactly and explains the first position correction without finding a
+filter defect. The [next-step plan](docs/next-steps.md) scopes an explicit
+pre-arm alignment contract; no estimator or controller is promoted.
 
 ## Run it
 
