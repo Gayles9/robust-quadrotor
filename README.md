@@ -28,7 +28,9 @@ work.
 The bounded startup/hover investigation is now closed: its single candidate
 reduced spline effort but still failed hover, so the accepted controllers remain
 unchanged. The [closeout](docs/progress/2026-09-26-geometric-transient-closeout.md)
-records the result; observation health monitoring is the next separate task.
+records the result. [Observation health monitoring](docs/observation-health.md)
+now reports accepted-data loss and recovery independently for position and
+altitude. Designing the supervisor's response is the next separate task.
 
 ## Run it
 

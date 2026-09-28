@@ -20,6 +20,7 @@ the [next-step plan](../next-steps.md) for the present scope.
 - [0008: Aligned consistency evaluation and frozen nominal ensemble](0008-eskf-consistency-evaluation.md)
 - [0009: Estimator completion scope and frozen validation protocol](0009-eskf-completion-validation.md)
 - [0010: Endpoint integration and matched sample-noise covariance](0010-eskf-endpoint-propagation.md)
+- [0021: Causal observation health monitoring](0021-observation-health-monitoring.md)
 
 ## Feedback control
 
@@ -42,7 +43,7 @@ the [next-step plan](../next-steps.md) for the present scope.
 
 ## Writing a new decision
 
-Use the next number and a descriptive filename, such as `0021-short-title.md`.
+Use the next number and a descriptive filename, such as `0022-short-title.md`.
 Explain the problem before the equations. State the evidence needed to accept
 the change and the limits that remain afterward.
 

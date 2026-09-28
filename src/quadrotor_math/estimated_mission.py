@@ -32,6 +32,7 @@ from .imu import (
 )
 from .mission_simulation import MissionNumerics, MissionResult, _simulate_mission
 from .missions import MissionPlan, MissionSafetyLimits
+from .observation_health import ObservationHealthMonitor
 from .position_control import PositionControllerParameters
 from .position_sensors import (
     barometric_altitude_measurement,
@@ -195,6 +196,7 @@ def simulate_estimated_mission(
     *,
     geometric_controller: GeometricControllerParameters | None = None,
     allow_minimum_snap: bool = False,
+    observation_health: ObservationHealthMonitor | None = None,
 ) -> EstimatedMissionResult:
     """Execute measurements and ESKF before same-epoch feedback, without lookahead.
 
@@ -206,6 +208,9 @@ def simulate_estimated_mission(
     Every epoch including an immediate abort is sampled and recorded. Sensor
     or estimator arithmetic failures raise without returning a partial mission;
     sampled safety/domain/timeout aborts retain their entire terminal history.
+    A fresh optional observation_health monitor records passive diagnostics in
+    its own history (ADR 0021). If execution raises, it retains only the observed
+    prefix; no partial mission result is returned. Reset it before reuse.
     """
     if not isinstance(sensors, MissionSensors) or not isinstance(
         estimator_configuration, EskfReplayConfiguration
@@ -234,6 +239,32 @@ def simulate_estimated_mission(
     if dt <= 2 * _time_comparison_tolerance_s(horizon, horizon):
         raise ValueError("plant clock must resolve sensor scheduler tolerance")
     schedules = (sensors.local_position_schedule, sensors.barometric_altitude_schedule)
+    if observation_health is not None:
+        if not isinstance(observation_health, ObservationHealthMonitor):
+            raise TypeError("observation_health must be ObservationHealthMonitor or None")
+        if (
+            observation_health.latest is not None
+            or observation_health.initial_time_s != config.initial_time_s
+        ):
+            raise ValueError(
+                "observation health monitor must be fresh at the estimator prior epoch"
+            )
+        health_config = observation_health.configuration
+        for policy, schedule, enabled in zip(
+            (health_config.local_position, health_config.barometric_altitude),
+            schedules,
+            (config.fuse_local_position, config.fuse_barometric_altitude),
+            strict=True,
+        ):
+            if (
+                policy.sample_period_s != schedule.sample_period_s
+                or policy.delivery_delay_s != schedule.delivery_delay_s
+                or policy.check_interval_s != dt
+                or policy.enabled != enabled
+            ):
+                raise ValueError(
+                    "observation health policy must match sensor schedule, clock and fusion flag"
+                )
     schedulers = tuple(
         FixedRateSensorScheduler[NDArray[np.float64]](
             sample_period_s=s.sample_period_s,
@@ -368,6 +399,8 @@ def simulate_estimated_mission(
                 record.delivery_index = k
                 delivered.append(record.observation())
         estimate = stream.step(time, measured_force, measured_rate, tuple(delivered))
+        if observation_health is not None:
+            observation_health.step(time, estimate.events)
         if measured_derivatives:
             posterior = estimate.nominal_state
             with np.errstate(over="raise", invalid="raise"):

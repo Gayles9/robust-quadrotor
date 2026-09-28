@@ -1,6 +1,6 @@
 # Project status
 
-Updated 2026-09-26. The implemented Python stack covers simulation, estimation,
+Updated 2026-09-28. The implemented Python stack covers simulation, estimation,
 planning and closed-loop virtual missions. The main open performance issue is
 hover and trajectory control with noisy estimated feedback.
 
@@ -15,7 +15,7 @@ hover and trajectory control with noisy estimated feedback.
 | Planning | Fixed-duration minimum-snap splines, derivatives through snap, nominal reference bounds, bounded uniform retiming | No obstacle planning, time optimization or complete actuator-feasibility proof |
 | Geometric control | Rotation-based moment law, analytic force-to-attitude derivatives, causal filter, true/estimated missions and two optional derivative strategies | Six earlier profiles and one subsequent coherent-force candidate fail the joint requirements; the bounded study is closed |
 | Integration | Earlier ROS 2/PX4/Gazebo compatibility checks and an x500 takeoff/hover/landing spike | The custom Python stack is not integrated into PX4 or validated on hardware |
-| Fault handling | Innovation rejection, event diagnostics and mission guards | Persistent health monitoring, diagnosis and degraded flight policy remain |
+| Fault handling | Innovation rejection, event diagnostics, mission guards and passive per-stream observation health monitoring | Supervisor responses, fault diagnosis and degraded flight policy remain |
 
 Estimated minimum-snap missions are available experimentally through the
 geometric controller or explicit cascade `allow_minimum_snap=True`. That support
@@ -23,14 +23,21 @@ is an implementation capability, not a passing noisy-trajectory qualification.
 
 ## Evidence that matters
 
+The [observation health milestone](progress/2026-09-28-observation-health-monitoring.md)
+adds independent availability, rejection and recovery evidence for local
+position and altitude. Its passive integration preserves complete numerical
+histories and saved flight bytes across six paired regression configurations.
+The monitor does not change flight decisions or establish estimator accuracy.
+The [guide](observation-health.md) defines the timing and recovery rules.
+
 The latest [startup/hover closeout](progress/2026-09-26-geometric-transient-closeout.md)
 reproduces the original failures and rejects one frozen coherent-force candidate.
 It passes the seed-30 spline comparison at 6.77 cm RMSE and 0.85 times cascade
 effort, but its full-hover maxima are 10.87 and 17.33 cm against 8 cm. No production
-algorithm or controller default changed. The complete software gate passes
+algorithm or controller default changed. That milestone's software gate passed
 3,338 tests; sampled-model checks include both horizontal frame directions.
-The reserved qualification seeds remain unopened, and observation health
-monitoring is the next separate task.
+The reserved qualification seeds remain unopened. Observation health monitoring
+is now implemented; supervisor responses are the next separate task.
 
 The [geometric audit](progress/2026-09-26-geometric-project-audit.md) records the
 following results for the implementation merged in
@@ -75,6 +82,6 @@ has the same distinction between implementation and qualified flight behavior.
 [Controller problems and tradeoffs](controller-tradeoffs.md) explains why the
 remaining failures can coexist with correct equations and good true-state
 tracking. [Project review](project-review.md) records the current audit, and
-[the next-step plan](next-steps.md) defines observation health monitoring before
+[the next-step plan](next-steps.md) defines supervisor response design before
 further integration. Broad integrated evaluation and an updated technical report remain
 separate deliverables; the earlier report is a historical snapshot.

@@ -30,6 +30,7 @@ results, seeds, thresholds and commit identities are preserved.
 
 ## State estimation
 
+- [2026-09-28: Observation health monitoring](2026-09-28-observation-health-monitoring.md)
 - [2026-09-23: ESKF sensor replay](2026-09-23-eskf-sensor-replay.md)
 - [2026-09-23: ESKF post merge audit](2026-09-23-eskf-post-merge-audit.md)
 - [2026-09-23: ESKF measurement updates and contract audit](2026-09-23-eskf-measurement-updates-and-contract-audit.md)

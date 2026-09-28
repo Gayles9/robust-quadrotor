@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file following a 
 
 ## [Unreleased]
 
+### 2026-09-28 observation health monitoring
+
+- Add independent position/altitude availability states from causal estimator
+  events, explicit schedule-based ages, rejection runs and recovery counts.
+- Add an optional passive mission observer with immutable history, strict
+  ordering/identity checks and reset; preserve flight results and archive formats.
+- Verify complete payload and saved-byte equality with monitoring on/off,
+  deterministic event replay, timing boundaries and damaged-evidence rejection.
+- Document the monitoring boundary and define supervisor policy as the next task.
+
 ### 2026-09-26 geometric startup/hover closeout
 
 - Reproduce the known spline and hover failures and reconstruct their complete
