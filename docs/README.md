@@ -44,6 +44,7 @@ reproducibility. Run experiment modules from the repository root with
 | `vertical_compensation_validation` | One frozen vertical candidate compared with the authenticated original robustness campaign |
 | `early_flight_diagnostic`, `early_flight_oracle` | Authenticated mass/hover decomposition and one attitude-only diagnostic intervention; never qualification |
 | `attitude_startup_audit` | Offline startup propagation/update reconstruction, independent joint conditioning and bounded information audit |
+| `prearm_alignment_feasibility` | Supported-stationary design, covariance and rejection feasibility; no production arming or flight integration |
 | `kalman_sandbox` | Small standalone Kalman calculations |
 
 The subsystem guides explain the supported arguments, expected outputs and
@@ -60,6 +61,7 @@ seed sets are reproduction cases, not fresh validation.
 - [Controller tradeoffs](controller-tradeoffs.md): interpretation of the results.
 - [Early-flight diagnosis](early-flight-diagnosis.md): distinct mass and hover mechanisms, oracle limits and reproduction.
 - [Attitude startup audit](attitude-startup-audit.md): first-position update explanation, information limits and justified no-go.
+- [Stationary pre-arm alignment](prearm-alignment.md): support contract, uncertainty, rejection, sample ownership and calibration limitation.
 - [Next-step plan](next-steps.md): the current bounded task and stopping rules.
 - [Project review](project-review.md): the September 26 documentation and source audit.
 - [Decision index](decisions/README.md): assumptions, alternatives and design rationale.

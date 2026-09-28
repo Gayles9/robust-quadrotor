@@ -59,6 +59,8 @@ The [closeout](progress/2026-09-28-technical-report.md) records acceptance.
 The report's proposed [early-flight diagnosis](early-flight-diagnosis.md) is
 now complete in a subsequent, separately recorded milestone. The current
 [startup audit](attitude-startup-audit.md) is also complete and finds no
-demonstrated filter defect. The [next step](next-steps.md) defines a separately
-scoped pre-arm alignment contract. These later diagnostic results are not part
-of report revision 2.0.
+demonstrated filter defect. The separately scoped
+[pre-arm alignment contract](prearm-alignment.md) is now defined and evaluated;
+its first-order joint covariance misses the frozen calibration limit. The
+[next step](next-steps.md) is the bounded nonlinear uncertainty derivation.
+These later diagnostic results are not part of report revision 2.0.
