@@ -53,6 +53,7 @@ from .run_configuration import (
     WorldParameters,
 )
 from .sensor_scheduling import FixedRateSensorScheduler, _time_comparison_tolerance_s
+from .vertical_compensation import VerticalIntegralCompensator
 
 
 @dataclass(frozen=True, slots=True, eq=False)
@@ -201,6 +202,7 @@ def simulate_estimated_mission(
     observation_health: ObservationHealthMonitor | None = None,
     observation_supervision: ObservationSupervisor | None = None,
     observation_faults: EskfLiveObservationFaults | None = None,
+    vertical_compensation: VerticalIntegralCompensator | None = None,
 ) -> EstimatedMissionResult:
     """Execute measurements and ESKF before same-epoch feedback, without lookahead.
 
@@ -220,6 +222,9 @@ def simulate_estimated_mission(
     Optional fresh observation_faults alters nominal arrivals before the ESKF.
     Its separate exhaustive source/fault ledger is sealed after execution;
     result.measurements contains only surviving inputs (including pending).
+    An optional fresh vertical_compensation adds the experimental scalar law in
+    ADR 0024. Both observation streams must be monitored and enabled. Its state
+    and attempt trace remain external to the mission archive; reset before reuse.
     """
     if not isinstance(sensors, MissionSensors) or not isinstance(
         estimator_configuration, EskfReplayConfiguration
@@ -296,6 +301,21 @@ def simulate_estimated_mission(
             raise ValueError("observation supervisor must be bound to the supplied health monitor")
         if observation_supervision.latest is not None:
             raise ValueError("observation supervisor must be fresh")
+    if vertical_compensation is not None:
+        if not isinstance(vertical_compensation, VerticalIntegralCompensator):
+            raise TypeError("vertical_compensation must be VerticalIntegralCompensator")
+        if (
+            vertical_compensation.history
+            or not vertical_compensation.matches(position_controller)
+            or vertical_compensation.policy.update_period_s != dt * numerics.position_stride
+            or geometric_controller is not None
+            or observation_health is None
+            or not config.fuse_local_position
+            or not config.fuse_barometric_altitude
+        ):
+            raise ValueError(
+                "vertical compensation requires fresh matched cascade and both health streams"
+            )
     schedulers = tuple(
         FixedRateSensorScheduler[NDArray[np.float64]](
             sample_period_s=s.sample_period_s,
@@ -477,6 +497,21 @@ def simulate_estimated_mission(
         options["estimated_acceleration"] = estimated_acceleration
     if observation_supervision is not None:
         options["observation_guard"] = lambda: observation_supervision.abort_reason
+    if vertical_compensation is not None:
+        assert observation_health is not None
+
+        def compensation_healthy() -> bool:
+            from .observation_health import ObservationHealthState
+
+            assert observation_health is not None and observation_health.latest is not None
+            snapshot = observation_health.latest
+            return (
+                snapshot.local_position.state is ObservationHealthState.HEALTHY
+                and snapshot.barometric_altitude.state is ObservationHealthState.HEALTHY
+            )
+
+        options["vertical_compensation"] = vertical_compensation
+        options["compensation_healthy"] = compensation_healthy
     if allow_minimum_snap:
         options["allow_minimum_snap"] = allow_minimum_snap
     if type(allow_minimum_snap) is not bool:

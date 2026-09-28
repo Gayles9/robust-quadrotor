@@ -30,6 +30,7 @@ the [next-step plan](../next-steps.md) for the present scope.
 - [0014: Joint cascade bandwidth and moment-matched initialization](0014-estimated-feedback-bandwidth.md)
 - [0022: Bounded supervision of observation loss](0022-observation-loss-supervision.md)
 - [0023: Integrated robustness evaluation](0023-integrated-robustness-evaluation.md)
+- [0024: Bounded vertical compensation](0024-bounded-vertical-compensation.md)
 
 ## Planning
 
@@ -45,7 +46,7 @@ the [next-step plan](../next-steps.md) for the present scope.
 
 ## Writing a new decision
 
-Use the next number and a descriptive filename, such as `0024-short-title.md`.
+Use the next number and a descriptive filename, such as `0025-short-title.md`.
 Explain the problem before the equations. State the evidence needed to accept
 the change and the limits that remain afterward.
 

@@ -50,6 +50,7 @@ from .run_configuration import (
     WorldParameters,
 )
 from .trajectory_feasibility import TrajectoryLimits, check_trajectory_feasibility
+from .vertical_compensation import VerticalIntegralCompensator
 
 
 @dataclass(frozen=True, slots=True)
@@ -278,6 +279,8 @@ def _simulate_mission(
     consume_estimator_force_jump: Callable[[], NDArray[np.float64]] | None = None,
     estimated_acceleration: Callable[[], NDArray[np.float64]] | None = None,
     observation_guard: Callable[[], str | None] | None = None,
+    vertical_compensation: VerticalIntegralCompensator | None = None,
+    compensation_healthy: Callable[[], bool] | None = None,
 ) -> MissionResult:
     """Shared private execution; observer is a truth-to-sensor integration boundary.
 
@@ -295,6 +298,13 @@ def _simulate_mission(
         raise ValueError("allow_minimum_snap must be bool")
     if observation_guard is not None and (observer is None or not callable(observation_guard)):
         raise ValueError("observation guard requires estimated feedback and a callable")
+    if vertical_compensation is not None and (
+        not isinstance(vertical_compensation, VerticalIntegralCompensator)
+        or observer is None
+        or not callable(compensation_healthy)
+        or geometric_controller is not None
+    ):
+        raise ValueError("vertical compensation requires estimated cascade feedback and health")
     if (
         geometric_controller is not None
         and geometric_controller.use_measured_acceleration
@@ -407,6 +417,7 @@ def _simulate_mission(
     geometric_reference: GeometricPositionReference | None = None
     supervisor = MissionState()
     command = np.zeros(4)
+    previous_inner_limited = False
     try:
         for k, time in enumerate(times):
             reference, _ = mission_reference(plan, float(time))
@@ -442,7 +453,20 @@ def _simulate_mission(
             try:
                 if k % numerics.position_stride == 0:
                     if geometric_controller is None:
-                        held = compute_position_control(feedback[0], feedback[1], reference, outer)
+                        if vertical_compensation is None:
+                            held = compute_position_control(
+                                feedback[0], feedback[1], reference, outer
+                            )
+                        else:
+                            assert compensation_healthy is not None
+                            held = vertical_compensation.step(
+                                float(time),
+                                feedback[0],
+                                feedback[1],
+                                reference,
+                                observations_healthy=compensation_healthy(),
+                                previous_inner_limited=previous_inner_limited,
+                            )
                     else:
                         assert derivative_memory is not None
                         if consume_estimator_force_jump is not None:
@@ -501,6 +525,11 @@ def _simulate_mission(
                         feedback[2], feedback[3], held.q_reference_WB, held.collective_thrust, inner
                     )
                 command = output.allocation.commanded_rotor_omega
+                previous_inner_limited = bool(
+                    output.rate_limited
+                    or output.moment_limited
+                    or output.allocation.moment_scale < 1
+                )
                 control_indices.append(k)
                 for control_rows, value in zip(
                     control_values,

@@ -12,6 +12,7 @@ hover and trajectory control with noisy estimated feedback.
 | Sensors and records | Noisy IMU, position and altitude; bias walks; scheduled acquisition/delivery; declared truth/nominal mismatch; authenticated artifacts and replay | Explicit timing and numerical-backend contracts |
 | State estimation | 15-state ESKF, measurement updates, attitude reset, innovation gates, endpoint propagation, online execution and replay | Explicit initial prior, no automatic alignment or delayed-state rewind; hover heading is weakly observable |
 | Baseline control | Cascaded position/velocity and attitude/rate feedback; supervised takeoff, tracking, landing and abort | True-state cases pass; original estimated-hover qualifications retain failures |
+| Vertical compensation | Explicit bounded integral, health-gated learning, reset, conditional anti-windup and authenticated state reconstruction | One frozen research candidate; no default change or whole-flight qualification |
 | Planning | Fixed-duration minimum-snap splines, derivatives through snap, nominal reference bounds, bounded uniform retiming | No obstacle planning, time optimization or complete actuator-feasibility proof |
 | Geometric control | Rotation-based moment law, analytic force-to-attitude derivatives, causal filter, true/estimated missions and two optional derivative strategies | Six earlier profiles and one subsequent coherent-force candidate fail the joint requirements; the bounded study is closed |
 | Integration | Earlier ROS 2/PX4/Gazebo compatibility checks and an x500 takeoff/hover/landing spike | The custom Python stack is not integrated into PX4 or validated on hardware |
@@ -49,8 +50,19 @@ flight cases pass: nominal tracking, brief recovery and wind. Hover peaks at
 10.76 cm against 8 cm; the 10% heavier-mass case times out at 25 s with 42.39 cm
 tracking RMSE and 43.46 cm final error. This is a completed evaluation with a
 failed overall flight campaign, not a controller promotion. Its complete
-warning-strict software gate passes 3,523 tests. The next bounded task targets
-vertical disturbance rejection while retaining the separate hover limitation.
+warning-strict software gate passed 3,523 tests at that milestone. The subsequent
+[vertical study](progress/2026-09-28-vertical-compensation.md) tests one bounded
+disturbance-compensation candidate against those exact saved histories and limits.
+
+That study completes 24 new executions with zero numerical failures, 12/12
+response passes and 10/12 candidate comparisons passing. The heavier-mass
+mission now completes at 17.5 s, with final error reduced from 43.46 to 6.02 cm.
+Its 17.57 cm RMSE still exceeds the original 15 cm limit. Hover peak also rises
+slightly, from 10.7563 to 10.7596 cm, failing the frozen no-regression rule and
+remaining above 8 cm. The candidate is rejected; it remains an explicit
+research option, and the original cascade stays default. The complete software
+gate passes 3,575 tests. The next task is the technical report and explicit
+operating boundary, preserving these failures and the separate geometric limit.
 
 The latest [startup/hover closeout](progress/2026-09-26-geometric-transient-closeout.md)
 reproduces the original failures and rejects one frozen coherent-force candidate.
@@ -105,7 +117,6 @@ has the same distinction between implementation and qualified flight behavior.
 [Controller problems and tradeoffs](controller-tradeoffs.md) explains why the
 remaining failures can coexist with correct equations and good true-state
 tracking. [Project review](project-review.md) records the current audit, and
-[the next-step plan](next-steps.md) defines the next response to the integrated
-evaluation. Broader qualification, middleware integration and an updated
-technical report remain separate deliverables; the earlier report is a
-historical snapshot.
+[the next-step plan](next-steps.md) defines the technical-report and operating-
+boundary task. Broader qualification and middleware integration remain separate
+deliverables; the earlier report is a historical snapshot.
