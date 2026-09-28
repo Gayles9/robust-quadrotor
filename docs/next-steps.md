@@ -16,35 +16,49 @@ saved-payload equality, causal reconstruction, timing boundaries, recovery and
 invalid-input behavior are covered by the
 [verification record](progress/2026-09-28-observation-health-monitoring.md).
 
-## Next bounded task: supervisor responses to persistent information loss
+## Completed: bounded observation loss supervision
 
-Audit the monitor and existing mission transition/abort logic, then freeze a
-small response policy before implementing it. Define which observations each
-mission phase requires, how long a degraded condition may persist, and when
-tracking should be stopped. Treat position and altitude independently, and
-distinguish explicitly disabled fusion from an unexpected observation loss.
+The [supervisor](observation-supervision.md) applies explicit, independent
+unhealthy-time budgets and a latched numerical abort. Local position is required
+in all active phases; altitude can be explicitly optional. Recovery must finish
+before expiry, phase changes preserve the timers, existing safety guards retain
+priority, and terminal epochs issue no command. The
+[verification record](progress/2026-09-28-observation-loss-supervision.md)
+documents component fault injection, closed-loop regression and saved-evidence
+reconstruction. This closes the bounded response-interface step, not general
+robust-flight qualification or a hardware fallback policy.
 
-The design must account for what the current estimator can observe. A fresh
-altitude stream does not establish horizontal or heading accuracy, and the
-simulation's truth safety monitor is not available as an onboard input. Choose
-actions supported by the existing mission/controller interfaces; explain any
-abort or virtual landing semantics without claiming a hardware safety policy.
+## Next bounded task: integrated robustness evaluation
 
-Acceptance should cover nominal equivalence, one rejected observation,
-persistent rejection, missing/delayed data, independent stream loss, recovery,
-phase boundaries and terminal command behavior. Inject faults under an explicit
-deterministic protocol. Verify that decisions depend only on causally available
-estimator and health information, retain all failures, and keep saved-evidence
-authentication and the complete software gate.
+Audit the monitor/supervisor milestone, then freeze a small campaign before
+executing it. Cover actual hover, tracking and virtual landing with nominal
+sensors, independent position/altitude dropout, rejection and delay, followed
+by explicitly declared wind and mass mismatch. Define fault timing, durations,
+seeds, health thresholds, response budgets and success criteria in advance.
 
-Automatic alignment, new sensors, estimator/controller tuning and ROS/PX4
-adapters remain separate scopes. Availability thresholds from the monitor's
-example are not automatically suitable action deadlines.
+Start with the unchanged cascade default and a matched supervision-off
+comparator for each case. Use a causal live fault-delivery boundary; retain an
+exhaustive fault ledger outside the estimator and supervisor. Do not infer
+closed-loop dropout performance from the current component-only dropout tests.
+Archive complete sensor/estimate/command histories, authenticate them, and
+reconstruct every health transition and abort decision.
+
+Measure nominal false aborts, fault detection and response times, accepted-data
+age, command cutoff, tracking/estimation error over the common horizon, and
+completion or abort reason. Keep all comparator failures. Distinguish a correct
+timed abort from successful mission completion, and separate simulation truth
+guards from observation-driven decisions. A passing short stationary fixture
+does not demonstrate acceptable maneuver performance.
+
+Conclude whether the declared policy meets that frozen campaign. If it fails,
+retain the failed cases and propose a separate evidence-based change; do not
+retune controllers, budgets or acceptance limits within the evaluation. Full
+software checks and authenticated evidence remain required. Automatic
+alignment, new sensors, estimator/controller tuning and ROS/PX4 adapters are
+separate scopes.
 
 ## Later milestones
 
-- Run broader integrated evaluation with faults and model mismatch under a
-  frozen protocol, preserving comparator failures and the open flight limits.
 - Update the technical report from verified source and results, including the
   controller operating boundary and failed studies.
 - Implement custom ROS 2/PX4 integration under separate acceptance criteria.

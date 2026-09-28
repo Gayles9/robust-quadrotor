@@ -33,6 +33,7 @@ from .imu import (
 from .mission_simulation import MissionNumerics, MissionResult, _simulate_mission
 from .missions import MissionPlan, MissionSafetyLimits
 from .observation_health import ObservationHealthMonitor
+from .observation_supervision import ObservationSupervisor
 from .position_control import PositionControllerParameters
 from .position_sensors import (
     barometric_altitude_measurement,
@@ -197,6 +198,7 @@ def simulate_estimated_mission(
     geometric_controller: GeometricControllerParameters | None = None,
     allow_minimum_snap: bool = False,
     observation_health: ObservationHealthMonitor | None = None,
+    observation_supervision: ObservationSupervisor | None = None,
 ) -> EstimatedMissionResult:
     """Execute measurements and ESKF before same-epoch feedback, without lookahead.
 
@@ -211,6 +213,8 @@ def simulate_estimated_mission(
     A fresh optional observation_health monitor records passive diagnostics in
     its own history (ADR 0021). If execution raises, it retains only the observed
     prefix; no partial mission result is returned. Reset it before reuse.
+    An optional fresh observation_supervision bound to that same monitor adds
+    the explicit numerical-abort policy in ADR 0022. Reset both before reuse.
     """
     if not isinstance(sensors, MissionSensors) or not isinstance(
         estimator_configuration, EskfReplayConfiguration
@@ -265,6 +269,13 @@ def simulate_estimated_mission(
                 raise ValueError(
                     "observation health policy must match sensor schedule, clock and fusion flag"
                 )
+    if observation_supervision is not None:
+        if not isinstance(observation_supervision, ObservationSupervisor):
+            raise TypeError("observation_supervision must be ObservationSupervisor or None")
+        if observation_supervision.monitor is not observation_health:
+            raise ValueError("observation supervisor must be bound to the supplied health monitor")
+        if observation_supervision.latest is not None:
+            raise ValueError("observation supervisor must be fresh")
     schedulers = tuple(
         FixedRateSensorScheduler[NDArray[np.float64]](
             sample_period_s=s.sample_period_s,
@@ -401,6 +412,8 @@ def simulate_estimated_mission(
         estimate = stream.step(time, measured_force, measured_rate, tuple(delivered))
         if observation_health is not None:
             observation_health.step(time, estimate.events)
+        if observation_supervision is not None:
+            observation_supervision.step()
         if measured_derivatives:
             posterior = estimate.nominal_state
             with np.errstate(over="raise", invalid="raise"):
@@ -439,6 +452,8 @@ def simulate_estimated_mission(
         options["consume_estimator_force_jump"] = consume_estimator_force_jump
     if measured_derivatives:
         options["estimated_acceleration"] = estimated_acceleration
+    if observation_supervision is not None:
+        options["observation_guard"] = lambda: observation_supervision.abort_reason
     if allow_minimum_snap:
         options["allow_minimum_snap"] = allow_minimum_snap
     if type(allow_minimum_snap) is not bool:
