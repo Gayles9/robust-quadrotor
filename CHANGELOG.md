@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file following a 
 
 ## [Unreleased]
 
+### 2026-09-28 integrated robustness evaluation
+
+- Add an optional causal live observation-fault boundary with exhaustive source
+  accounting and exact reconciliation against the offline injector.
+- Add twelve frozen maneuver/fault/mismatch cases, each executed with supervision
+  off and on; keep response correctness separate from flight performance.
+- Authenticate both full histories, reconstruct estimator/health/mission/control
+  behavior, reject altered evidence and retain all failures.
+- Preserve controller and estimator laws, original gains, response budgets and
+  acceptance limits; keep the cascade default and geometric qualification open.
+
 ### 2026-09-28 observation loss supervision
 
 - Add an opt-in supervisor with independent position/altitude unhealthy-time

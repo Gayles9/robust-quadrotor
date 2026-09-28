@@ -15,7 +15,7 @@ hover and trajectory control with noisy estimated feedback.
 | Planning | Fixed-duration minimum-snap splines, derivatives through snap, nominal reference bounds, bounded uniform retiming | No obstacle planning, time optimization or complete actuator-feasibility proof |
 | Geometric control | Rotation-based moment law, analytic force-to-attitude derivatives, causal filter, true/estimated missions and two optional derivative strategies | Six earlier profiles and one subsequent coherent-force candidate fail the joint requirements; the bounded study is closed |
 | Integration | Earlier ROS 2/PX4/Gazebo compatibility checks and an x500 takeoff/hover/landing spike | The custom Python stack is not integrated into PX4 or validated on hardware |
-| Fault handling | Innovation rejection, event diagnostics, per-stream observation health and opt-in timed numerical abort | Broad integrated fault/mismatch evaluation, fault diagnosis and physical fallback flight remain |
+| Fault handling | Innovation rejection, per-stream health, opt-in timed abort and causal live faults with a frozen paired maneuver campaign | Declared campaign failures, broader fault diagnosis and physical fallback flight remain |
 
 Estimated minimum-snap missions are available experimentally through the
 geometric controller or explicit cascade `allow_minimum_snap=True`. That support
@@ -37,6 +37,21 @@ it. Recovery deadlines, phase boundaries, safety priority, nominal equivalence
 and saved-history reconstruction are checked. This is an opt-in simulation
 response, not a hardware emergency procedure or a new flight qualification.
 
+The [integrated robustness evaluation](progress/2026-09-28-integrated-robustness.md)
+uses twelve frozen cases and 24 actual supervised/unsupervised executions,
+covering hover, translation, virtual landing, independent stream faults,
+recovery, wind and mass mismatch. Full saved histories support exact ESKF,
+health, decision and command reconstruction. Response acceptance is scored
+separately from flight completion and tracking limits.
+
+All 12 response cases pass with zero numerical failures. Three of five required
+flight cases pass: nominal tracking, brief recovery and wind. Hover peaks at
+10.76 cm against 8 cm; the 10% heavier-mass case times out at 25 s with 42.39 cm
+tracking RMSE and 43.46 cm final error. This is a completed evaluation with a
+failed overall flight campaign, not a controller promotion. Its complete
+warning-strict software gate passes 3,523 tests. The next bounded task targets
+vertical disturbance rejection while retaining the separate hover limitation.
+
 The latest [startup/hover closeout](progress/2026-09-26-geometric-transient-closeout.md)
 reproduces the original failures and rejects one frozen coherent-force candidate.
 It passes the seed-30 spline comparison at 6.77 cm RMSE and 0.85 times cascade
@@ -44,8 +59,8 @@ effort, but its full-hover maxima are 10.87 and 17.33 cm against 8 cm. No produc
 algorithm or controller default changed. That milestone's software gate passed
 3,338 tests; sampled-model checks include both horizontal frame directions.
 The reserved qualification seeds remain unopened. Observation health monitoring
-and bounded supervisor responses are implemented; broader integrated fault and
-mismatch evaluation is the next task.
+and bounded supervisor responses are implemented; the separate integrated
+evaluation retains the original controller settings and performance limits.
 
 The [geometric audit](progress/2026-09-26-geometric-project-audit.md) records the
 following results for the implementation merged in
@@ -90,6 +105,7 @@ has the same distinction between implementation and qualified flight behavior.
 [Controller problems and tradeoffs](controller-tradeoffs.md) explains why the
 remaining failures can coexist with correct equations and good true-state
 tracking. [Project review](project-review.md) records the current audit, and
-[the next-step plan](next-steps.md) defines integrated evaluation before
-further integration. Broad integrated evaluation and an updated technical report remain
-separate deliverables; the earlier report is a historical snapshot.
+[the next-step plan](next-steps.md) defines the next response to the integrated
+evaluation. Broader qualification, middleware integration and an updated
+technical report remain separate deliverables; the earlier report is a
+historical snapshot.
