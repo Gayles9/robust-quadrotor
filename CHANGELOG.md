@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file following a 
 
 ## [Unreleased]
 
+### 2026-09-28 stationary pre-arm alignment design
+
+- Define an externally supported, motors-off 0.5 s acquisition stage, retained
+  heading and accelerometer-bias uncertainty, motion rejection and fresh-sample
+  handoff. No production initializer or flight behavior changes.
+- Preserve all 10,000 feasibility trials: nominal alignment is accurate, but the
+  nonlinear joint covariance narrowly exceeds the frozen underprediction limit.
+- Stop before production implementation and scope a bounded nonlinear uncertainty
+  derivation; retain the cascade default and original flight failures.
+
 ### 2026-09-28 attitude-estimation startup audit
 
 - Recover a missing historical evidence payload by exact pinned-case reproduction

@@ -90,32 +90,45 @@ freely flying initialization. A stationary-gravity pseudo-measurement is not
 valid during arbitrary accelerated flight. This closes the audit, not the
 hover requirement, and does not prove that all measurement-only designs fail.
 
-## Next bounded task: pre-arm alignment contract and feasibility design
+## Completed: stationary pre-arm contract and feasibility design
 
-Audit the startup closeout, then establish whether a mechanically supported,
-nonaccelerating pre-arm interval is an allowed operating requirement. This
-must be an explicit scope decision, not an assumption hidden in an estimator.
+The [contract](prearm-alignment.md) requires external evidence of mechanical
+support, motors off and stationarity throughout acquisition and release. It
+specifies inclination/gyro-bias estimation, retained heading and accelerometer
+bias uncertainty, rejection, sample ownership and later flight regression.
+The [record](progress/2026-09-28-prearm-alignment-design.md) retains all outcomes.
+The allowed design scope does not establish that hardware or the existing
+free-flight model supplies the required support condition.
 
-1. Specify a measurement-only alignment interface using existing IMU samples,
-   explicit timing and an externally guaranteed supported-stationary condition.
-   IMU-only quietness cannot prove absence of constant acceleration.
-2. Derive roll/pitch and gyro-bias information, retained yaw ambiguity, and
-   accelerometer-bias uncertainty. Do not invent yaw observability or supply
-   simulated attitude as an input. Do not choose a duration from the failed seed.
-3. Freeze independent analytic/noisy tests, sample reuse/cross-covariance rules,
-   motion rejection, failure behavior and a quantitative initialization-error
-   budget before implementation. Check whether the required guarantee is usable.
-4. Define later full-flight regression with the added pre-arm stage disclosed,
-   all original flight time and limits retained, and original free-flight results
-   still labelled separately. No qualification claim follows from this design.
+A 0.5 s window meets the analytic noise budgets. Nominal 99th-percentile axis
+error is 0.1869 degrees, with one rejection in 5,000. However, the full nonlinear
+Gaussian covariance check gives maximum normalized variance 1.1122 versus the
+frozen 1.10 cap; the linearized check gives 1.0622. The first-order design is
+no-go for production implementation. No budgets, noise scales or duration were
+tuned after the result, and no flight case was run.
 
-Acceptance is a feasible, explicit contract with independent verification
-criteria, or a justified stop if the required operating information is absent.
-Do not integrate it into flight yet. If supported stationarity is not allowed,
-request a different independent attitude-information source or an explicit
-startup-requirement redesign. No gain/cutoff sweep, reserved seeds, scoring
-shift, threshold relaxation or geometric reopening is authorized. The original
-cascade and endpoint ESKF remain default; the separate mass transient stays open.
+## Next bounded task: nonlinear pre-arm uncertainty derivation
+
+1. Audit the design closeout and independently reconstruct the retained
+   covariance failure, including all rejected trials. Check error coordinates,
+   covariance evaluation point and the leading rotation/heading/bias coupling.
+2. Derive one justified uncertainty representation at the estimated attitude,
+   with attitude/bias cross-covariances and any nonzero mean correction. Bound
+   or quantify approximation terms; do not fit an inflation factor to this data.
+3. Freeze analytic identities, a new independent covariance population and the
+   stopping rule before execution. Retain the 0.5 s interval, original sensor
+   model/priors, <=10% covariance-underprediction criterion and support contract.
+4. Decide go/no-go for a standalone production alignment component. A passing
+   derivation permits that as the subsequent step, with complete support-token,
+   sample-ID, state-machine, prior-validation and release tests. It does not
+   authorize immediate flight integration or hardware arming.
+
+If the uncertainty criterion still fails, retain the failure and stop. Do not
+run a covariance-inflation, duration, gain or cutoff sweep. Reserved flight
+seeds, original full-flight scoring and thresholds remain unchanged. The
+cascade and endpoint ESKF stay default; mass-transient and geometric
+qualification remain separate. Hardware use also requires a verified way to
+establish the supported-stationary interval.
 
 Any future project-completion percentage must declare an agreed weighted
 milestone denominator; campaign pass fractions are not project completion.

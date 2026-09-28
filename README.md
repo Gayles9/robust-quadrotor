@@ -47,8 +47,11 @@ compensation from the hover transient and records one attitude-only oracle with
 7.23 cm hover peak. That is diagnostic headroom, not deployable feedback. The
 [startup audit](docs/attitude-startup-audit.md) reconstructs both estimator
 histories exactly and explains the first position correction without finding a
-filter defect. The [next-step plan](docs/next-steps.md) scopes an explicit
-pre-arm alignment contract; no estimator or controller is promoted.
+filter defect. The [pre-arm design](docs/prearm-alignment.md) now defines a
+supported 0.5 s IMU alignment stage. Inclination results are promising, but its
+joint covariance narrowly fails the frozen calibration gate. The
+[next-step plan](docs/next-steps.md) scopes that uncertainty derivation before
+any production implementation; no estimator or controller is promoted.
 
 ## Run it
 
