@@ -194,11 +194,11 @@ step with explicit support provenance, sample/clock ownership, fixed priors,
 latched rejection and one-time fresh-sample release. It reproduces all 15,000
 archived covariances exactly and passes complete-session handoff checks.
 
-Next, a separately scoped supported-start flight study can test performance,
-retaining the full original flight time, controller,
-limits and comparison rules. Existing free-flight failures remain separately
-labelled. Hardware still needs an established support procedure and validated
-sensor assumptions.
+The later [supported-start flight comparison](supported-start-flight.md) now
+passes the known-seed hover limit and improves nominal/wind tracking using this
+component, with the full original scoring and controller. Mass mismatch and
+the old free-flight failures remain separately labelled. Independent validation
+and a hardware support procedure remain necessary.
 
 ## Reproduce and references
 

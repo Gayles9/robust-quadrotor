@@ -47,6 +47,7 @@ reproducibility. Run experiment modules from the repository root with
 | `prearm_alignment_feasibility` | Supported-stationary design, covariance and rejection feasibility; no production arming or flight integration |
 | `prearm_nonlinear_uncertainty` | Nonlinear joint-moment derivation, independent calibration and prior-failure reconstruction |
 | `prearm_component_validation` | Authenticated numerical equivalence and 200 complete supported acquisition/handoff sessions |
+| `supported_start_validation` | Eight physically supported-release flights, paired alignment comparison and complete saved replay |
 | `kalman_sandbox` | Small standalone Kalman calculations |
 
 The subsystem guides explain the supported arguments, expected outputs and
@@ -64,6 +65,7 @@ seed sets are reproduction cases, not fresh validation.
 - [Early-flight diagnosis](early-flight-diagnosis.md): distinct mass and hover mechanisms, oracle limits and reproduction.
 - [Attitude startup audit](attitude-startup-audit.md): first-position update explanation, information limits and justified no-go.
 - [Stationary pre-arm alignment](prearm-alignment.md): support contract, uncertainty, rejection, sample ownership and calibration limitation.
+- [Supported-start flight comparison](supported-start-flight.md): explicit fixture physics, alignment benefit, retained mass failure and validation boundary.
 - [Standalone pre-arm component](prearm-component.md): support evidence, acquisition, rejection and one-time estimator handoff.
 - [Nonlinear pre-arm uncertainty](prearm-nonlinear-uncertainty.md): rotation/bias coupling, positive quadrature and passing independent calibration.
 - [Next-step plan](next-steps.md): the current bounded task and stopping rules.

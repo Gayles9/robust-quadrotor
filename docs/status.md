@@ -87,9 +87,14 @@ population, below the unchanged 1.10 cap. The original failing population also
 passes at 1.0614. All 15,000 study outcomes are retained. The
 [standalone component](prearm-component.md) now reproduces all archived
 covariances exactly and completes 200 supported acquisition/handoff sessions.
-Support, timing, ownership and latched rejection are explicit. Next is a
-separately frozen supported-start flight evaluation; no new flight result or
-verified hardware support procedure is claimed.
+Support, timing, ownership and latched rejection are explicit. The subsequent
+[supported-start flight comparison](supported-start-flight.md) passes its frozen
+startup acceptance: hover peak is 2.51 cm versus 8.59 cm in the same supported
+release without alignment (10.76 cm in the original moving/spinning baseline).
+Nominal and wind tracking pass; the mass case still fails at 42.53 cm RMSE.
+These are known-seed development results under modeled fixture support. Next
+is independent repeatability and fault validation; no hardware support procedure
+or general flight qualification is claimed.
 
 The latest [startup/hover closeout](progress/2026-09-26-geometric-transient-closeout.md)
 reproduces the original failures and rejects one frozen coherent-force candidate.

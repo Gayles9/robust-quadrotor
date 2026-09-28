@@ -64,6 +64,9 @@ demonstrated filter defect. The separately scoped
 its first-order joint covariance misses the frozen calibration limit. The
 [nonlinear uncertainty derivation](prearm-nonlinear-uncertainty.md) subsequently
 passes that gate. The [standalone component](prearm-component.md) also passes
-reference and acquisition/handoff checks. The [next step](next-steps.md) is a
-separately scoped supported-start flight evaluation.
+reference and acquisition/handoff checks. A subsequent
+[supported-start comparison](supported-start-flight.md) passes the original
+hover limit at 2.51 cm peak and improves nominal/wind tracking, while mass
+mismatch remains a failure. The [next step](next-steps.md) is independent
+supported-start validation before normal mission integration.
 These later diagnostic results are not part of report revision 2.0.

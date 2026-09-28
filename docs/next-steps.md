@@ -132,26 +132,39 @@ Covariance and complete-session compatibility statistics reproduce exactly.
 Constant acceleration remains unobservable without genuine external support.
 No arming command or flight integration was added.
 
-## Next bounded task: physically supported-start flight evaluation
+## Completed: physically supported-start flight evaluation
 
-1. Audit the component closeout and freeze one paired flight protocol before
-   integration or execution. Keep reserved qualification seeds unopened.
-2. Model mechanical support, motors off and zero motion through the complete
-   acquisition and fresh release sample. Generate explicit support evidence
-   from that modeled stage; never assume stationarity during flight.
-3. Use the component output in an experiment-only handoff to the existing
-   endpoint ESKF. Preserve the original controller, flight duration, p/v and
-   heading information assumptions, common flight noise and full scoring.
-4. Compare against the authenticated original baseline and preserve every
-   outcome. Retain the 8 cm hover criterion and all existing no-regression and
-   whole-flight limits; distinguish the changed supported-start operating
-   condition from the original freely flying initialization.
+The [frozen comparison](supported-start-flight.md) executes eight flights across
+hover, nominal translation, wind and mass mismatch. An explicit fixture holds
+zero motion with motors off, supplies the correct gravity/drag reaction, and
+releases only after the fresh pre-arm sample. The supported unaligned and
+aligned arms share physical startup and all flight random draws. The original
+moving/spinning baseline remains a separately authenticated comparator.
 
-Acceptance is evidence that determines whether supported initialization improves
-flight and passes its frozen criteria. A failed result must remain a failure;
-no automatic duration, noise, threshold or controller retuning. Geometric
-qualification and the separate mass-transient limitation remain open. Hardware
-still requires an established support procedure and validated sensor assumptions.
+The [verification record](progress/2026-09-28-supported-start-flight.md) retains
+all outcomes and complete saved replay. Aligned hover peak is 2.506 cm against
+8.588 cm in the identical supported release without alignment; the original
+baseline is 10.756 cm. The unchanged 8 cm hover limit passes. Nominal and wind
+tracking RMSE improve, and their original conditions pass. Mass mismatch still
+fails: aligned whole-flight RMSE is 42.526 cm with landing timeout at 25 s.
+The frozen startup comparison passes, while all-four-case flight qualification
+does not. The initializer remains experiment-only.
+
+## Next bounded task: independent supported-start validation
+
+1. Audit this closeout and freeze one bounded independent seed/case protocol
+   before execution. Keep reserved geometric qualification seeds unopened.
+2. Check repeatability of the supported-start benefit and the existing
+   observation-loss/rejection/delay/recovery responses under the new prior.
+3. Retain the same physical fixture/release, original controller, full-flight
+   scoring and all performance/no-regression limits. Separate sampling variation
+   from a demonstrated implementation defect; do not tune after seeing outcomes.
+4. Preserve every outcome and decide explicitly whether normal mission integration
+   is justified within a stated supported-start operating boundary.
+
+The mass-induced offset is a separate open requirement. This next step must not
+silently combine the rejected integral candidate, reopen geometric tuning,
+claim hardware stationarity, or promote one known-seed success into qualification.
 
 Any future project-completion percentage must declare an agreed weighted
 milestone denominator; campaign pass fractions are not project completion.

@@ -95,11 +95,12 @@ simultaneous failure reasons and one-time release.
 
 This establishes the bounded software component. It does not establish improved
 flight performance, hardware support, real-time scheduling or motor safety.
-The cascade controller and existing endpoint ESKF remain unchanged. The next
-step is a separately frozen supported-start flight evaluation: physically model
-support, use the same flight noise for paired comparisons, score the complete
-original flight and retain every existing performance/no-regression limit.
-Reserved qualification seeds remain unopened.
+The cascade controller and existing endpoint ESKF remain unchanged. The later
+[supported-start comparison](supported-start-flight.md) now demonstrates improved
+known-seed hover and tracking under an explicit fixture model. Its mass failure
+remains open. Next is independently frozen repeatability and observation-fault
+validation before normal mission integration. Reserved geometric qualification
+seeds remain unopened.
 
 ```bash
 OPENBLAS_NUM_THREADS=1 uv run python -W error -m experiments.prearm_component_validation --prior-evidence results/prearm-nonlinear --output results/prearm-component
