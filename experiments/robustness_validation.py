@@ -43,6 +43,10 @@ from quadrotor_math.missions import MissionPhase
 from quadrotor_math.observation_health import ObservationHealthMonitor, ObservationHealthState
 from quadrotor_math.observation_supervision import ObservationSupervisor
 from quadrotor_math.run_manifest import capture_software_provenance
+from quadrotor_math.vertical_compensation import (
+    VerticalCompensationPolicy,
+    VerticalIntegralCompensator,
+)
 
 
 def prefix_equal(off: EstimatedMissionResult, on: EstimatedMissionResult) -> bool:
@@ -273,7 +277,14 @@ def score_pair(
     return metrics
 
 
-def audit_case(directory: Path, case: str, partition: str, row: dict[str, Any]) -> dict[str, Any]:
+def audit_case(
+    directory: Path,
+    case: str,
+    partition: str,
+    row: dict[str, Any],
+    *,
+    compensation_policy: VerticalCompensationPolicy | None = None,
+) -> dict[str, Any]:
     ensure(row["name"] == case and set(row["modes"]) == {"off", "on"}, "case/mode ledger mismatch")
     results: dict[str, EstimatedMissionResult] = {}
     health: dict[str, ObservationHealthMonitor] = {}
@@ -289,7 +300,9 @@ def audit_case(directory: Path, case: str, partition: str, row: dict[str, Any]) 
             )
             diagnostic = load_json(directory, f"failure-{mode}.json", item["diagnostic"])
             ensure(
-                set(diagnostic) == {"health", "supervision", "delivered"},
+                set(diagnostic)
+                == {"health", "supervision", "delivered"}
+                | ({"vertical"} if compensation_policy is not None else set()),
                 "failure diagnostic schema mismatch",
             )
             continue
@@ -304,7 +317,9 @@ def audit_case(directory: Path, case: str, partition: str, row: dict[str, Any]) 
                 "archive companion mission mismatch",
             )
         diagnostic = load_json(directory, f"diagnostic-{mode}.json", item["diagnostic"])
-        h, _ = audit_result(case, partition, mode, result, diagnostic)
+        h, _ = audit_result(
+            case, partition, mode, result, diagnostic, compensation_policy=compensation_policy
+        )
         results[mode], health[mode], diagnostics[mode] = result, h, diagnostic
     if len(results) != 2:
         return {
@@ -316,7 +331,9 @@ def audit_case(directory: Path, case: str, partition: str, row: dict[str, Any]) 
     return score_pair(case, partition, results, health, diagnostics)
 
 
-def _execute_case(task: tuple[str, str, str]) -> dict[str, Any]:
+def _execute_case(
+    task: tuple[str, str, str], *, compensation_policy: VerticalCompensationPolicy | None = None
+) -> dict[str, Any]:
     case, partition, root = task
     directory = Path(root) / case
     directory.mkdir()
@@ -327,12 +344,18 @@ def _execute_case(task: tuple[str, str, str]) -> dict[str, Any]:
         health = ObservationHealthMonitor(h)
         supervisor = ObservationSupervisor(health, response)
         channel = EskfLiveObservationFaults(faults(case, partition, args))
+        compensation = (
+            None
+            if compensation_policy is None
+            else VerticalIntegralCompensator(args["position_controller"], compensation_policy)
+        )
         try:
             result = simulate_estimated_mission(
                 **args,
                 observation_health=health,
                 observation_supervision=supervisor if mode == "on" else None,
                 observation_faults=channel,
+                vertical_compensation=compensation,
             )
         except (ValueError, FloatingPointError, np.linalg.LinAlgError, RuntimeError) as error:
             row["modes"][mode] = {
@@ -345,7 +368,12 @@ def _execute_case(task: tuple[str, str, str]) -> dict[str, Any]:
                         "health": [asdict(s) for s in health.history],
                         "supervision": [asdict(d) for d in supervisor.history],
                         "delivered": [asdict(o) for o in channel.delivered],
-                    },
+                    }
+                    | (
+                        {}
+                        if compensation is None
+                        else {"vertical": [asdict(s) for s in compensation.history]}
+                    ),
                 ),
             }
         else:
@@ -360,14 +388,21 @@ def _execute_case(task: tuple[str, str, str]) -> dict[str, Any]:
                         "fault_records": [asdict(r) for r in channel.injection.records],
                         "health": [asdict(s) for s in health.history],
                         "supervision": [asdict(d) for d in supervisor.history],
-                    },
+                    }
+                    | (
+                        {}
+                        if compensation is None
+                        else {"vertical": [asdict(s) for s in compensation.history]}
+                    ),
                 ),
             }
         print(
             json.dumps({"case": case, "mode": mode, "status": row["modes"][mode]["status"]}),
             flush=True,
         )
-    row["metrics"] = audit_case(directory, case, partition, row)
+    row["metrics"] = audit_case(
+        directory, case, partition, row, compensation_policy=compensation_policy
+    )
     print(
         json.dumps(
             {

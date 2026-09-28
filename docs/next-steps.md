@@ -38,37 +38,45 @@ reconstructed before response and flight criteria are scored separately.
 The [verification record](progress/2026-09-28-integrated-robustness.md) preserves
 all outcomes, including the failed hover peak and mass-mismatch landing.
 
-## Next bounded task: vertical disturbance rejection
+## Completed: bounded vertical disturbance compensation
 
-Audit the integrated evaluation and diagnose the 10% mass-mismatch case from
-its saved histories. Compare the measured vertical offset with the existing
-PD controller's equilibrium prediction; check estimator error, motor/thrust
-limits and the complete takeoff/landing response. Review the earlier bounded
-integral probes before proposing a new mechanism. They did not close the
-startup/hover gap and must not be presented as an already-qualified remedy.
+The [single-candidate study](vertical-compensation.md) diagnoses the mass offset
+against the PD equilibrium and evaluates one bounded vertical integral with
+health gating, conditional anti-windup and exact trace reconstruction. The
+[verification record](progress/2026-09-28-vertical-compensation.md) preserves
+all twelve paired comparisons against the original authenticated baseline.
 
-Freeze at most one justified, explicitly experimental vertical disturbance-
-compensation candidate, with defined state, bounds, anti-windup, initialization,
-reset and observation-loss behavior. It may use causal measured/estimated
-feedback and commanded quantities, never the simulator's true mass or fault
-labels. Preserve the original default and compare the candidate against the
-saved original cascade under unchanged seeds, flight limits and fault policy.
+The candidate fixes the tested mass-case landing timeout and greatly reduces
+its final error, but whole-flight RMSE is 17.57 cm against the original 15 cm
+limit. It also fails the frozen hover no-regression condition, even though the
+increase is small. The original 8 cm hover requirement remains open. Keep the
+original cascade default and retain the candidate only as an explicit research
+option. Do not retune it, loosen the comparison or promote a mass-offset benefit
+into whole-flight qualification. Geometric qualification remains separate.
 
-Require a complete mass-mismatch mission within the original campaign's error
-limits, and no regression in nominal, recovery, wind or timed-fault behavior.
-Retain the known hover-peak failure unless a separately justified change actually
-passes its unchanged requirement. A mass-offset improvement cannot qualify the
-controller as a whole. Do not run a gain sweep, relax the landing tolerance,
-reopen reserved qualification seeds or silently promote an experimental option.
+## Next bounded task: technical report and operating boundary
 
-Conclude with complete authenticated evidence, full software checks, a clear
-accept/reject decision and the next bounded action. Geometric-controller
-qualification and a physical fallback maneuver remain separate scopes.
+Audit this closeout against the merged source, software checks and saved
+evidence. Consolidate the current mathematical architecture and verified results
+into the technical report: plant, sensor timing, ESKF assumptions, planning,
+controller tradeoffs, observation health, timed response and disturbance study.
+
+Include a traceable capability table separating implemented software, bounded
+development evidence, unresolved qualification and unimplemented integration.
+Preserve the original limits, every failed controller study and the distinction
+between numerical abort and a physical emergency maneuver. Cite exact source
+commits and evidence hashes; do not present development seeds as new validation.
+Any progress estimate must declare its milestone denominator and weighting.
+
+Acceptance requires reconciled numbers and source references, reproducible
+commands and evidence locations, a clear default-controller decision, and an
+explicit list of open flight requirements. Identify the later ROS 2/PX4
+integration interface and its required acceptance criteria without implementing
+middleware or claiming hardware readiness. This is consolidation of verified
+work, not another gain search or an automatic controller promotion.
 
 ## Later milestones
 
-- Update the technical report from verified source and results, including the
-  controller operating boundary and failed studies.
 - Implement custom ROS 2/PX4 integration under separate acceptance criteria.
 
 The reserved geometric qualification seeds remain unopened. Reopening controller

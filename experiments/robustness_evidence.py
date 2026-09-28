@@ -32,9 +32,13 @@ from quadrotor_math.missions import (
     mission_guard_reason,
     mission_reference,
 )
-from quadrotor_math.observation_health import ObservationHealthMonitor
+from quadrotor_math.observation_health import ObservationHealthMonitor, ObservationHealthState
 from quadrotor_math.observation_supervision import ObservationSupervisor
 from quadrotor_math.position_control import compute_position_control
+from quadrotor_math.vertical_compensation import (
+    VerticalCompensationPolicy,
+    VerticalIntegralCompensator,
+)
 
 
 def ensure(condition: object, message: str) -> None:
@@ -73,12 +77,21 @@ def observation(value: dict[str, Any]) -> EskfReplayObservation:
 
 
 def audit_result(
-    case: str, partition: str, mode: str, result: EstimatedMissionResult, diagnostic: dict[str, Any]
+    case: str,
+    partition: str,
+    mode: str,
+    result: EstimatedMissionResult,
+    diagnostic: dict[str, Any],
+    *,
+    compensation_policy: VerticalCompensationPolicy | None = None,
 ) -> tuple[ObservationHealthMonitor, ObservationSupervisor]:
     """Replay measurements, original fault sources, health, guards and all commands."""
     ensure(mode in ("off", "on"), "unknown supervision mode")
     ensure(
-        set(diagnostic) == {"fault_records", "health", "supervision"}, "diagnostic schema mismatch"
+        set(diagnostic)
+        == {"fault_records", "health", "supervision"}
+        | ({"vertical"} if compensation_policy is not None else set()),
+        "diagnostic schema mismatch",
     )
     args = configuration(case, partition)
     mission, estimates = result.mission, result.estimates
@@ -197,6 +210,12 @@ def audit_result(
             by_epoch[event.observation.delivery_index].append(event)
     state = MissionState()
     outer_row = inner_row = 0
+    compensation = (
+        None
+        if compensation_policy is None
+        else VerticalIntegralCompensator(args["position_controller"], compensation_policy)
+    )
+    previous_inner_limited = False
     for k, time in enumerate(times):
         health.step(float(time), tuple(by_epoch[k]))
         decision = observation_supervisor.step()
@@ -223,9 +242,27 @@ def audit_result(
         )
         if state.phase not in (MissionPhase.COMPLETE, MissionPhase.ABORT):
             if k % args["numerics"].position_stride == 0:
-                held = compute_position_control(
-                    estimate.position_W, estimate.velocity_W, reference, args["position_controller"]
-                )
+                if compensation is None:
+                    held = compute_position_control(
+                        estimate.position_W,
+                        estimate.velocity_W,
+                        reference,
+                        args["position_controller"],
+                    )
+                else:
+                    assert health.latest is not None
+                    held = compensation.step(
+                        float(time),
+                        estimate.position_W,
+                        estimate.velocity_W,
+                        reference,
+                        observations_healthy=(
+                            health.latest.local_position.state is ObservationHealthState.HEALTHY
+                            and health.latest.barometric_altitude.state
+                            is ObservationHealthState.HEALTHY
+                        ),
+                        previous_inner_limited=previous_inner_limited,
+                    )
             if (
                 np.linalg.norm(attitude_error_body(estimate.q_WB, held.q_reference_WB))
                 > args["attitude_controller"].maximum_attitude_error_rad
@@ -262,6 +299,11 @@ def audit_result(
                 held.collective_thrust,
                 args["attitude_controller"],
             )
+            previous_inner_limited = bool(
+                control.rate_limited
+                or control.moment_limited
+                or control.allocation.moment_scale < 1
+            )
             values: dict[str, Any] = {
                 "q_reference_WB": held.q_reference_WB,
                 "collective_thrust": held.collective_thrust,
@@ -291,4 +333,10 @@ def audit_result(
         [asdict(d) for d in observation_supervisor.history] if mode == "on" else [],
         "supervisor reconstruction mismatch",
     )
+    if compensation is not None:
+        equal_json(
+            diagnostic["vertical"],
+            [asdict(s) for s in compensation.history],
+            "vertical compensation reconstruction mismatch",
+        )
     return health, observation_supervisor

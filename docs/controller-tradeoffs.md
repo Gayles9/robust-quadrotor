@@ -68,12 +68,20 @@ position-estimation error was only about 7.7 mm while true position error was
 13.7 cm. That observation shows why looking only at the estimator error at the
 peak is insufficient; the preceding coupled response matters.
 
-Persistent wind is a separate issue. The current position law has proportional
+Persistent wind is a separate issue. The default position law has proportional
 and velocity feedback, with no integral disturbance estimate. It needs a
 position offset to generate the force balancing a persistent load. Integral
 action could address that offset, but adds state, reset and anti-windup design
 and does not automatically solve startup transients. Earlier bounded integral
 probes also failed to close the qualification gap.
+
+The [vertical compensation study](vertical-compensation.md) separately tests
+one bounded scalar integral against the measured mass-mismatch offset. It adds
+health gating, explicit reset and conditional anti-windup to the cascade as an
+opt-in experiment. It does not change the geometric controller, compensate
+horizontal wind, or establish that startup hover is solved. Its
+[dated record](progress/2026-09-28-vertical-compensation.md) retains the full
+comparison and acceptance decision under the original flight limits.
 
 ## What I tested
 

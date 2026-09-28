@@ -16,6 +16,7 @@ design choices to equations, interfaces and verification.
 | Observation health | [Availability, rejection and recovery](observation-health.md) | [Passive monitor](../src/quadrotor_math/observation_health.py) | [0021](decisions/0021-observation-health-monitoring.md) |
 | Observation supervision | [Required streams and timed abort](observation-supervision.md) | [Supervisor](../src/quadrotor_math/observation_supervision.py) | [0022](decisions/0022-observation-loss-supervision.md) |
 | Integrated robustness | [Faulted flight and paired evidence](integrated-robustness.md) | [Live faults](../src/quadrotor_math/eskf_live_faults.py), [campaign](../experiments/robustness_validation.py) | [0023](decisions/0023-integrated-robustness-evaluation.md) |
+| Vertical compensation | [Bounded experimental integral](vertical-compensation.md) | [Scalar law](../src/quadrotor_math/vertical_compensation.py), [comparison](../experiments/vertical_compensation_validation.py) | [0024](decisions/0024-bounded-vertical-compensation.md) |
 | Attitude control | [Cascade inner loop](control.md) | [Attitude control](../src/quadrotor_math/attitude_control.py) | [0011](decisions/0011-baseline-attitude-control.md) |
 | Position control and missions | [Position loop and supervisor](position-control.md) | [Position control](../src/quadrotor_math/position_control.py), [missions](../src/quadrotor_math/missions.py) | [0012](decisions/0012-position-control-and-missions.md) |
 | Feedback from estimates | [Sensor-to-controller integration](estimated-feedback.md), [cascade design](feedback-design.md) | [Online ESKF](../src/quadrotor_math/eskf_online.py), [estimated missions](../src/quadrotor_math/estimated_mission.py) | [0013–0014](decisions/README.md#feedback-control) |
@@ -40,6 +41,7 @@ reproducibility. Run experiment modules from the repository root with
 | `geometric_reimplementation_validation` | Original geometric true/estimated comparisons |
 | `geometric_correction_validation` | Reproduce the six rejected derivative/gain profiles |
 | `robustness_validation` | Frozen paired observation-fault and model-mismatch flights with complete evidence reconstruction |
+| `vertical_compensation_validation` | One frozen vertical candidate compared with the authenticated original robustness campaign |
 | `kalman_sandbox` | Small standalone Kalman calculations |
 
 The subsystem guides explain the supported arguments, expected outputs and

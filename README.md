@@ -36,7 +36,11 @@ now aborts numerical missions when explicit per-stream budgets expire.
 live observation faults and a frozen, paired maneuver campaign under faults
 and model mismatch. Its [results](docs/progress/2026-09-28-integrated-robustness.md)
 separate correct timed responses from acceptable flight performance. The
-[next-step plan](docs/next-steps.md) records the next bounded action.
+[vertical compensation study](docs/vertical-compensation.md) adds an explicit,
+bounded experiment for the mass-induced offset. Its
+[comparison record](docs/progress/2026-09-28-vertical-compensation.md) retains the
+benefits and failed acceptance conditions; it does not replace the default.
+The [next-step plan](docs/next-steps.md) records the next bounded action.
 
 ## Run it
 

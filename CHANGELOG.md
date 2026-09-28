@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file following a 
 
 ## [Unreleased]
 
+### 2026-09-28 bounded vertical compensation
+
+- Diagnose the heavier-mass offset against the PD equilibrium and saved
+  estimator, thrust and motor histories before freezing one candidate.
+- Add an opt-in, bounded vertical integral with explicit health gating, reset,
+  conditional anti-windup and a reconstructable applied/next-state trace.
+- Compare all twelve original cases and both supervision modes against the
+  authenticated saved baseline, retaining all original limits and failures.
+- Keep the cascade default and geometric implementation unchanged; reject
+  candidate promotion when any frozen comparison condition fails.
+
 ### 2026-09-28 integrated robustness evaluation
 
 - Add an optional causal live observation-fault boundary with exhaustive source
