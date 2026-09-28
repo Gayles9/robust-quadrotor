@@ -63,5 +63,7 @@ demonstrated filter defect. The separately scoped
 [pre-arm alignment contract](prearm-alignment.md) is now defined and evaluated;
 its first-order joint covariance misses the frozen calibration limit. The
 [nonlinear uncertainty derivation](prearm-nonlinear-uncertainty.md) subsequently
-passes that gate. The [next step](next-steps.md) is the standalone component.
+passes that gate. The [standalone component](prearm-component.md) also passes
+reference and acquisition/handoff checks. The [next step](next-steps.md) is a
+separately scoped supported-start flight evaluation.
 These later diagnostic results are not part of report revision 2.0.

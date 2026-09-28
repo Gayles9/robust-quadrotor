@@ -1,9 +1,9 @@
 # Nonlinear uncertainty for supported pre-arm alignment
 
-The uncertainty derivation passes its frozen acceptance. The next bounded step
-is a standalone production alignment component with the support and release
-contract from the [pre-arm design](prearm-alignment.md). Flight integration is
-still separate. This study improves the reported joint uncertainty; it makes
+The uncertainty derivation passes its frozen acceptance. The subsequent
+[standalone component](prearm-component.md) now implements its support and
+release contract and passes reference checks. Flight integration is separate.
+This study improves the reported joint uncertainty; it makes
 only a negligible change to the inclination estimate itself.
 
 The [frozen decision](decisions/0028-nonlinear-prearm-uncertainty.md) records one
@@ -189,17 +189,13 @@ supported one-sample hold, add only the new bias-walk variances and preserve
 the nonlinear cross-covariance. The fresh independent IMU sample initializes
 endpoint sample memory; earlier samples are never replayed as fresh data.
 
-**Next:** implement this one model in a standalone production component. First
-audit these results, then freeze the public interface, supported-acquisition
-state machine and acceptance. Validate explicit support provenance/revocation,
-motors-off status, paired sample IDs and clocks, prior/profile restrictions,
-window ownership, rejection latching, uncertainty diagnostics and one-time
-fresh-sample release. Test failures independently. Keep the original physical
-operating boundary and all uncertainty limits. Do not integrate flight or issue
-arming commands in that step.
+The [standalone component](prearm-component.md) now completes that implementation
+step with explicit support provenance, sample/clock ownership, fixed priors,
+latched rejection and one-time fresh-sample release. It reproduces all 15,000
+archived covariances exactly and passes complete-session handoff checks.
 
-Only after that component passes can a separately scoped supported-start flight
-study test performance, retaining the full original flight time, controller,
+Next, a separately scoped supported-start flight study can test performance,
+retaining the full original flight time, controller,
 limits and comparison rules. Existing free-flight failures remain separately
 labelled. Hardware still needs an established support procedure and validated
 sensor assumptions.
