@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file following a 
 
 ## [Unreleased]
 
+### 2026-09-28 attitude-estimation startup audit
+
+- Recover a missing historical evidence payload by exact pinned-case reproduction
+  and mandatory original-digest equality; preserve original report provenance.
+- Reconstruct both full estimator histories and independently check joint
+  conditioning/reset, startup correction timing and local information limits.
+- Explain the first-position tilt increase without a demonstrated filter defect;
+  retain production behavior and scope an explicit pre-arm alignment contract.
+
 ### 2026-09-28 causal early-flight diagnosis
 
 - Reauthenticate and independently rescore the original and vertical campaigns;

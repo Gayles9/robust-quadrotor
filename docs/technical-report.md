@@ -58,6 +58,7 @@ fallback flight.
 The [closeout](progress/2026-09-28-technical-report.md) records acceptance.
 The report's proposed [early-flight diagnosis](early-flight-diagnosis.md) is
 now complete in a subsequent, separately recorded milestone. The current
-[next step](next-steps.md#next-bounded-task-attitude-estimation-startup-audit)
-audits the attitude-estimation startup path before a measurement-only correction
-is selected. Those later diagnostic results are not part of report revision 2.0.
+[startup audit](attitude-startup-audit.md) is also complete and finds no
+demonstrated filter defect. The [next step](next-steps.md) defines a separately
+scoped pre-arm alignment contract. These later diagnostic results are not part
+of report revision 2.0.

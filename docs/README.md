@@ -43,6 +43,7 @@ reproducibility. Run experiment modules from the repository root with
 | `robustness_validation` | Frozen paired observation-fault and model-mismatch flights with complete evidence reconstruction |
 | `vertical_compensation_validation` | One frozen vertical candidate compared with the authenticated original robustness campaign |
 | `early_flight_diagnostic`, `early_flight_oracle` | Authenticated mass/hover decomposition and one attitude-only diagnostic intervention; never qualification |
+| `attitude_startup_audit` | Offline startup propagation/update reconstruction, independent joint conditioning and bounded information audit |
 | `kalman_sandbox` | Small standalone Kalman calculations |
 
 The subsystem guides explain the supported arguments, expected outputs and
@@ -58,6 +59,7 @@ seed sets are reproduction cases, not fresh validation.
 - [Technical report](technical-report.md): consolidated LaTeX report, source/evidence identity and operating boundary.
 - [Controller tradeoffs](controller-tradeoffs.md): interpretation of the results.
 - [Early-flight diagnosis](early-flight-diagnosis.md): distinct mass and hover mechanisms, oracle limits and reproduction.
+- [Attitude startup audit](attitude-startup-audit.md): first-position update explanation, information limits and justified no-go.
 - [Next-step plan](next-steps.md): the current bounded task and stopping rules.
 - [Project review](project-review.md): the September 26 documentation and source audit.
 - [Decision index](decisions/README.md): assumptions, alternatives and design rationale.

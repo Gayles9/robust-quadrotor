@@ -75,33 +75,47 @@ but simulated truth is not an implementable controller input. The
 [verification record](progress/2026-09-28-early-flight-diagnosis.md) preserves the
 causal finding, limitations and explicit go/no-go.
 
-## Next bounded task: attitude-estimation startup audit
+## Completed: attitude-estimation startup audit
 
-Audit the diagnostic closeout and reuse the authenticated original and oracle
-hover histories. Do not generate another controller trial first.
+The [audit](attitude-startup-audit.md) reconstructs both original and oracle
+full estimator histories exactly. The first position correction accounts for
+0.8443 degrees of the early tilt increase; its ordinary-sized innovation passes
+the existing gate. Independent joint conditioning/reset agrees to roundoff.
+The [verification record](progress/2026-09-28-attitude-startup-audit.md) documents
+the conservative prior, coupled corrections, covariance limits, exact recovery
+of damaged evidence and no demonstrated implementation defect.
 
-1. Reconstruct roll/pitch error and covariance through the first second and the
-   subsequent approach to the hover peak. Separate IMU propagation from each
-   position/altitude correction; inspect coupled velocity and bias corrections.
-2. Explain why thrust-axis estimation error grows from 2.2941 degrees initially
-   to 3.1614 degrees at 0.2 s. Check innovation timing, Jacobian/reset signs and
-   covariance consistency against the declared initial prior and sensor model.
-   Fix a demonstrated in-scope defect if found; do not infer one from a failed
-   flight score alone.
-3. Assess which attitude information is available causally from existing
-   measurements during this freely flying initialization. Do not assume a
-   stationary gravity measurement, supply true attitude, silently tighten the
-   prior, change sensors or tune process/measurement noise to the observed run.
-4. Return one justified measurement-only correction design and freeze its
-   interface, independent tests and original full-flight regression acceptance
-   before implementation, or record a justified no-go and the missing information.
+The decision is no-go for a speculative correction law under the unchanged
+freely flying initialization. A stationary-gravity pseudo-measurement is not
+valid during arbitrary accelerated flight. This closes the audit, not the
+hover requirement, and does not prove that all measurement-only designs fail.
 
-Acceptance is an auditable estimator explanation and an implementable bounded
-design or justified stop. There is no gain/cutoff search, reserved seed access,
-startup removal, scoring shift, threshold relaxation or geometric reopening.
-The present step does not authorize implementing a flight-controller candidate.
-The separate mass transient remains open; attitude improvement must not be
-represented as a solution to the measured vertical force deficit.
+## Next bounded task: pre-arm alignment contract and feasibility design
+
+Audit the startup closeout, then establish whether a mechanically supported,
+nonaccelerating pre-arm interval is an allowed operating requirement. This
+must be an explicit scope decision, not an assumption hidden in an estimator.
+
+1. Specify a measurement-only alignment interface using existing IMU samples,
+   explicit timing and an externally guaranteed supported-stationary condition.
+   IMU-only quietness cannot prove absence of constant acceleration.
+2. Derive roll/pitch and gyro-bias information, retained yaw ambiguity, and
+   accelerometer-bias uncertainty. Do not invent yaw observability or supply
+   simulated attitude as an input. Do not choose a duration from the failed seed.
+3. Freeze independent analytic/noisy tests, sample reuse/cross-covariance rules,
+   motion rejection, failure behavior and a quantitative initialization-error
+   budget before implementation. Check whether the required guarantee is usable.
+4. Define later full-flight regression with the added pre-arm stage disclosed,
+   all original flight time and limits retained, and original free-flight results
+   still labelled separately. No qualification claim follows from this design.
+
+Acceptance is a feasible, explicit contract with independent verification
+criteria, or a justified stop if the required operating information is absent.
+Do not integrate it into flight yet. If supported stationarity is not allowed,
+request a different independent attitude-information source or an explicit
+startup-requirement redesign. No gain/cutoff sweep, reserved seeds, scoring
+shift, threshold relaxation or geometric reopening is authorized. The original
+cascade and endpoint ESKF remain default; the separate mass transient stays open.
 
 Any future project-completion percentage must declare an agreed weighted
 milestone denominator; campaign pass fractions are not project completion.

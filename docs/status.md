@@ -69,8 +69,14 @@ recomputed metrics from all 48 archived baseline/candidate executions, with
 mass/hover histories and uses one new attitude-only oracle. An unfitted vertical
 model matches the mass trajectories to about 8 mm RMS; the oracle reduces hover
 peak to 7.2291 cm. That truth-assisted result demonstrates headroom and cannot
-qualify a flight controller. The next task is an attitude-estimation startup
-audit before selecting any measurement-only correction.
+qualify a flight controller. The subsequent
+[startup audit](attitude-startup-audit.md) reconstructs both complete estimator
+histories and attributes the early tilt growth mainly to the first, valid noisy
+position correction. Independent conditioning/reset agrees to roundoff; no
+implementation defect is demonstrated. It rejects a speculative free-flight
+gravity correction and retains all production behavior. The next task is an
+explicit stationary pre-arm alignment contract and feasibility design, requiring
+a genuinely supported stationary interval rather than a hidden new assumption.
 
 The latest [startup/hover closeout](progress/2026-09-26-geometric-transient-closeout.md)
 reproduces the original failures and rejects one frozen coherent-force candidate.
