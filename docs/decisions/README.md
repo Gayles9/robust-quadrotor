@@ -28,6 +28,7 @@ the [next-step plan](../next-steps.md) for the present scope.
 - [0012: True-state position control and baseline missions](0012-position-control-and-missions.md)
 - [0013: Causal online ESKF and estimated-state mission feedback](0013-estimated-state-mission-feedback.md)
 - [0014: Joint cascade bandwidth and moment-matched initialization](0014-estimated-feedback-bandwidth.md)
+- [0022: Bounded supervision of observation loss](0022-observation-loss-supervision.md)
 
 ## Planning
 
@@ -43,7 +44,7 @@ the [next-step plan](../next-steps.md) for the present scope.
 
 ## Writing a new decision
 
-Use the next number and a descriptive filename, such as `0022-short-title.md`.
+Use the next number and a descriptive filename, such as `0023-short-title.md`.
 Explain the problem before the equations. State the evidence needed to accept
 the change and the limits that remain afterward.
 

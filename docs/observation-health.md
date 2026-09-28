@@ -5,8 +5,9 @@ fused, rejected, stale, disabled or still pending. A single rejected outlier is
 different from losing usable observations for a sustained interval. The
 observation health monitor makes that distinction explicit for each stream.
 
-I keep this monitor passive: it reports evidence that a later supervisor can
-use. It does not change an estimate, command, mission phase or abort decision.
+I keep this monitor passive: it reports evidence that the optional
+[observation supervisor](observation-supervision.md) can use. The monitor itself
+does not change an estimate, command, mission phase or abort decision.
 Accepted observations can still be biased or uninformative about some state
 directions, so HEALTHY means available accepted observations, not proof of
 accuracy, observability or safe flight.
@@ -150,6 +151,7 @@ recovery, reset, atomic retry and passive integration checks. Integration cases
 compare complete numerical payloads and saved byte digests, reconstruct the
 health history from recorded events, and detect deliberately damaged files.
 
-The next task is to design supervisor responses to sustained information loss.
+The separate [supervisor](observation-supervision.md) now implements explicit
+timed numerical aborts for sustained information loss.
 Controller qualification, startup alignment, additional sensors and custom
 ROS/PX4 integration remain separate work.

@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file following a 
 
 ## [Unreleased]
 
+### 2026-09-28 observation loss supervision
+
+- Add an opt-in supervisor with independent position/altitude unhealthy-time
+  budgets, explicit optional altitude, strict epoch order and latched abort.
+- Enforce recovery before expiry, preserve timers across mission phases, and
+  stop before terminal commands while retaining existing safety guard priority.
+- Check real ESKF dropout/rejection/delay responses, healthy mission parity,
+  independent stream failures and authenticated decision reconstruction.
+- Preserve controllers, estimator, evidence formats and open noisy-flight
+  requirements; define broader integrated fault/mismatch evaluation next.
+
 ### 2026-09-28 observation health monitoring
 
 - Add independent position/altitude availability states from causal estimator

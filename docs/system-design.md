@@ -58,6 +58,12 @@ does not establish performance in the second. The truth safety monitor is
 explicitly separate from both the estimator and controller; it is a simulation
 guard, not an onboard sensing capability.
 
+The optional [observation supervisor](observation-supervision.md) consumes the
+passive monitor's current availability states. Independent elapsed budgets can
+stop an estimated mission before another command, with existing truth and
+estimate safety guards retaining priority. It has no truth-state input and
+does not implement a hardware recovery maneuver.
+
 ## Frames and physical assumptions
 
 All core calculations use North-East-Down world coordinates and

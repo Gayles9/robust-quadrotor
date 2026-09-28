@@ -15,7 +15,7 @@ hover and trajectory control with noisy estimated feedback.
 | Planning | Fixed-duration minimum-snap splines, derivatives through snap, nominal reference bounds, bounded uniform retiming | No obstacle planning, time optimization or complete actuator-feasibility proof |
 | Geometric control | Rotation-based moment law, analytic force-to-attitude derivatives, causal filter, true/estimated missions and two optional derivative strategies | Six earlier profiles and one subsequent coherent-force candidate fail the joint requirements; the bounded study is closed |
 | Integration | Earlier ROS 2/PX4/Gazebo compatibility checks and an x500 takeoff/hover/landing spike | The custom Python stack is not integrated into PX4 or validated on hardware |
-| Fault handling | Innovation rejection, event diagnostics, mission guards and passive per-stream observation health monitoring | Supervisor responses, fault diagnosis and degraded flight policy remain |
+| Fault handling | Innovation rejection, event diagnostics, per-stream observation health and opt-in timed numerical abort | Broad integrated fault/mismatch evaluation, fault diagnosis and physical fallback flight remain |
 
 Estimated minimum-snap missions are available experimentally through the
 geometric controller or explicit cascade `allow_minimum_snap=True`. That support
@@ -30,6 +30,13 @@ histories and saved flight bytes across six paired regression configurations.
 The monitor does not change flight decisions or establish estimator accuracy.
 The [guide](observation-health.md) defines the timing and recovery rules.
 
+The separate [observation supervision milestone](progress/2026-09-28-observation-loss-supervision.md)
+adds explicit, independent unhealthy-time budgets. Required streams can stop
+the numerical mission before another command; optional altitude cannot veto
+it. Recovery deadlines, phase boundaries, safety priority, nominal equivalence
+and saved-history reconstruction are checked. This is an opt-in simulation
+response, not a hardware emergency procedure or a new flight qualification.
+
 The latest [startup/hover closeout](progress/2026-09-26-geometric-transient-closeout.md)
 reproduces the original failures and rejects one frozen coherent-force candidate.
 It passes the seed-30 spline comparison at 6.77 cm RMSE and 0.85 times cascade
@@ -37,7 +44,8 @@ effort, but its full-hover maxima are 10.87 and 17.33 cm against 8 cm. No produc
 algorithm or controller default changed. That milestone's software gate passed
 3,338 tests; sampled-model checks include both horizontal frame directions.
 The reserved qualification seeds remain unopened. Observation health monitoring
-is now implemented; supervisor responses are the next separate task.
+and bounded supervisor responses are implemented; broader integrated fault and
+mismatch evaluation is the next task.
 
 The [geometric audit](progress/2026-09-26-geometric-project-audit.md) records the
 following results for the implementation merged in
@@ -82,6 +90,6 @@ has the same distinction between implementation and qualified flight behavior.
 [Controller problems and tradeoffs](controller-tradeoffs.md) explains why the
 remaining failures can coexist with correct equations and good true-state
 tracking. [Project review](project-review.md) records the current audit, and
-[the next-step plan](next-steps.md) defines supervisor response design before
+[the next-step plan](next-steps.md) defines integrated evaluation before
 further integration. Broad integrated evaluation and an updated technical report remain
 separate deliverables; the earlier report is a historical snapshot.

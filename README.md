@@ -30,7 +30,9 @@ reduced spline effort but still failed hover, so the accepted controllers remain
 unchanged. The [closeout](docs/progress/2026-09-26-geometric-transient-closeout.md)
 records the result. [Observation health monitoring](docs/observation-health.md)
 now reports accepted-data loss and recovery independently for position and
-altitude. Designing the supervisor's response is the next separate task.
+altitude. An optional [observation supervisor](docs/observation-supervision.md)
+now aborts numerical missions when explicit per-stream budgets expire. The next
+task is broader integrated evaluation under faults and model mismatch.
 
 ## Run it
 

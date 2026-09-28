@@ -277,12 +277,15 @@ def _simulate_mission(
     allow_minimum_snap: bool = False,
     consume_estimator_force_jump: Callable[[], NDArray[np.float64]] | None = None,
     estimated_acceleration: Callable[[], NDArray[np.float64]] | None = None,
+    observation_guard: Callable[[], str | None] | None = None,
 ) -> MissionResult:
     """Shared private execution; observer is a truth-to-sensor integration boundary.
 
     None preserves the original true-state path exactly. Otherwise controllers
     and completion use only the returned feedback state; the separate numerical
     truth guard is labelled truth_*, and feedback guards estimate_* (ADR 0013).
+    An estimated observation guard runs after those safety guards and before
+    completion or commands; it must read only current observation diagnostics.
     """
     if geometric_controller is not None and not isinstance(
         geometric_controller, GeometricControllerParameters
@@ -290,6 +293,8 @@ def _simulate_mission(
         raise TypeError("geometric_controller must be GeometricControllerParameters")
     if type(allow_minimum_snap) is not bool:
         raise ValueError("allow_minimum_snap must be bool")
+    if observation_guard is not None and (observer is None or not callable(observation_guard)):
+        raise ValueError("observation guard requires estimated feedback and a callable")
     if (
         geometric_controller is not None
         and geometric_controller.use_measured_acceleration
@@ -422,6 +427,10 @@ def _simulate_mission(
                 estimated_reason = mission_guard_reason(feedback[0], feedback[2], safety)
                 if reason is None and estimated_reason is not None:
                     reason = f"estimate_{estimated_reason}"
+            if observation_guard is not None:
+                observation_reason = observation_guard()
+                if reason is None:
+                    reason = observation_reason
             supervisor = advance_mission(
                 supervisor, plan, float(time), feedback[0], feedback[1], reason
             )

@@ -28,5 +28,6 @@ This repository supports a six-month Robust Autonomous Quadrotor project. Build 
 ## Completion
 
 - Before finishing a task, run the relevant tests and lint checks. Report the exact commands and their results.
+- At the end of each scoped step, assess the quality and limits of the results, state explicitly whether the step met its acceptance criteria, and give the next concrete step.
 - Never commit changes unless the repository owner explicitly requests publication.
 - Keep documentation in the project author's voice. Do not identify the repository owner by name or include personal home-directory paths. Explain current design choices in guides and preserve dated numerical evidence in progress records.
