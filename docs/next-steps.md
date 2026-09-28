@@ -54,26 +54,44 @@ original cascade default and retain the candidate only as an explicit research
 option. Do not retune it, loosen the comparison or promote a mass-offset benefit
 into whole-flight qualification. Geometric qualification remains separate.
 
-## Next bounded task: technical report and operating boundary
+## Completed: technical report and operating boundary
 
-Audit this closeout against the merged source, software checks and saved
-evidence. Consolidate the current mathematical architecture and verified results
-into the technical report: plant, sensor timing, ESKF assumptions, planning,
-controller tradeoffs, observation health, timed response and disturbance study.
+The [report consolidation](technical-report.md) updates the original LaTeX
+report to the current mathematical stack and evidence. It separates implemented
+software, development results, unresolved flight qualification and unimplemented
+integration. Source/report identities, reproduction instructions, failed studies,
+controller defaults and numerical-abort limitations are explicit. The
+[verification record](progress/2026-09-28-technical-report.md) records the audit.
+No controller, threshold, seed or mission behavior changed.
 
-Include a traceable capability table separating implemented software, bounded
-development evidence, unresolved qualification and unimplemented integration.
-Preserve the original limits, every failed controller study and the distinction
-between numerical abort and a physical emergency maneuver. Cite exact source
-commits and evidence hashes; do not present development seeds as new validation.
-Any progress estimate must declare its milestone denominator and weighting.
+## Next bounded task: causal early-flight diagnosis
 
-Acceptance requires reconciled numbers and source references, reproducible
-commands and evidence locations, a clear default-controller decision, and an
-explicit list of open flight requirements. Identify the later ROS 2/PX4
-integration interface and its required acceptance criteria without implementing
-middleware or claiming hardware readiness. This is consolidation of verified
-work, not another gain search or an automatic controller promotion.
+Audit the report closeout and reauthenticate the original mass/hover histories.
+Reproduce their full-flight metrics before analyzing the startup interval.
+The mass candidate's first-five-second RMSE is 29.736 cm versus 3.286 cm over
+its last five seconds; this motivates a transient investigation, not a new
+scoring window. Hover causality must be established separately.
+
+1. Decompose saved tracking error by axis, phase and declared diagnostic windows.
+   Distinguish reference-to-truth error from estimate-to-truth error.
+2. Reconstruct commanded and achieved force, attitude, motor lag, limits,
+   observation health and integral-learning timing. State a testable mechanism
+   with predicted signs, timing and magnitude.
+3. If needed, use an independently checked local model or a single-factor
+   counterfactual to distinguish causes. Mark altered initialization or oracle
+   inputs as diagnostic, not qualification.
+4. Return a causal finding with its uncertainty and an explicit go/no-go.
+   Only then scope one justified candidate with unchanged regression and
+   full-flight acceptance.
+
+Acceptance is reproducible attribution and a bounded next experiment or a
+justified stop, not a promised controller pass. Do not sweep gains/cutoffs,
+open reserved seeds, discard startup, move the scoring clock, or relax limits.
+This task does not automatically reopen the closed geometric study or authorize
+implementation of a controller candidate.
+
+Any future project-completion percentage must declare an agreed weighted
+milestone denominator; campaign pass fractions are not project completion.
 
 ## Later milestones
 

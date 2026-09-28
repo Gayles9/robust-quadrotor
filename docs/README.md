@@ -54,6 +54,7 @@ seed sets are reproduction cases, not fresh validation.
 ## Status and evidence
 
 - [Current status](status.md): implemented capabilities and measured limitations.
+- [Technical report](technical-report.md): consolidated LaTeX report, source/evidence identity and operating boundary.
 - [Controller tradeoffs](controller-tradeoffs.md): interpretation of the results.
 - [Next-step plan](next-steps.md): the current bounded task and stopping rules.
 - [Project review](project-review.md): the September 26 documentation and source audit.
@@ -62,6 +63,7 @@ seed sets are reproduction cases, not fresh validation.
 - [Changelog](../CHANGELOG.md): notable repository changes.
 
 Dated records describe their own commits. Their old next actions and test counts
-are historical; use the current status and plan for today's scope. The earlier
-standalone technical report is a separate snapshot and is not built from this
-repository. These Markdown guides are the current repository documentation.
+are historical; use the current status and plan for today's scope. The standalone
+technical report is a separately maintained, source-pinned LaTeX deliverable;
+its [guide](technical-report.md) identifies the current revision. These Markdown
+guides are the current repository documentation.

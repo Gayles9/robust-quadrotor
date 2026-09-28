@@ -40,7 +40,10 @@ separate correct timed responses from acceptable flight performance. The
 bounded experiment for the mass-induced offset. Its
 [comparison record](docs/progress/2026-09-28-vertical-compensation.md) retains the
 benefits and failed acceptance conditions; it does not replace the default.
-The [next-step plan](docs/next-steps.md) records the next bounded action.
+The [technical report](docs/technical-report.md) consolidates the mathematical
+architecture, verified results and operating boundary. The
+[next-step plan](docs/next-steps.md) scopes causal early-flight diagnosis using
+saved evidence; it does not authorize another gain sweep or default promotion.
 
 ## Run it
 

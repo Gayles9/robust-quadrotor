@@ -189,5 +189,5 @@ The implementation/evaluation scope is completed successfully; the candidate
 performance acceptance is not. Retain the option only for explicit research,
 keep the original cascade default, and leave geometric, broad noisy-flight and
 hardware qualification open. The next bounded task is the
-[technical report and operating boundary](../next-steps.md#next-bounded-task-technical-report-and-operating-boundary),
+[technical report and operating boundary](../next-steps.md#completed-technical-report-and-operating-boundary),
 reconciling verified capabilities, failures and the later integration contract.
