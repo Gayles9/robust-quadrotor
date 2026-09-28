@@ -121,30 +121,37 @@ This is go for a standalone alignment component, not a demonstrated flight
 improvement. The local approximation and physical support condition remain
 explicit. The original first-order study stays preserved as a failed design.
 
-## Next bounded task: standalone supported pre-arm alignment component
+## Completed: standalone supported pre-arm alignment
 
-1. Audit this closeout, then freeze the public API and independent component
-   acceptance before implementing the approved nonlinear model in the core.
-2. Implement explicit acquisition/support provenance, motors-off status,
-   revocation, paired sample IDs and clocks, fixed prior/profile restrictions,
-   window ownership, latched rejection, uncertainty diagnostics and a one-time
-   fresh-sample release. Incomplete or invalid acquisition cannot become ready.
-3. Preserve the full covariance at the computed rotation mean, unchanged heading
-   and accelerometer-bias information, supported bias-walk hold and fresh endpoint
-   sample independence. Reject unsupported prior correlations or stale/overlapping
-   handoffs. Do not substitute assumed independence for missing information.
-4. Test independently against the analytic contract and the preserved numerical
-   reference. Cover missing/revoked support, motors enabled, clock/sample faults,
-   motion rejection, readiness boundaries, repeated release and the required
-   constant-acceleration ambiguity. Retain all original uncertainty limits.
+The [component](prearm-component.md) implements the fixed nonlinear model,
+externally supplied support evidence, paired sample/clock ownership, restricted
+priors, latched rejection, diagnostics and one-time fresh endpoint handoff.
+The [verification record](progress/2026-09-28-prearm-component.md) preserves
+all 15,000 reference comparisons and 200 complete acquisition/release sessions.
+Covariance and complete-session compatibility statistics reproduce exactly.
+Constant acceleration remains unobservable without genuine external support.
+No arming command or flight integration was added.
 
-Acceptance is a tested standalone component with no production arming command
-or flight integration. Then scope a separate supported-start flight evaluation
-with physically modeled support, common flight noise, full original scoring
-time and unchanged performance/no-regression criteria. Reserved qualification
-seeds remain unopened. The cascade and endpoint ESKF stay default; mass-transient
-and geometric qualification remain separate. Hardware still requires an
-established support procedure and validated sensor assumptions.
+## Next bounded task: physically supported-start flight evaluation
+
+1. Audit the component closeout and freeze one paired flight protocol before
+   integration or execution. Keep reserved qualification seeds unopened.
+2. Model mechanical support, motors off and zero motion through the complete
+   acquisition and fresh release sample. Generate explicit support evidence
+   from that modeled stage; never assume stationarity during flight.
+3. Use the component output in an experiment-only handoff to the existing
+   endpoint ESKF. Preserve the original controller, flight duration, p/v and
+   heading information assumptions, common flight noise and full scoring.
+4. Compare against the authenticated original baseline and preserve every
+   outcome. Retain the 8 cm hover criterion and all existing no-regression and
+   whole-flight limits; distinguish the changed supported-start operating
+   condition from the original freely flying initialization.
+
+Acceptance is evidence that determines whether supported initialization improves
+flight and passes its frozen criteria. A failed result must remain a failure;
+no automatic duration, noise, threshold or controller retuning. Geometric
+qualification and the separate mass-transient limitation remain open. Hardware
+still requires an established support procedure and validated sensor assumptions.
 
 Any future project-completion percentage must declare an agreed weighted
 milestone denominator; campaign pass fractions are not project completion.
