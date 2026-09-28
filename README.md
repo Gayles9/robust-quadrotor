@@ -51,10 +51,12 @@ filter defect. The [pre-arm design](docs/prearm-alignment.md) now defines a
 supported 0.5 s IMU alignment stage. Its initial first-order covariance failed
 calibration. The [nonlinear uncertainty derivation](docs/prearm-nonlinear-uncertainty.md)
 now passes the frozen independent gate while retaining attitude/bias correlation.
-The [standalone component](docs/prearm-component.md) now passes reference and
-acquisition/handoff checks. The [next-step plan](docs/next-steps.md) scopes a
-physically supported-start flight evaluation; flight improvement and controller
-qualification remain unproven.
+The [standalone component](docs/prearm-component.md) passes reference and
+acquisition/handoff checks. The [supported-start flight comparison](docs/supported-start-flight.md)
+now reduces the scored hover peak from 8.59 cm without alignment to 2.51 cm
+with alignment under the same modeled support conditions, passing the 8 cm
+limit. Nominal and wind tracking also pass; mass mismatch still fails. The
+[next step](docs/next-steps.md) is independent repeatability and fault validation.
 
 ## Run it
 
