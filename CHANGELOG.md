@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file following a 
 
 ## [Unreleased]
 
+### 2026-09-28 nonlinear pre-arm uncertainty
+
+- Derive the mixed heading/inclination error and propagate one local Gaussian
+  model through nonlinear rotations with full terminal-bias correlations.
+- Pass the original and fresh covariance gates using fixed positive quadrature,
+  retaining all 15,000 outcomes and unchanged priors, duration and thresholds.
+- Scope the standalone production alignment component next; no flight behavior
+  or controller default changes and no flight-performance gain is claimed.
+
 ### 2026-09-28 stationary pre-arm alignment design
 
 - Define an externally supported, motors-off 0.5 s acquisition stage, retained

@@ -107,28 +107,44 @@ frozen 1.10 cap; the linearized check gives 1.0622. The first-order design is
 no-go for production implementation. No budgets, noise scales or duration were
 tuned after the result, and no flight case was run.
 
-## Next bounded task: nonlinear pre-arm uncertainty derivation
+## Completed: nonlinear pre-arm uncertainty derivation
 
-1. Audit the design closeout and independently reconstruct the retained
-   covariance failure, including all rejected trials. Check error coordinates,
-   covariance evaluation point and the leading rotation/heading/bias coupling.
-2. Derive one justified uncertainty representation at the estimated attitude,
-   with attitude/bias cross-covariances and any nonzero mean correction. Bound
-   or quantify approximation terms; do not fit an inflation factor to this data.
-3. Freeze analytic identities, a new independent covariance population and the
-   stopping rule before execution. Retain the 0.5 s interval, original sensor
-   model/priors, <=10% covariance-underprediction criterion and support contract.
-4. Decide go/no-go for a standalone production alignment component. A passing
-   derivation permits that as the subsequent step, with complete support-token,
-   sample-ID, state-machine, prior-validation and release tests. It does not
-   authorize immediate flight integration or hardware arming.
+The [derivation](prearm-nonlinear-uncertainty.md) propagates a fixed local Gaussian
+model through nonlinear rotations and retains terminal-bias correlations using
+positive quadrature. Its [verification record](progress/2026-09-28-prearm-nonlinear-uncertainty.md)
+reconstructs the original failure exactly and preserves all 15,000 outcomes.
+The old Gaussian set passes at 1.0614; a fresh set passes at 1.0822 against the
+unchanged 1.10 cap. The paired first-order result on that fresh set is 1.1424.
+No empirical inflation, new noise assumptions or duration tuning was used.
 
-If the uncertainty criterion still fails, retain the failure and stop. Do not
-run a covariance-inflation, duration, gain or cutoff sweep. Reserved flight
-seeds, original full-flight scoring and thresholds remain unchanged. The
-cascade and endpoint ESKF stay default; mass-transient and geometric
-qualification remain separate. Hardware use also requires a verified way to
-establish the supported-stationary interval.
+This is go for a standalone alignment component, not a demonstrated flight
+improvement. The local approximation and physical support condition remain
+explicit. The original first-order study stays preserved as a failed design.
+
+## Next bounded task: standalone supported pre-arm alignment component
+
+1. Audit this closeout, then freeze the public API and independent component
+   acceptance before implementing the approved nonlinear model in the core.
+2. Implement explicit acquisition/support provenance, motors-off status,
+   revocation, paired sample IDs and clocks, fixed prior/profile restrictions,
+   window ownership, latched rejection, uncertainty diagnostics and a one-time
+   fresh-sample release. Incomplete or invalid acquisition cannot become ready.
+3. Preserve the full covariance at the computed rotation mean, unchanged heading
+   and accelerometer-bias information, supported bias-walk hold and fresh endpoint
+   sample independence. Reject unsupported prior correlations or stale/overlapping
+   handoffs. Do not substitute assumed independence for missing information.
+4. Test independently against the analytic contract and the preserved numerical
+   reference. Cover missing/revoked support, motors enabled, clock/sample faults,
+   motion rejection, readiness boundaries, repeated release and the required
+   constant-acceleration ambiguity. Retain all original uncertainty limits.
+
+Acceptance is a tested standalone component with no production arming command
+or flight integration. Then scope a separate supported-start flight evaluation
+with physically modeled support, common flight noise, full original scoring
+time and unchanged performance/no-regression criteria. Reserved qualification
+seeds remain unopened. The cascade and endpoint ESKF stay default; mass-transient
+and geometric qualification remain separate. Hardware still requires an
+established support procedure and validated sensor assumptions.
 
 Any future project-completion percentage must declare an agreed weighted
 milestone denominator; campaign pass fractions are not project completion.

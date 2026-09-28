@@ -23,6 +23,7 @@ the [next-step plan](../next-steps.md) for the present scope.
 - [0021: Causal observation health monitoring](0021-observation-health-monitoring.md)
 - [0026: Bounded attitude-estimation startup audit](0026-attitude-startup-audit.md)
 - [0027: Stationary pre-arm alignment design and feasibility](0027-stationary-prearm-alignment-design.md)
+- [0028: Nonlinear joint pre-arm uncertainty](0028-nonlinear-prearm-uncertainty.md)
 
 ## Feedback control
 
@@ -49,7 +50,7 @@ the [next-step plan](../next-steps.md) for the present scope.
 
 ## Writing a new decision
 
-Use the next number and a descriptive filename, such as `0028-short-title.md`.
+Use the next number and a descriptive filename, such as `0029-short-title.md`.
 Explain the problem before the equations. State the evidence needed to accept
 the change and the limits that remain afterward.
 

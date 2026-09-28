@@ -80,9 +80,13 @@ stationary 0.5 s interval, uncertainty, rejection and sample ownership. Across
 5,000 nominal trials its 99th-percentile axis error is 0.1869 degrees and one
 window is rejected. However, the independent nonlinear Gaussian covariance
 check reaches 1.1122 maximum normalized variance against a 1.10 limit. Production
-implementation is no-go pending a bounded uncertainty derivation. This is a
-completed design study with a retained calibration failure, not a new flight
-result or an assertion that existing hardware supplies the required support.
+implementation was blocked pending a bounded uncertainty derivation. The
+[nonlinear model](prearm-nonlinear-uncertainty.md) now passes that gate: maximum
+normalized variance falls from 1.1424 to 1.0822 on a fresh paired Gaussian
+population, below the unchanged 1.10 cap. The original failing population also
+passes at 1.0614. All 15,000 study outcomes are retained. The next step is the
+standalone alignment component; no new flight result or verified hardware
+support procedure is claimed.
 
 The latest [startup/hover closeout](progress/2026-09-26-geometric-transient-closeout.md)
 reproduces the original failures and rejects one frozen coherent-force candidate.
