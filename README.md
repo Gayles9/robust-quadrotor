@@ -31,8 +31,12 @@ unchanged. The [closeout](docs/progress/2026-09-26-geometric-transient-closeout.
 records the result. [Observation health monitoring](docs/observation-health.md)
 now reports accepted-data loss and recovery independently for position and
 altitude. An optional [observation supervisor](docs/observation-supervision.md)
-now aborts numerical missions when explicit per-stream budgets expire. The next
-task is broader integrated evaluation under faults and model mismatch.
+now aborts numerical missions when explicit per-stream budgets expire.
+[Integrated robustness evaluation](docs/integrated-robustness.md) adds causal
+live observation faults and a frozen, paired maneuver campaign under faults
+and model mismatch. Its [results](docs/progress/2026-09-28-integrated-robustness.md)
+separate correct timed responses from acceptable flight performance. The
+[next-step plan](docs/next-steps.md) records the next bounded action.
 
 ## Run it
 

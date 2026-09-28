@@ -111,5 +111,7 @@ contains the results. Core fault tests use the real online ESKF with explicit
 dropouts, offsets and delayed deliveries. Closed-loop tests use short stationary
 phase fixtures with independent stale/rejected streams and both controllers.
 They verify response correctness and unchanged nominal behavior, not general
-robust flight. The next task is a frozen integrated campaign across actual
-maneuvers, faults and model mismatch.
+robust flight. The separate [integrated campaign](integrated-robustness.md)
+evaluates actual maneuvers, causal live faults and model mismatch with paired
+histories and unchanged controller settings. Its response and flight results
+remain separate criteria.

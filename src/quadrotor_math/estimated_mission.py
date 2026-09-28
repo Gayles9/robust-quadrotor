@@ -9,6 +9,7 @@ from numpy.typing import NDArray
 from .attitude_control import AttitudeControllerParameters
 from .attitude_simulation import State, _wrench
 from .dynamics import quadratic_drag_force_body, translational_acceleration_world_from_body_force
+from .eskf_live_faults import EskfLiveObservationFaults
 from .eskf_online import EskfOnlineEstimator
 from .eskf_replay import (
     EskfObservationKind,
@@ -199,6 +200,7 @@ def simulate_estimated_mission(
     allow_minimum_snap: bool = False,
     observation_health: ObservationHealthMonitor | None = None,
     observation_supervision: ObservationSupervisor | None = None,
+    observation_faults: EskfLiveObservationFaults | None = None,
 ) -> EstimatedMissionResult:
     """Execute measurements and ESKF before same-epoch feedback, without lookahead.
 
@@ -215,6 +217,9 @@ def simulate_estimated_mission(
     prefix; no partial mission result is returned. Reset it before reuse.
     An optional fresh observation_supervision bound to that same monitor adds
     the explicit numerical-abort policy in ADR 0022. Reset both before reuse.
+    Optional fresh observation_faults alters nominal arrivals before the ESKF.
+    Its separate exhaustive source/fault ledger is sealed after execution;
+    result.measurements contains only surviving inputs (including pending).
     """
     if not isinstance(sensors, MissionSensors) or not isinstance(
         estimator_configuration, EskfReplayConfiguration
@@ -243,6 +248,21 @@ def simulate_estimated_mission(
     if dt <= 2 * _time_comparison_tolerance_s(horizon, horizon):
         raise ValueError("plant clock must resolve sensor scheduler tolerance")
     schedules = (sensors.local_position_schedule, sensors.barometric_altitude_schedule)
+    if observation_faults is not None:
+        if not isinstance(observation_faults, EskfLiveObservationFaults):
+            raise TypeError("observation_faults must be EskfLiveObservationFaults or None")
+        if (
+            observation_faults.epoch_count
+            or observation_faults.initial_time_s != config.initial_time_s
+        ):
+            raise ValueError("observation faults must be fresh at the estimator prior epoch")
+        try:
+            if any(
+                not np.isfinite(f.delay_steps * dt + horizon) for f in observation_faults.faults
+            ):
+                raise ValueError("fault delivery times must remain finite")
+        except OverflowError:
+            raise ValueError("fault delivery times must remain finite") from None
     if observation_health is not None:
         if not isinstance(observation_health, ObservationHealthMonitor):
             raise TypeError("observation_health must be ObservationHealthMonitor or None")
@@ -409,7 +429,10 @@ def simulate_estimated_mission(
                 record = source[delivery.sequence_index]
                 record.delivery_index = k
                 delivered.append(record.observation())
-        estimate = stream.step(time, measured_force, measured_rate, tuple(delivered))
+        arrivals = tuple(delivered)
+        if observation_faults is not None:
+            arrivals = observation_faults.step(time, arrivals)
+        estimate = stream.step(time, measured_force, measured_rate, arrivals)
         if observation_health is not None:
             observation_health.step(time, estimate.events)
         if observation_supervision is not None:
@@ -479,6 +502,17 @@ def simulate_estimated_mission(
         np.asarray(gyro_rows),
         tuple(r.observation() for r in all_records),
     )
+    delivery_times = {(r.kind, r.source_index): r.scheduled_time_s for r in all_records}
+    if observation_faults is not None:
+        injection = observation_faults.finish(measurements)
+        measurements = injection.measurements
+        delivery_times = {
+            (r.output.kind, r.output.observation_index): (
+                delivery_times[r.source.kind, r.source.observation_index] + r.fault.delay_steps * dt
+            )
+            for r in injection.records
+            if r.output is not None
+        }
     events.extend(
         EskfReplayEvent(o, EskfReplayStatus.PENDING)
         for o in measurements.observations
@@ -487,7 +521,6 @@ def simulate_estimated_mission(
     estimates = EskfReplayResult(
         mission.time_s, tuple(states), np.asarray(covariance_rows), tuple(events)
     )
-    delivery_times = {(r.kind, r.source_index): r.scheduled_time_s for r in all_records}
     return EstimatedMissionResult(
         mission,
         measurements,

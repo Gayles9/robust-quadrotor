@@ -139,7 +139,10 @@ recovery. This is a useful diagnosis, but fails the unchanged joint requirement.
 That bounded study is now closed, with no further gain or cutoff search and no
 reserved validation seeds opened. The cascade default and original geometric
 controller remain unchanged. [Observation health monitoring](observation-health.md)
-now reports persistent accepted-data loss. The [next plan](next-steps.md) defines
-supervisor responses as a separate task; qualification is still open.
+now reports persistent accepted-data loss. The
+[observation supervisor](observation-supervision.md) supplies timed numerical
+abort, and the [integrated campaign](integrated-robustness.md) evaluates its
+response alongside flight performance. The [next plan](next-steps.md) records
+the separate follow-up scope; controller qualification is still open.
 The [geometric guide](geometric-control.md) contains the equations and API, and
 [cascade design](feedback-design.md) explains the coupled local model.

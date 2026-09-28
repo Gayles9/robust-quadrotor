@@ -28,34 +28,42 @@ documents component fault injection, closed-loop regression and saved-evidence
 reconstruction. This closes the bounded response-interface step, not general
 robust-flight qualification or a hardware fallback policy.
 
-## Next bounded task: integrated robustness evaluation
+## Completed: integrated robustness evaluation
 
-Audit the monitor/supervisor milestone, then freeze a small campaign before
-executing it. Cover actual hover, tracking and virtual landing with nominal
-sensors, independent position/altitude dropout, rejection and delay, followed
-by explicitly declared wind and mass mismatch. Define fault timing, durations,
-seeds, health thresholds, response budgets and success criteria in advance.
+The [frozen campaign](integrated-robustness.md) executes twelve paired cases
+with original cascade parameters and known seeds. It retains actual hover,
+translation and virtual landing, causal position/altitude faults, recovery,
+wind and mass mismatch. Each mode's full saved evidence is authenticated and
+reconstructed before response and flight criteria are scored separately.
+The [verification record](progress/2026-09-28-integrated-robustness.md) preserves
+all outcomes, including the failed hover peak and mass-mismatch landing.
 
-Start with the unchanged cascade default and a matched supervision-off
-comparator for each case. Use a causal live fault-delivery boundary; retain an
-exhaustive fault ledger outside the estimator and supervisor. Do not infer
-closed-loop dropout performance from the current component-only dropout tests.
-Archive complete sensor/estimate/command histories, authenticate them, and
-reconstruct every health transition and abort decision.
+## Next bounded task: vertical disturbance rejection
 
-Measure nominal false aborts, fault detection and response times, accepted-data
-age, command cutoff, tracking/estimation error over the common horizon, and
-completion or abort reason. Keep all comparator failures. Distinguish a correct
-timed abort from successful mission completion, and separate simulation truth
-guards from observation-driven decisions. A passing short stationary fixture
-does not demonstrate acceptable maneuver performance.
+Audit the integrated evaluation and diagnose the 10% mass-mismatch case from
+its saved histories. Compare the measured vertical offset with the existing
+PD controller's equilibrium prediction; check estimator error, motor/thrust
+limits and the complete takeoff/landing response. Review the earlier bounded
+integral probes before proposing a new mechanism. They did not close the
+startup/hover gap and must not be presented as an already-qualified remedy.
 
-Conclude whether the declared policy meets that frozen campaign. If it fails,
-retain the failed cases and propose a separate evidence-based change; do not
-retune controllers, budgets or acceptance limits within the evaluation. Full
-software checks and authenticated evidence remain required. Automatic
-alignment, new sensors, estimator/controller tuning and ROS/PX4 adapters are
-separate scopes.
+Freeze at most one justified, explicitly experimental vertical disturbance-
+compensation candidate, with defined state, bounds, anti-windup, initialization,
+reset and observation-loss behavior. It may use causal measured/estimated
+feedback and commanded quantities, never the simulator's true mass or fault
+labels. Preserve the original default and compare the candidate against the
+saved original cascade under unchanged seeds, flight limits and fault policy.
+
+Require a complete mass-mismatch mission within the original campaign's error
+limits, and no regression in nominal, recovery, wind or timed-fault behavior.
+Retain the known hover-peak failure unless a separately justified change actually
+passes its unchanged requirement. A mass-offset improvement cannot qualify the
+controller as a whole. Do not run a gain sweep, relax the landing tolerance,
+reopen reserved qualification seeds or silently promote an experimental option.
+
+Conclude with complete authenticated evidence, full software checks, a clear
+accept/reject decision and the next bounded action. Geometric-controller
+qualification and a physical fallback maneuver remain separate scopes.
 
 ## Later milestones
 
