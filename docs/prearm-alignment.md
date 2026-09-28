@@ -3,8 +3,10 @@
 This is a defined operating contract and an offline feasibility study, not an
 arming feature. A supported 0.5 s interval provides useful inclination and
 gyro-bias information with the existing IMU. The first-order joint covariance
-misses the frozen calibration limit, so production implementation is **no-go**
-until that uncertainty model is resolved. See the frozen
+missed the frozen calibration limit. The subsequent
+[nonlinear derivation](prearm-nonlinear-uncertainty.md) passes that gate and
+permits the next standalone component. This page retains the original contract
+and first-order result. See the frozen
 [ADR 0027](decisions/0027-stationary-prearm-alignment-design.md) and
 [measured record](progress/2026-09-28-prearm-alignment-design.md).
 
@@ -248,13 +250,11 @@ flight seeds. Independent tests cover frame signs, finite-difference Jacobians,
 latent-walk covariance, correlation whitening, uncertainty rejection,
 nonstationarity ambiguity and supported handoff.
 
-**Next:** audit this result and derive the nonlinear joint uncertainty at the
-actual estimated attitude, including the leading rotation/bias coupling. Choose
-one mathematically justified representation before running another calibration
-study. Keep the 0.5 s window, priors, sensor model and <=10% covariance criterion;
-do not add an empirical inflation factor. Freeze a new independent covariance
-population and stopping rule. Only a passing uncertainty design can advance to
-a standalone production component with the full interface/state-machine tests.
+The subsequent [nonlinear derivation](prearm-nonlinear-uncertainty.md) completes
+the planned uncertainty step and passes the unchanged <=10% calibration gate.
+It retains the 0.5 s window, priors, sensor model and full correlations without
+an empirical inflation factor. The [current next step](next-steps.md) is the
+standalone production component with the complete interface/state-machine tests.
 
 A later flight study must add a physically modeled support stage rather than
 freeze an airborne state by assertion. Pair it with the original initialization

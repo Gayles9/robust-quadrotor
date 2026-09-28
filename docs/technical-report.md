@@ -62,5 +62,6 @@ now complete in a subsequent, separately recorded milestone. The current
 demonstrated filter defect. The separately scoped
 [pre-arm alignment contract](prearm-alignment.md) is now defined and evaluated;
 its first-order joint covariance misses the frozen calibration limit. The
-[next step](next-steps.md) is the bounded nonlinear uncertainty derivation.
+[nonlinear uncertainty derivation](prearm-nonlinear-uncertainty.md) subsequently
+passes that gate. The [next step](next-steps.md) is the standalone component.
 These later diagnostic results are not part of report revision 2.0.
