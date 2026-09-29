@@ -15,8 +15,18 @@ tradeoff, including a changed observation-gate disposition under the same policy
 The combined candidate's three hover peaks remain below 8 cm, but its frozen
 no-regression comparison fails. This startup study is closed and the candidate
 remains experimental. Fresh validation and production integration are incomplete;
-controller defaults are unchanged. The full software gate passes 3,892 tests.
-The next step is a separate whole-flight estimation/control error-budget design.
+controller defaults are unchanged. That milestone's full software gate passed
+3,892 tests.
+
+The completed [error-budget review](whole-flight-error-budget.md) retains all
+27 full-flight Gram matrices and derives the original sampled cascade's input
+sensitivities. Correlations can outweigh a reduction in individual channel
+energies. Local information rank remains 11 with an added velocity observation
+and becomes 13 with independent inclination. The decision is go for a physical
+inclination-measurement contract and feasibility study, with no new scientific
+flights or component implementation yet. The full warning-strict software suite
+passes 3,918 tests. Source availability, error allocation
+and fresh nonlinear flight qualification remain to be established.
 
 ## Implemented capabilities
 
@@ -187,7 +197,7 @@ has the same distinction between implementation and qualified flight behavior.
 [Controller problems and tradeoffs](controller-tradeoffs.md) explains why the
 remaining failures can coexist with correct equations and good true-state
 tracking. [Project review](project-review.md) records the current audit, and
-[the next-step plan](next-steps.md) defines a separately frozen combined-prior comparison.
+[the next-step plan](next-steps.md) defines the independent-inclination feasibility task.
 Broader qualification and middleware integration remain separate deliverables.
 The updated report is pinned to its declared source; historical report revisions
 and dated records remain snapshots, not instructions to repeat old studies.

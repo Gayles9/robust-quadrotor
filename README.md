@@ -79,8 +79,11 @@ experimental option with a measured tradeoff; it is not adopted into normal
 missions. A subsequent [saved-history diagnosis](docs/combined-prior-diagnosis.md)
 reconstructs all 27 clean histories and explains the mixed outcome through
 changed navigation and attitude errors. No correctable defect is demonstrated;
-the startup study is closed. The [next-step plan](docs/next-steps.md) now calls
-for a separate whole-flight estimation/control error budget.
+the startup study is closed. The subsequent [error-budget review](docs/whole-flight-error-budget.md)
+quantifies correlated whole-flight errors and sampled controller sensitivities.
+It supports investigating an independent inclination measurement contract;
+no new sensor implementation or flight qualification is claimed. The
+[next-step plan](docs/next-steps.md) defines that bounded feasibility study.
 
 ## Run it
 

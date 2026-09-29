@@ -265,18 +265,35 @@ further startup variant was demonstrated. This startup study is closed with its
 failed no-regression gate preserved. The candidate remains experimental; current
 production defaults remain unchanged. No new scientific flights were run.
 
-## Next bounded task: whole-flight estimation/control error-budget design
+## Completed: whole-flight estimation/control error-budget review
 
-1. Audit the closed startup study and the remaining estimated-feedback flight
-   requirements against the current source and preserved original limits.
-2. Derive an error budget using the existing sensor model and sampled cascade
-   sensitivities. Keep navigation, attitude and bias effects, their correlations,
-   and innovation-gate discontinuities explicit.
-3. Determine whether a specific measurement or feedback design is independently
-   justified. State its physical assumptions, expected benefit and acceptance
-   criteria before proposing an implementation or any new flight campaign.
-4. Do not reopen startup tuning, choose favorable seeds, relax no-regression,
-   or substitute approximate-model agreement for fresh flight qualification.
+The [review](whole-flight-error-budget.md) authenticates all preceding payloads
+and recovers every full-flight score with complete Gram matrices, including
+nonzero means and signed cross terms. The original sampled cascade supplies
+prospective position, velocity, inclination and rate sensitivities, checked by
+independent time-domain evolution and attainable impulse bounds. The
+[record](progress/2026-09-29-whole-flight-error-budget.md) retains all results.
+
+An ideal velocity observation leaves the local hover information rank at 11;
+independent inclination raises it to 13 and removes two tilt/bias ambiguities.
+This justifies a measurement feasibility hypothesis, not an implementable sensor
+under current assumptions. No new flight or production change was made. The
+original frozen comparison and fresh qualification remain unresolved.
+
+## Next bounded task: independent-inclination measurement contract and feasibility
+
+1. Audit this review and freeze the new scope and acceptance before any work.
+2. Identify a physically justified source of body-down direction in the world
+   frame. Specify calibration, tangent-space noise and bias, timestamps/latency,
+   outages and correlations with existing position observations. Do not assume
+   hardware exists or treat accelerated-flight IMU gravity as independent data.
+3. Derive the two-coordinate measurement and Jacobian with heading unobserved,
+   and assess the joint error allocation against the existing sampled budget.
+   Keep bias coupling and changed innovation-gate sequences explicit.
+4. Establish a go/no-go for a standalone component under stated physical and
+   uncertainty assumptions. Stop if no defensible source/bounds are available.
+   No new scientific flight, startup tuning, gain/seed search, default adoption,
+   threshold relaxation or integration belongs in this feasibility task.
 
 The mass-induced offset remains a separate open requirement. Do not silently
 combine the rejected integral candidate, reopen geometric tuning, claim hardware
