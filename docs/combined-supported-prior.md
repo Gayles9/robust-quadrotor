@@ -42,7 +42,9 @@ All nine clean flights pass their absolute conditions. Hover peaks are 6.75,
 slightly. Four of nine clean comparisons and all eight fault-response comparisons
 pass. The overall comparison fails; the candidate remains experimental and
 fresh validation is incomplete. The [dated record](progress/2026-09-29-combined-supported-prior.md)
-preserves every outcome and the exact evidence identities.
+preserves every outcome and the exact evidence identities. The subsequent
+[saved-history diagnosis](combined-prior-diagnosis.md) explains the tradeoff and
+closes the startup study without promoting this candidate.
 
 ## Source and reproduction
 

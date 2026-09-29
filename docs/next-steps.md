@@ -250,22 +250,33 @@ comparisons pass. The candidate remains experimental; the frozen comparison
 fails and fresh qualification is incomplete. Do not reinterpret the improved
 worst case as satisfying every acceptance condition.
 
-## Next bounded task: explain the saved combined-prior tradeoff
+## Completed: saved combined-prior tradeoff diagnosis
 
-1. Authenticate the original, boundary-only and combined histories and their
-   complete score/replay records. Use existing data; run no new flights.
-2. Compare the improved seed47001 and regressing seed47002/47003 clean histories.
-   Reconstruct how initial velocity conditioning changes later observation gains,
-   navigation-error feedback and commanded acceleration. Use simulated truth only
-   for offline error accounting, never as a proposed controller input.
-3. Test an unfitted explanation against the saved trajectories. Distinguish
-   expected redistribution of noise and bias corrections from an implementation
-   defect; exact replay alone does not prove physical optimality.
-4. Record a bounded design decision. If no specific correctable defect or
-   independently justified next hypothesis is demonstrated, close this startup
-   candidate without another tuning or seed search. Preserve the failed gate;
-   fresh validation and normal integration are not automatically authorized by
-   the better worst-case hover peak.
+The [diagnosis](combined-prior-diagnosis.md) authenticates 84 existing outcomes
+and reconstructs all 27 clean histories. Independent joint updates and exact
+command/response accounting pass. The unfitted model reproduces all nine hover
+histories within 0.146..0.769 mm horizontal RMS. Smaller early velocity gains
+change later coupled navigation and attitude errors, including one observation
+rejection in each seed47001 mission under the unchanged gate.
+
+The [record](progress/2026-09-29-combined-prior-diagnosis.md) explains both the
+improvements and regressions. No correctable implementation defect or justified
+further startup variant was demonstrated. This startup study is closed with its
+failed no-regression gate preserved. The candidate remains experimental; current
+production defaults remain unchanged. No new scientific flights were run.
+
+## Next bounded task: whole-flight estimation/control error-budget design
+
+1. Audit the closed startup study and the remaining estimated-feedback flight
+   requirements against the current source and preserved original limits.
+2. Derive an error budget using the existing sensor model and sampled cascade
+   sensitivities. Keep navigation, attitude and bias effects, their correlations,
+   and innovation-gate discontinuities explicit.
+3. Determine whether a specific measurement or feedback design is independently
+   justified. State its physical assumptions, expected benefit and acceptance
+   criteria before proposing an implementation or any new flight campaign.
+4. Do not reopen startup tuning, choose favorable seeds, relax no-regression,
+   or substitute approximate-model agreement for fresh flight qualification.
 
 The mass-induced offset remains a separate open requirement. Do not silently
 combine the rejected integral candidate, reopen geometric tuning, claim hardware

@@ -12,6 +12,8 @@ results, seeds, thresholds and commit identities are preserved.
 
 ## Controller and planning studies
 
+- [2026-09-29: Saved combined-prior tradeoff diagnosis](2026-09-29-combined-prior-diagnosis.md)
+
 - [2026-09-29: Combined supported velocity and nonlinear release](2026-09-29-combined-supported-prior.md)
 
 - [2026-09-29: Nonlinear release uncertainty and isolated flight comparison](2026-09-29-nonlinear-release.md)

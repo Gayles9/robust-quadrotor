@@ -76,7 +76,11 @@ known zero release velocity. All three tested hover peaks are now below 8 cm:
 6.75, 5.69 and 5.56 cm. The latter two regress slightly against their controls,
 so the frozen no-regression requirement still fails. This is an implemented
 experimental option with a measured tradeoff; it is not adopted into normal
-missions. The [next-step plan](docs/next-steps.md) retains that distinction.
+missions. A subsequent [saved-history diagnosis](docs/combined-prior-diagnosis.md)
+reconstructs all 27 clean histories and explains the mixed outcome through
+changed navigation and attitude errors. No correctable defect is demonstrated;
+the startup study is closed. The [next-step plan](docs/next-steps.md) now calls
+for a separate whole-flight estimation/control error budget.
 
 ## Run it
 

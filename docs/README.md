@@ -76,6 +76,7 @@ seed sets are reproduction cases, not fresh validation.
 - [Release-aware prediction](release-prediction.md): corrected first interval, verified derivatives and the nonlinear covariance limitation.
 - [Nonlinear release uncertainty](nonlinear-release.md): conditional joint moments, full calibration and isolated boundary-only flight comparison.
 - [Combined supported prior](combined-supported-prior.md): one supported velocity constraint, nonlinear release and matched comparisons against both previous versions.
+- [Combined-prior diagnosis](combined-prior-diagnosis.md): observation corrections, signed physical error budgets and startup-study closeout.
 - [Standalone pre-arm component](prearm-component.md): support evidence, acquisition, rejection and one-time estimator handoff.
 - [Nonlinear pre-arm uncertainty](prearm-nonlinear-uncertainty.md): rotation/bias coupling, positive quadrature and passing independent calibration.
 - [Next-step plan](next-steps.md): the current bounded task and stopping rules.
