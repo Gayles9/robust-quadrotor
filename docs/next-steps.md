@@ -295,20 +295,38 @@ production change or implicit expansion into vision/hardware. A source/model
 and justified calibration/timing/uncertainty would be required to reopen it.
 The previous failed flight and no-regression gates remain unchanged.
 
-## Next bounded task: original-sensor operating envelope and report consolidation
+## Completed: original-sensor operating envelope and report revision 3.0
 
-1. Audit the merged closeout and freeze the documentation/report scope.
-2. Build one source-indexed capability/requirement table: implemented behavior,
-   passing evidence, failed or conditional requirements, default versus research
-   options, and unimplemented integration. Authenticate existing results.
-3. Update the existing editable LaTeX report and PDF from revision 2.0 to the
-   current merged mathematical stack and evidence. Include the completed
-   initialization/release work, whole-flight budget and sensor-study stopping
-   decision, without rewriting failed studies as qualification.
-4. Compile, inspect and independently check quantitative claims. Preserve the
-   report artifacts' identity/history and publish the repository documentation.
-   This step includes no new flight, tuning, sensor extension, threshold change,
-   default promotion or middleware integration. Report completion does not pass G2.
+The [capability/requirement ledger](operating-envelope.md) links default behavior,
+research components, passing evidence, failed or conditional requirements and
+unimplemented integration to their sources. [Report revision 3.0](technical-report.md)
+updates the original editable LaTeX/PDF through merged PR #39, including supported
+initialization, nonlinear release, matched outcomes, whole-flight accounting and
+the sensor extension's stopping decision. The
+[record](progress/2026-09-29-operating-envelope-report.md) documents authentication,
+independent rescoring and compilation/layout checks. Existing artifact identities
+and failed gates are preserved. No scientific flight or production change occurs.
+
+## Next bounded task: simulation-only ROS 2/PX4 interface and acceptance design
+
+1. Audit this merged documentation/report closeout against current source and
+   the operating-envelope ledger. Keep G2 explicitly open and defaults unchanged.
+2. Select and justify one initial interface boundary for the existing custom
+   stack. Record what remains in Python and what ROS 2/PX4 would own; do not
+   silently substitute PX4 estimation/control for the custom implementation.
+3. Specify frames, quaternion direction/order, units, acquisition/delivery clocks,
+   sequence identity, held-command semantics, rates, latency/jitter budgets,
+   bounded queues, readiness, reset, authority and loss-of-link handling.
+4. Define deterministic offline message/replay fixtures and future simulation
+   acceptance for sign/frame/timing parity, nominal equivalence, fault responses
+   and evidence integrity. Separate interface acceptance from flight qualification.
+5. Record unresolved decisions and a go/no-go before an adapter is implemented.
+   This is design only: no dependency/system changes, middleware code, new flight
+   campaign, hardware action, new sensor, tuning, reserved seeds or default promotion.
+
+Numerical abort does not establish a physical fallback, and the old x500 spike
+does not establish custom-stack integration. A future adapter requires its own
+bounded implementation step after the interface contract passes review.
 
 The mass-induced offset remains a separate open requirement. Do not silently
 combine the rejected integral candidate, reopen geometric tuning, claim hardware

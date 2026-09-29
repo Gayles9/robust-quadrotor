@@ -4,8 +4,8 @@ The [bounded study](decisions/0040-independent-inclination-feasibility.md) is
 complete and **no-go for a measurement component under the current assumptions**.
 The conditional mathematics is useful, but no justified independent orientation
 source/model, calibration, timing or simultaneous error allocation is available.
-Close this extension study. The next deliverable is consolidation of the existing
-operating envelope and technical report, with flight failures retained.
+Close this extension study. The [operating envelope](operating-envelope.md) and [report revision 3.0](technical-report.md)
+now consolidate the existing evidence with all flight failures retained.
 
 This is a simulation-first project. Hardware is not required to define a valid
 simulated sensor, but a new sensor still needs an explicit physical model and
@@ -208,10 +208,10 @@ follows. Startup tuning and the sensor extension are closed under present scope.
 Reopening requires an explicitly justified source/model and a separately frozen
 scope, not another arbitrary noise/rate sweep.
 
-The next step is to consolidate the original-sensor operating envelope and update
-the technical report to the current merged evidence. Preserve every failed
-flight gate and distinguish implemented, tested and qualified capabilities.
-That deliverable does not authorize middleware integration or declare G2 passed.
+The original-sensor operating envelope and report consolidation are now complete.
+They preserve every failed flight gate and distinguish implemented, tested and
+qualified capabilities. The [current plan](next-steps.md) defines a separate
+simulation-only interface design; neither deliverable declares G2 passed.
 
 ## Reproduction
 

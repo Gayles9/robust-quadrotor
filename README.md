@@ -25,67 +25,19 @@ problems, tested alternatives, and why an improvement in one metric can make
 another worse. [Project status](docs/status.md) lists the evidence and remaining
 work.
 
-The bounded startup/hover investigation is now closed: its single candidate
-reduced spline effort but still failed hover, so the accepted controllers remain
-unchanged. The [closeout](docs/progress/2026-09-26-geometric-transient-closeout.md)
-records the result. [Observation health monitoring](docs/observation-health.md)
-now reports accepted-data loss and recovery independently for position and
-altitude. An optional [observation supervisor](docs/observation-supervision.md)
-now aborts numerical missions when explicit per-stream budgets expire.
-[Integrated robustness evaluation](docs/integrated-robustness.md) adds causal
-live observation faults and a frozen, paired maneuver campaign under faults
-and model mismatch. Its [results](docs/progress/2026-09-28-integrated-robustness.md)
-separate correct timed responses from acceptable flight performance. The
-[vertical compensation study](docs/vertical-compensation.md) adds an explicit,
-bounded experiment for the mass-induced offset. Its
-[comparison record](docs/progress/2026-09-28-vertical-compensation.md) retains the
-benefits and failed acceptance conditions; it does not replace the default.
-The [technical report](docs/technical-report.md) consolidates the mathematical
-architecture, verified results and operating boundary. The
-[early-flight diagnosis](docs/early-flight-diagnosis.md) now separates slow mass
-compensation from the hover transient and records one attitude-only oracle with
-7.23 cm hover peak. That is diagnostic headroom, not deployable feedback. The
-[startup audit](docs/attitude-startup-audit.md) reconstructs both estimator
-histories exactly and explains the first position correction without finding a
-filter defect. The [pre-arm design](docs/prearm-alignment.md) now defines a
-supported 0.5 s IMU alignment stage. Its initial first-order covariance failed
-calibration. The [nonlinear uncertainty derivation](docs/prearm-nonlinear-uncertainty.md)
-now passes the frozen independent gate while retaining attitude/bias correlation.
-The [standalone component](docs/prearm-component.md) passes reference and
-acquisition/handoff checks. The [supported-start flight comparison](docs/supported-start-flight.md)
-now reduces the scored hover peak from 8.59 cm without alignment to 2.51 cm
-with alignment under the same modeled support conditions, passing the 8 cm
-limit. Nominal and wind tracking also pass; mass mismatch still fails. The
-[independent validation](docs/independent-supported-start.md) finds that alignment
-improves all three fresh hover peaks, but one still reaches 10.18 cm. Normal
-mission integration remains blocked. The [residual diagnosis](docs/residual-supported-hover.md)
-now explains the failed trajectory mainly through navigation-error feedback;
-an unfitted local model matches it to 0.76 mm horizontal RMS. The subsequent
-[navigation-feedback isolation](docs/navigation-feedback-isolation.md) reduces
-that failed hover peak to 1.99 cm using simulated true position/velocity only
-at the outer controller. This demonstrates headroom, not deployable feedback.
-The subsequent [supported velocity prior check](docs/supported-velocity-prior.md)
-rejects reducing velocity uncertainty with the original release integration.
-The [release correction](docs/release-prediction.md) removes that deterministic
-ballistic error. Its [nonlinear joint moments](docs/nonlinear-release.md) now
-pass the full uncertainty checks under both priors. The isolated original-prior
-flight comparison still misses hover acceptance: the failed peak is 10.198 cm
-versus 10.181 cm previously. The subsequent
-[combined supported-prior experiment](docs/combined-supported-prior.md) adds the
-known zero release velocity. All three tested hover peaks are now below 8 cm:
-6.75, 5.69 and 5.56 cm. The latter two regress slightly against their controls,
-so the frozen no-regression requirement still fails. This is an implemented
-experimental option with a measured tradeoff; it is not adopted into normal
-missions. A subsequent [saved-history diagnosis](docs/combined-prior-diagnosis.md)
-reconstructs all 27 clean histories and explains the mixed outcome through
-changed navigation and attitude errors. No correctable defect is demonstrated;
-the startup study is closed. The subsequent [error-budget review](docs/whole-flight-error-budget.md)
-quantifies correlated whole-flight errors and sampled controller sensitivities.
-The subsequent [inclination feasibility study](docs/independent-inclination-feasibility.md)
-completes the conditional measurement mathematics but rejects implementation
-without a justified source/model, calibration and joint error budget. The sensor
-extension is closed under current scope. The [next-step plan](docs/next-steps.md)
-now calls for consolidating the operating envelope and technical report.
+The supported-start research now brings all three tested hover peaks below the
+8 cm limit, but the combined candidate fails five of nine strict no-regression
+comparisons. It remains experimental. The original mass-mismatch failure and
+geometric qualification are also unresolved; correct software is not the same
+as a qualified flight controller.
+
+The [operating envelope](docs/operating-envelope.md) is the source-indexed guide
+to what is implemented, what passes, and what remains conditional or failed.
+[Report revision 3.0](docs/technical-report.md) develops the mathematics, including
+supported alignment, nonlinear release uncertainty and the whole-flight error
+budget. Startup tuning and the independent-inclination sensor extension are
+closed under current assumptions. The [next task](docs/next-steps.md) is a
+simulation-only ROS 2/PX4 interface and acceptance design.
 
 ## Run it
 
@@ -110,7 +62,7 @@ reproducibility details.
 | How the complete system fits together | [System design](docs/system-design.md) |
 | Why the controller still misses its targets | [Controller problems and tradeoffs](docs/controller-tradeoffs.md) |
 | The equations, interfaces and source for a subsystem | [Technical documentation](docs/README.md) |
-| What has been demonstrated and what remains | [Current status](docs/status.md) |
+| What has been demonstrated and what remains | [Operating envelope](docs/operating-envelope.md) and [current status](docs/status.md) |
 | The next bounded piece of work | [Next-step plan](docs/next-steps.md) |
 | Why a design was chosen, or how it was tested | [Design decisions](docs/decisions/README.md) and [verification records](docs/progress/README.md) |
 
