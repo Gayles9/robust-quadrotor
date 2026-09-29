@@ -46,6 +46,10 @@ without a special correction. Its startup discretization error is retained in
 all scores. This is an ideal fixture release, not a ground-contact takeoff,
 physical landing or validated hardware support procedure.
 
+The later [supported velocity prior screen](supported-velocity-prior.md) quantifies
+why this retained first-interval error prevents simply reducing the initial
+velocity covariance. The next bounded task derives a release-aware boundary map.
+
 ## Information, sample ownership and replay
 
 Support acquisition has independent deterministic white-noise and bias-walk

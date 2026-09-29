@@ -103,5 +103,7 @@ The subsequent [residual diagnosis](residual-supported-hover.md) now separates
 physical tracking, estimation error and the retained release response. Its
 quantitative explanation led to the [navigation-feedback isolation](navigation-feedback-isolation.md),
 which reduces the failed hover peak to 1.99 cm using true outer position/velocity.
-That diagnostic headroom supports one implementable supported-velocity prior
-candidate next; it does not qualify ordinary flight or justify a gain search.
+That diagnostic headroom led to the [supported velocity prior screen](supported-velocity-prior.md).
+The prior-only candidate is rejected before flight because its release uncertainty
+does not cover the known first-interval integration error. The next step addresses
+that boundary; ordinary flight remains unqualified.

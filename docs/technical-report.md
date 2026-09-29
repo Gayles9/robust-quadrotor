@@ -76,5 +76,7 @@ an unfitted model to 0.761 mm horizontal RMS. The subsequent
 [navigation oracle](navigation-feedback-isolation.md) reduces hover peak to
 1.99 cm and whole-flight RMSE to 3.93 cm with unchanged scoring. Truth is supplied
 only to the outer controller; this is headroom, not qualification. The
-[next step](next-steps.md) is one supported zero-velocity prior candidate.
+[supported velocity prior screen](supported-velocity-prior.md) subsequently rejects
+the prior-only change because the first release interval has unrepresented
+integration error. The [next step](next-steps.md) addresses that boundary map.
 These later diagnostic results are not part of report revision 2.0.

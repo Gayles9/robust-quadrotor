@@ -191,33 +191,42 @@ saved reconstruction, named-noise pairing and every metric. The frozen headroom
 comparison passes. The result is diagnostic and leaves ordinary flight
 qualification open; it does not identify separate p-only and v-only effects.
 
-## Next bounded task: supported zero-velocity prior
+## Completed: supported velocity prior and release screen
 
-1. Audit this closeout and freeze one candidate and its acceptance before coding
-   or flights. Use the existing externally guaranteed world-stationary support
-   through the fresh endpoint; do not infer zero velocity from quiet IMU data.
-2. Derive one-time Gaussian conditioning on supported velocity. For the ideal
-   fixture, exact zero velocity can imply zero initial velocity covariance; handle
-   the resulting PSD/rank deficiency explicitly. Preserve position uncertainty,
-   alignment/bias cross terms, fresh-sample ownership and unchanged estimator
-   equations. A hardware version needs independently justified support uncertainty.
-   Include the support-to-flight force discontinuity and endpoint integration
-   error in uncertainty checks; exact initial velocity does not make first-step
-   propagation error-free. Reject an overconfident candidate.
-3. Implement only this opt-in experiment candidate after the derivation checks.
-   Reject absent/stale/broken support, avoid repeated conditioning or in-flight
-   zero-velocity observations, and verify algebra, covariance, endpoint continuity
-   and no-truth dataflow. Do not add a covariance floor or fit Q/R/gains to seed47001.
-4. Compare against the authenticated aligned baselines on all three recorded
-   hover seeds and the existing clean/fault conditions, retaining full startup,
-   individual failures and 8 cm/15 cm/speed/completion limits. Freeze counts and
-   no-regression rules first. The existing seeds are now regression cases; a
-   passing candidate still needs separately frozen fresh validation before normal
-   mission integration. Stop after the single candidate and publish its decision.
+The [prior-only candidate](supported-velocity-prior.md) performs exact one-time
+Gaussian conditioning on genuinely stationary support. Its algebra, rejection
+paths, PSD/rank and full covariance checks pass. All 17 existing release
+configurations fail the mandatory uncertainty screen: the analytic ballistic
+case has a 1.22625 cm/s down-velocity error, about 119 candidate standard
+deviations. The supported left-limit sample is being averaged across a force
+discontinuity. The [record](progress/2026-09-28-supported-velocity-prior.md) retains
+all outcomes. Under the predeclared stopping rule, zero scientific flights run
+and all 25 conditional regression flights are skipped. The investigation succeeds
+and rejects this combination of prior and release map.
 
-The physical support contract justifies this candidate; the oracle does not
-prove that a velocity prior alone will achieve its improvement or fix position
-error. Do not silently substitute truth or add another sensor.
+## Next bounded task: release-aware first prediction interval
+
+1. Audit this closeout and freeze one causal boundary rule, its uncertainty
+   contract and acceptance. Preserve the genuinely stationary support and the
+   fresh supported sample; do not assume stationarity after release.
+2. Derive a one-sided first-interval prediction from the first post-release IMU
+   measurement, with the existing gyro endpoints and full sample-noise memory.
+   The left supported force cannot represent an open free-flight interval. Do
+   not invent a second simultaneous sample or read simulated true velocity/force.
+3. Check the exact ballistic limit, smooth-force consistency and bounded numerical
+   error at the chosen time step. Derive the complete discrete Jacobians and covariance;
+   verify them independently, including singular initial velocity uncertainty,
+   fresh-noise ownership and any changed cross terms. Reject overconfidence rather
+   than tune Q/R or add a covariance floor. Keep later prediction intervals intact.
+4. Implement only the derived experiment boundary after those checks. Freeze a
+   comparison that isolates the boundary change before combining it with velocity
+   conditioning. Preserve all known hover seeds, clean/fault conditions, full
+   startup and original thresholds; require fresh validation before integration.
+   Stop at the frozen decision and publish it, including an unsuccessful result.
+
+Correcting this small interval is a numerical/uncertainty prerequisite. It does
+not guarantee recovery of the oracle's whole-flight improvement or establish that
+velocity alone explains its combined position/velocity-feedback effect.
 
 The mass-induced offset remains a separate open requirement. Do not silently
 combine the rejected integral candidate, reopen geometric tuning, claim hardware
