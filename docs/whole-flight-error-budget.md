@@ -163,7 +163,10 @@ The next contract must identify a physically justified source, such as an extern
 orientation measurement, and specify its world/body calibration, acquisition
 time, latency, angular noise, bias, outages and correlations with existing
 position measurements. A body-down observation lives on the unit sphere; its
-two tangent coordinates constrain inclination while leaving heading free.
+two tangent coordinates leave a twist about the body-down axis unobserved.
+That is not generally a world-vertical yaw rotation when tilted; the subsequent
+[measurement contract](independent-inclination-feasibility.md) makes this
+distinction explicit and completes the feasibility decision.
 An orientation derived from the same accelerometer under arbitrary acceleration
 does not satisfy the independent-source assumption. A co-produced external pose
 must retain position/orientation correlation rather than claiming independence.

@@ -81,9 +81,11 @@ reconstructs all 27 clean histories and explains the mixed outcome through
 changed navigation and attitude errors. No correctable defect is demonstrated;
 the startup study is closed. The subsequent [error-budget review](docs/whole-flight-error-budget.md)
 quantifies correlated whole-flight errors and sampled controller sensitivities.
-It supports investigating an independent inclination measurement contract;
-no new sensor implementation or flight qualification is claimed. The
-[next-step plan](docs/next-steps.md) defines that bounded feasibility study.
+The subsequent [inclination feasibility study](docs/independent-inclination-feasibility.md)
+completes the conditional measurement mathematics but rejects implementation
+without a justified source/model, calibration and joint error budget. The sensor
+extension is closed under current scope. The [next-step plan](docs/next-steps.md)
+now calls for consolidating the operating envelope and technical report.
 
 ## Run it
 
