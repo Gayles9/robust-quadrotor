@@ -180,22 +180,44 @@ The [record](progress/2026-09-28-residual-supported-hover.md) retains the signed
 accounting, bias errors, local-model assumptions and exact reconstruction checks.
 The step succeeds as a diagnosis, while the 10.18 cm hover failure remains.
 
-## Next bounded task: isolate navigation feedback
+## Completed: navigation-feedback isolation
 
-1. Audit this closeout and authenticate the saved seed-47001 aligned baseline.
-   Freeze a separate protocol before executing any intervention.
-2. Run one diagnostic on that same failed case with true position and velocity
-   supplied only to the outer controller. Preserve the estimator, estimated
-   attitude/rate, all guard/completion inputs, supported release, sensors, named
-   random streams, controller gains, reference and supervision.
-3. Reconstruct the changed outer commands and unchanged interfaces, authenticate
-   the complete history and compare full-flight metrics and the inclusive 5..11 s
-   hover peak against the saved baseline. Do not crop startup, alter 8 cm/15 cm
-   limits, resample the seed or turn a truth-assisted success into qualification.
-4. If this isolates useful navigation-channel headroom, define one implementable
-   information/prior or estimator design under explicit operating assumptions.
-   Otherwise reject that direction and identify the remaining coupled path.
-   Do not prescribe a new gain or covariance from the offline contribution table.
+The [single oracle](navigation-feedback-isolation.md) changes only the failed
+aligned seed47001 flight's outer position/velocity inputs to simultaneous truth.
+Hover peak falls from 10.1808 to 1.9896 cm (80.46%); whole-flight RMSE falls from
+6.4891 to 3.9256 cm (39.50%). Both flights complete at 15.5 s. The
+[record](progress/2026-09-28-navigation-feedback-isolation.md) preserves complete
+saved reconstruction, named-noise pairing and every metric. The frozen headroom
+comparison passes. The result is diagnostic and leaves ordinary flight
+qualification open; it does not identify separate p-only and v-only effects.
+
+## Next bounded task: supported zero-velocity prior
+
+1. Audit this closeout and freeze one candidate and its acceptance before coding
+   or flights. Use the existing externally guaranteed world-stationary support
+   through the fresh endpoint; do not infer zero velocity from quiet IMU data.
+2. Derive one-time Gaussian conditioning on supported velocity. For the ideal
+   fixture, exact zero velocity can imply zero initial velocity covariance; handle
+   the resulting PSD/rank deficiency explicitly. Preserve position uncertainty,
+   alignment/bias cross terms, fresh-sample ownership and unchanged estimator
+   equations. A hardware version needs independently justified support uncertainty.
+   Include the support-to-flight force discontinuity and endpoint integration
+   error in uncertainty checks; exact initial velocity does not make first-step
+   propagation error-free. Reject an overconfident candidate.
+3. Implement only this opt-in experiment candidate after the derivation checks.
+   Reject absent/stale/broken support, avoid repeated conditioning or in-flight
+   zero-velocity observations, and verify algebra, covariance, endpoint continuity
+   and no-truth dataflow. Do not add a covariance floor or fit Q/R/gains to seed47001.
+4. Compare against the authenticated aligned baselines on all three recorded
+   hover seeds and the existing clean/fault conditions, retaining full startup,
+   individual failures and 8 cm/15 cm/speed/completion limits. Freeze counts and
+   no-regression rules first. The existing seeds are now regression cases; a
+   passing candidate still needs separately frozen fresh validation before normal
+   mission integration. Stop after the single candidate and publish its decision.
+
+The physical support contract justifies this candidate; the oracle does not
+prove that a velocity prior alone will achieve its improvement or fix position
+error. Do not silently substitute truth or add another sensor.
 
 The mass-induced offset remains a separate open requirement. Do not silently
 combine the rejected integral candidate, reopen geometric tuning, claim hardware

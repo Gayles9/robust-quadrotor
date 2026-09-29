@@ -146,6 +146,11 @@ would justify a subsequent implementable navigation-information design; a
 failure would redirect the diagnosis. Do not choose new gains or filter tuning
 by subtracting the response table.
 
+The subsequent [navigation-feedback isolation](navigation-feedback-isolation.md)
+now completes that test: hover peak falls to 1.99 cm and full-flight RMSE to
+3.93 cm. The result supports one supported zero-velocity prior candidate next,
+with explicit covariance/operating assumptions and fresh validation still required.
+
 Keep the initializer experiment-only and the cascade default. The 8 cm hover
 gate and separate mass failure remain open; geometric qualification and ordinary
 mission integration are unchanged.

@@ -101,6 +101,7 @@ recomputes scores, checks handoffs and reconstructs response/comparison decision
 
 The subsequent [residual diagnosis](residual-supported-hover.md) now separates
 physical tracking, estimation error and the retained release response. Its
-quantitative explanation supports one bounded navigation-feedback isolation
-experiment next. It changes no flight score and does not justify a gain search
-or immediate mission integration.
+quantitative explanation led to the [navigation-feedback isolation](navigation-feedback-isolation.md),
+which reduces the failed hover peak to 1.99 cm using true outer position/velocity.
+That diagnostic headroom supports one implementable supported-velocity prior
+candidate next; it does not qualify ordinary flight or justify a gain search.

@@ -39,6 +39,7 @@ the [next-step plan](../next-steps.md) for the present scope.
 - [0024: Bounded vertical compensation](0024-bounded-vertical-compensation.md)
 - [0025: Causal early-flight diagnosis](0025-causal-early-flight-diagnosis.md)
 - [0032: Residual supported-hover diagnosis](0032-residual-supported-hover-diagnosis.md)
+- [0033: Supported-hover navigation-feedback isolation](0033-navigation-feedback-isolation.md)
 
 ## Planning
 
@@ -54,7 +55,7 @@ the [next-step plan](../next-steps.md) for the present scope.
 
 ## Writing a new decision
 
-Use the next number and a descriptive filename, such as `0033-short-title.md`.
+Use the next number and a descriptive filename, such as `0034-short-title.md`.
 Explain the problem before the equations. State the evidence needed to accept
 the change and the limits that remain afterward.
 

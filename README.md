@@ -60,9 +60,12 @@ limit. Nominal and wind tracking also pass; mass mismatch still fails. The
 improves all three fresh hover peaks, but one still reaches 10.18 cm. Normal
 mission integration remains blocked. The [residual diagnosis](docs/residual-supported-hover.md)
 now explains the failed trajectory mainly through navigation-error feedback;
-an unfitted local model matches it to 0.76 mm horizontal RMS. The
-[next step](docs/next-steps.md) is one bounded navigation-feedback isolation
-experiment before proposing an implementable change.
+an unfitted local model matches it to 0.76 mm horizontal RMS. The subsequent
+[navigation-feedback isolation](docs/navigation-feedback-isolation.md) reduces
+that failed hover peak to 1.99 cm using simulated true position/velocity only
+at the outer controller. This demonstrates headroom, not deployable feedback.
+The [next step](docs/next-steps.md) is one supported zero-velocity prior candidate
+with explicit uncertainty and unchanged flight acceptance.
 
 ## Run it
 
