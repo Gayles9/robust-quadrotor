@@ -4,11 +4,14 @@ Updated 2026-09-29. The implemented Python stack covers simulation, estimation,
 planning and closed-loop virtual missions. The main open performance issue is
 hover and trajectory control with noisy estimated feedback.
 
-The latest [release correction](release-prediction.md) passes its bounded
-component checks and removes the analytic first-interval velocity bias in all
-17 configurations. Exact zero-velocity conditioning remains deferred: nonlinear
-rotation/noise products are missing from three singular covariance directions.
-No new scientific flights run, and the 10.18 cm hover failure remains open.
+The latest [nonlinear release correction](nonlinear-release.md) passes full joint
+uncertainty checks in all 17 configurations under both velocity priors. The
+isolated original-prior flights still miss hover acceptance: the failed peak is
+10.198 cm versus 10.181 cm previously, and all three hover peaks increase slightly.
+The mathematical omission is repaired; the flight problem is not. Exact velocity
+conditioning has not been used in a flight and no production default changes.
+All 25 isolated flights are retained: 6/9 clean no-regression comparisons and
+8/8 fault-response comparisons pass. The full software gate passes 3,872 tests.
 
 ## Implemented capabilities
 
@@ -115,8 +118,10 @@ change: all 17 release configurations fail its necessary uncertainty screen.
 The analytic release case exposes a 1.226 cm/s deterministic velocity error,
 about 119 reported standard deviations after conditioning. No new flights run.
 The subsequent [release correction](release-prediction.md) removes that analytic
-bias, but leaves the exact prior deferred because its first-order covariance
-omits nonlinear uncertainty in singular directions. Joint moments are next.
+bias, but its first-order covariance omits nonlinear uncertainty in singular
+directions. The subsequent [joint moment model](nonlinear-release.md) repairs that
+omission and passes fixed full covariance checks. The boundary-only comparison
+retains the original velocity prior and does not fix the failed hover case.
 All six nominal/wind tracking cases and all eight fault-response comparisons
 pass; the 34-flight campaign and its failed hover condition are retained.
 No hardware support procedure or general flight qualification is claimed.
@@ -174,7 +179,7 @@ has the same distinction between implementation and qualified flight behavior.
 [Controller problems and tradeoffs](controller-tradeoffs.md) explains why the
 remaining failures can coexist with correct equations and good true-state
 tracking. [Project review](project-review.md) records the current audit, and
-[the next-step plan](next-steps.md) defines the bounded nonlinear release-uncertainty derivation.
+[the next-step plan](next-steps.md) defines a separately frozen combined-prior comparison.
 Broader qualification and middleware integration remain separate deliverables.
 The updated report is pinned to its declared source; historical report revisions
 and dated records remain snapshots, not instructions to repeat old studies.

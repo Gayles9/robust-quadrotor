@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file following a 
 
 ## [Unreleased]
 
+### 2026-09-29 nonlinear release moments and isolated flight comparison
+
+- Add experiment-only conditional Gaussian moment propagation for the first
+  release interval, retaining nonlinear rotation/bias/sample-noise covariance.
+- Pass full joint calibration and fixed quadrature checks in all 17 release
+  configurations under both priors, retaining 680,000 nonlinear outcomes.
+- Run the original-prior boundary-only comparison: clean RMSE gains are below
+  one millimetre, while all three hover peaks regress slightly and the failed
+  case remains above 8 cm. Retain the candidate as experimental.
+- Keep zero-velocity conditioning out of flights, preserve controller defaults,
+  and require a separately frozen combined-prior comparison before reconsidering
+  integration. Add tested durable, no-clobber experimental evidence recording.
+
 ### 2026-09-29 release-aware first prediction
 
 - Add an experiment-only one-sided release map using the existing post-release

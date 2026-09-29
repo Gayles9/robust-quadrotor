@@ -146,9 +146,10 @@ rejects the exact velocity prior. Generated evidence includes all 170,000
 nonlinear outputs and their paired linear outputs, full covariances, the old
 screens and an independent NumPy-only verifier.
 
-Next derive nonlinear joint release uncertainty, including rotation/bias/noise
-products and retained sample memory. Check mean and full covariance independently
-before reconsidering the exact prior. The subsequent boundary-only 25-flight
-comparison is already frozen; a later separately frozen comparison can combine
-it with velocity conditioning. Fresh validation remains necessary before normal
-mission integration. Mass compensation and geometric qualification remain separate.
+The subsequent [nonlinear joint model](nonlinear-release.md) now retains these
+rotation/bias/noise products and passes the full uncertainty checks. Its isolated
+original-prior flight comparison does not fix the failed hover requirement.
+That later result supersedes this component record's next action, not its
+first-order mathematics. A separately frozen combined-prior comparison is next;
+fresh validation remains necessary before normal mission integration. Mass
+compensation and geometric qualification remain separate.

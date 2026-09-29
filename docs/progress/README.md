@@ -12,6 +12,7 @@ results, seeds, thresholds and commit identities are preserved.
 
 ## Controller and planning studies
 
+- [2026-09-29: Nonlinear release uncertainty and isolated flight comparison](2026-09-29-nonlinear-release.md)
 - [2026-09-29: Release-aware prediction and uncertainty](2026-09-29-release-aware-prediction.md)
 - [2026-09-28: Supported velocity prior and release uncertainty](2026-09-28-supported-velocity-prior.md)
 
