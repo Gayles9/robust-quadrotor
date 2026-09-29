@@ -168,20 +168,34 @@ rules; recovery completes and persistent faults produce the required numerical
 abort. All 34 planned histories are retained.
 Keep the initializer experiment-only and retain the original controller default.
 
-## Next bounded task: residual supported-hover diagnosis
+## Completed: residual supported-hover diagnosis
 
-1. Audit this closeout and authenticate the complete saved independent campaign.
-   Freeze a small offline diagnostic protocol before analysis or intervention.
-2. Decompose the failed seed-47001 hover into true tracking error, estimated
-   tracking error, navigation-estimation error, attitude/bias error and the
-   support-release transient. Use the two passing fresh seeds as descriptive
-   comparisons; do not treat different random draws as a causal intervention.
-3. Develop and check a quantitative causal explanation against the saved
-   equations/commands and full histories. Any truth-assisted counterfactual
-   must be separately bounded and labeled diagnostic, with unchanged scoring.
-4. Decide whether the evidence supports one concrete estimator/controller or
-   operating-boundary change. A diagnosis that rejects speculative tuning is
-   a valid outcome. Preserve the 8 cm and 15 cm limits and every failure.
+The [offline diagnosis](residual-supported-hover.md) authenticates all previous
+scores and reconstructs all six full hover histories. Saved navigation-error
+forcing accounts for -7.729 cm of the failed peak's -9.693 cm East displacement.
+The direct initial-state/first-0.5-s response is only 0.796 mm in norm there.
+An unfitted sampled cascade model reproduces the failed flight to 0.761 mm
+horizontal RMS; across all six histories the range is 0.169..1.389 mm.
+The [record](progress/2026-09-28-residual-supported-hover.md) retains the signed
+accounting, bias errors, local-model assumptions and exact reconstruction checks.
+The step succeeds as a diagnosis, while the 10.18 cm hover failure remains.
+
+## Next bounded task: isolate navigation feedback
+
+1. Audit this closeout and authenticate the saved seed-47001 aligned baseline.
+   Freeze a separate protocol before executing any intervention.
+2. Run one diagnostic on that same failed case with true position and velocity
+   supplied only to the outer controller. Preserve the estimator, estimated
+   attitude/rate, all guard/completion inputs, supported release, sensors, named
+   random streams, controller gains, reference and supervision.
+3. Reconstruct the changed outer commands and unchanged interfaces, authenticate
+   the complete history and compare full-flight metrics and the inclusive 5..11 s
+   hover peak against the saved baseline. Do not crop startup, alter 8 cm/15 cm
+   limits, resample the seed or turn a truth-assisted success into qualification.
+4. If this isolates useful navigation-channel headroom, define one implementable
+   information/prior or estimator design under explicit operating assumptions.
+   Otherwise reject that direction and identify the remaining coupled path.
+   Do not prescribe a new gain or covariance from the offline contribution table.
 
 The mass-induced offset remains a separate open requirement. Do not silently
 combine the rejected integral candidate, reopen geometric tuning, claim hardware

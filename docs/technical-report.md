@@ -70,6 +70,8 @@ hover limit at 2.51 cm peak and improves nominal/wind tracking, while mass
 mismatch remains a failure. The subsequent
 [independent validation](independent-supported-start.md) improves all three
 fresh hover peaks, but one still reaches 10.18 cm against 8 cm. Normal mission
-integration is no-go. The [next step](next-steps.md) is a bounded diagnosis of
-that remaining error using the saved histories.
+integration is no-go. The [residual diagnosis](residual-supported-hover.md) now
+attributes most of the failed peak to saved navigation-error forcing and checks
+an unfitted model to 0.761 mm horizontal RMS. The [next step](next-steps.md) is
+one bounded navigation-feedback isolation experiment before an implementable change.
 These later diagnostic results are not part of report revision 2.0.

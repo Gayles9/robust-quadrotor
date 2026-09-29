@@ -95,8 +95,12 @@ Nominal and wind tracking pass; the mass case still fails at 42.53 cm RMSE.
 These are known-seed development results under modeled fixture support. The
 subsequent [independent validation](independent-supported-start.md) improves
 hover peaks on all three fresh seeds, but only two pass the 8 cm limit; the
-third reaches 10.18 cm. Normal mission integration remains no-go. The next
-bounded task is diagnosis of the residual hover error using the saved histories.
+third reaches 10.18 cm. Normal mission integration remains no-go. The
+[residual diagnosis](residual-supported-hover.md) now reconstructs all six hover
+histories and explains most of the failed peak through navigation-error forcing.
+An unfitted sampled cascade model matches the failed flight to 0.761 mm horizontal
+RMS. The next bounded task is one navigation-feedback isolation experiment;
+the diagnosis itself changes no flight behavior or acceptance outcome.
 All six nominal/wind tracking cases and all eight fault-response comparisons
 pass; the 34-flight campaign and its failed hover condition are retained.
 No hardware support procedure or general flight qualification is claimed.
@@ -154,7 +158,7 @@ has the same distinction between implementation and qualified flight behavior.
 [Controller problems and tradeoffs](controller-tradeoffs.md) explains why the
 remaining failures can coexist with correct equations and good true-state
 tracking. [Project review](project-review.md) records the current audit, and
-[the next-step plan](next-steps.md) defines the bounded early-flight diagnosis.
+[the next-step plan](next-steps.md) defines the bounded navigation-feedback experiment.
 Broader qualification and middleware integration remain separate deliverables.
 The updated report is pinned to its declared source; historical report revisions
 and dated records remain snapshots, not instructions to repeat old studies.

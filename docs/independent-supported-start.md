@@ -99,7 +99,8 @@ Full archived replay requires the recorded source fingerprint and protocol.
 The evidence bundle's NumPy-only verifier independently authenticates payloads,
 recomputes scores, checks handoffs and reconstructs response/comparison decisions.
 
-The next bounded step is an offline causal diagnosis of the failed fresh-seed
-hover using these retained histories. Separate estimation error, physical
-tracking error and the support-release transient before choosing any change.
-Do not assume another gain search or immediate mission integration is justified.
+The subsequent [residual diagnosis](residual-supported-hover.md) now separates
+physical tracking, estimation error and the retained release response. Its
+quantitative explanation supports one bounded navigation-feedback isolation
+experiment next. It changes no flight score and does not justify a gain search
+or immediate mission integration.
