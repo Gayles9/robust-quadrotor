@@ -234,27 +234,38 @@ improvement is small and does not compensate for the failed hover/no-regression
 conditions. Keep the correction experimental; no exact velocity prior enters
 this comparison and no default is promoted.
 
-## Next bounded task: separately freeze a combined-prior comparison
+## Completed: combined supported velocity and nonlinear release comparison
 
-1. Audit ADR 0036 and authenticate all saved boundary-only results. Confirm the
-   original/exact-prior nonlinear covariance and ballistic gates still reproduce.
-2. Freeze one experiment adding exact supported zero-velocity conditioning to
-   the verified nonlinear first prediction. Use the just-completed boundary-only
-   histories as matched controls to isolate the prior's incremental effect.
-   Also retain the original uncorrected comparison, so an intermediate regression
-   cannot make an apparent improvement look like qualification.
-3. Preserve genuine mechanical support, the existing IMU, causal observations,
-   original controller/noise parameters and full startup/flight/fault limits.
-   Do not impose stationarity after release. Check complete online/replay equality,
-   initial prior ownership and new-sample correlations before a flight campaign.
-4. Predeclare all cases and stopping rules before running the combined candidate.
-   Retain every outcome, including failures; do not retune, loosen thresholds or
-   retry valid flights after inspection. Fresh validation remains a separate
-   prerequisite to integration even if the known-seed comparison succeeds.
+The [combined experiment](combined-supported-prior.md) conditions world velocity
+once on the verified support fixture, then uses the nonlinear first prediction
+and ordinary later ESKF intervals. It preserves every controller/noise setting
+and compares against both authenticated boundary-only and original aligned
+controls. All nine clean flights pass their absolute limits, with hover peaks
+of 6.75, 5.69 and 5.56 cm. The previously failed hover case improves substantially.
 
-The uncertainty repair makes this follow-up test mathematically defensible. It
-does not predict that velocity conditioning will recover the oracle benefit or
-meet the hover requirement. No combined-prior flight has been executed yet.
+The other two hover peaks increase, and five of nine clean comparisons fail
+no-regression through peak or RMSE. The [verification record](progress/2026-09-29-combined-supported-prior.md)
+retains every result. All 25 saved histories reconstruct; all eight fault-response
+comparisons pass. The candidate remains experimental; the frozen comparison
+fails and fresh qualification is incomplete. Do not reinterpret the improved
+worst case as satisfying every acceptance condition.
+
+## Next bounded task: explain the saved combined-prior tradeoff
+
+1. Authenticate the original, boundary-only and combined histories and their
+   complete score/replay records. Use existing data; run no new flights.
+2. Compare the improved seed47001 and regressing seed47002/47003 clean histories.
+   Reconstruct how initial velocity conditioning changes later observation gains,
+   navigation-error feedback and commanded acceleration. Use simulated truth only
+   for offline error accounting, never as a proposed controller input.
+3. Test an unfitted explanation against the saved trajectories. Distinguish
+   expected redistribution of noise and bias corrections from an implementation
+   defect; exact replay alone does not prove physical optimality.
+4. Record a bounded design decision. If no specific correctable defect or
+   independently justified next hypothesis is demonstrated, close this startup
+   candidate without another tuning or seed search. Preserve the failed gate;
+   fresh validation and normal integration are not automatically authorized by
+   the better worst-case hover peak.
 
 The mass-induced offset remains a separate open requirement. Do not silently
 combine the rejected integral candidate, reopen geometric tuning, claim hardware

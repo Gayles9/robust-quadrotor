@@ -4,14 +4,16 @@ Updated 2026-09-29. The implemented Python stack covers simulation, estimation,
 planning and closed-loop virtual missions. The main open performance issue is
 hover and trajectory control with noisy estimated feedback.
 
-The latest [nonlinear release correction](nonlinear-release.md) passes full joint
-uncertainty checks in all 17 configurations under both velocity priors. The
-isolated original-prior flights still miss hover acceptance: the failed peak is
-10.198 cm versus 10.181 cm previously, and all three hover peaks increase slightly.
-The mathematical omission is repaired; the flight problem is not. Exact velocity
-conditioning has not been used in a flight and no production default changes.
-All 25 isolated flights are retained: 6/9 clean no-regression comparisons and
-8/8 fault-response comparisons pass. The full software gate passes 3,872 tests.
+The latest [combined supported-prior experiment](combined-supported-prior.md)
+uses the verified nonlinear release correction and conditions velocity once on
+genuine simulated support. The three tested hover peaks are 6.75, 5.69 and
+5.56 cm, all below the original 8 cm limit. The first improves from 10.20 cm;
+the other two regress against their matched controls. The frozen no-regression
+requirement therefore fails, despite the improved worst hover case. The
+candidate remains experimental, fresh validation is incomplete, and production
+defaults remain unchanged. The full software gate passes 3,883 tests.
+All 25 candidate histories pass saved reconstruction. Four of nine clean
+no-regression comparisons and all eight fault-response comparisons pass.
 
 ## Implemented capabilities
 
@@ -123,8 +125,11 @@ directions. The subsequent [joint moment model](nonlinear-release.md) repairs th
 omission and passes fixed full covariance checks. The boundary-only comparison
 retains the original velocity prior and does not fix the failed hover case.
 All six nominal/wind tracking cases and all eight fault-response comparisons
-pass; the 34-flight campaign and its failed hover condition are retained.
-No hardware support procedure or general flight qualification is claimed.
+pass in that boundary-only study. Both the original 34-flight campaign and the
+25 boundary-only histories are retained. The subsequent
+[combined-prior study](combined-supported-prior.md) achieves three hover peaks
+below 8 cm but regresses two peaks, failing its frozen comparison. It does not
+establish a hardware support procedure or general flight qualification.
 
 The latest [startup/hover closeout](progress/2026-09-26-geometric-transient-closeout.md)
 reproduces the original failures and rejects one frozen coherent-force candidate.
