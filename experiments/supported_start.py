@@ -16,8 +16,9 @@ from experiments.robustness_protocol import configuration, policies
 from quadrotor_math import estimated_mission
 from quadrotor_math.dynamics import quadratic_drag_force_body
 from quadrotor_math.eskf_endpoint import initialize_eskf_endpoint
+from quadrotor_math.eskf_faults import EskfObservationFault
 from quadrotor_math.eskf_live_faults import EskfLiveObservationFaults
-from quadrotor_math.eskf_replay import EskfObservationKind
+from quadrotor_math.eskf_replay import EskfObservationKind, EskfReplayObservation
 from quadrotor_math.estimated_mission import EstimatedMissionResult
 from quadrotor_math.imu import (
     accelerometer_specific_force_measurement_body,
@@ -86,7 +87,13 @@ def support_evidence(
 def prepare(case: str, partition: str = "campaign") -> PreparedStart:
     if case not in CASES:
         raise ValueError("unknown frozen supported-start case")
-    args = configuration(case, partition)
+    return prepare_configured(case, configuration(case, partition), partition)
+
+
+def prepare_configured(
+    case: str, args: dict[str, Any], partition: str = "campaign"
+) -> PreparedStart:
+    """Use the unchanged physical fixture with an explicitly supplied experiment."""
     initial, body, world, sensors = (
         args[k] for k in ("initial_state", "truth_body", "truth_world", "sensors")
     )
@@ -258,17 +265,23 @@ def release_measurement(prepared: PreparedStart) -> Iterator[dict[str, int]]:
         yield trace
 
 
-def fly(prepared: PreparedStart, mode: str) -> tuple[EstimatedMissionResult, dict[str, Any]]:
+def fly(
+    prepared: PreparedStart,
+    mode: str,
+    *,
+    faults: tuple[EskfObservationFault, ...] = (),
+    supervised: bool = True,
+) -> tuple[EstimatedMissionResult, dict[str, Any]]:
     args = configuration_for(prepared, mode)
     health_config, response = policies(args, prepared.partition)
     health = ObservationHealthMonitor(health_config)
     supervisor = ObservationSupervisor(health, response)
-    channel = EskfLiveObservationFaults(())
+    channel = EskfLiveObservationFaults(faults)
     with release_measurement(prepared) as trace:
         result = estimated_mission.simulate_estimated_mission(
             **args,
             observation_health=health,
-            observation_supervision=supervisor,
+            observation_supervision=supervisor if supervised else None,
             observation_faults=channel,
         )
     assert channel.injection is not None and prepared.release is not None
@@ -289,7 +302,11 @@ def fly(prepared: PreparedStart, mode: str) -> tuple[EstimatedMissionResult, dic
 
 
 def verify_noise(
-    result: EstimatedMissionResult, args: dict[str, Any], *, supported: bool
+    result: EstimatedMissionResult,
+    args: dict[str, Any],
+    *,
+    supported: bool,
+    original_observations: tuple[EskfReplayObservation, ...] | None = None,
 ) -> dict[str, float]:
     """Reconstruct every actual named-stream draw independently of mission sampling."""
     m, imu, pos = result.mission, args["sensors"].imu, args["sensors"].position
@@ -356,9 +373,12 @@ def verify_noise(
                 args["numerics"].time_step_s
             ) * generator.standard_normal(3)
             ensure(np.array_equal(expected, history[k]), "flight bias walk changed")
+    sources = (
+        result.measurements.observations if original_observations is None else original_observations
+    )
     for kind in EskfObservationKind:
         observations = sorted(
-            (o for o in result.measurements.observations if o.kind is kind),
+            (o for o in sources if o.kind is kind),
             key=lambda o: o.observation_index,
         )
         for o in observations:
@@ -387,7 +407,12 @@ def verify_noise(
 
 
 def audit(
-    prepared: PreparedStart, mode: str, result: EstimatedMissionResult, diagnostic: dict[str, Any]
+    prepared: PreparedStart,
+    mode: str,
+    result: EstimatedMissionResult,
+    diagnostic: dict[str, Any],
+    *,
+    supervision: str = "on",
 ) -> dict[str, float]:
     args = configuration_for(prepared, mode)
     # The existing verifier replays ESKF, commands, guards and supervision against
@@ -396,7 +421,7 @@ def audit(
         robustness_evidence.audit_result(
             prepared.case,
             prepared.partition,
-            "on",
+            supervision,
             result,
             {k: v for k, v in diagnostic.items() if k != "boundary"},
         )
@@ -420,7 +445,12 @@ def audit(
         ),
         "fresh sample reuse mismatch",
     )
+    # Authenticate original draws before causal faults, including dropped sources.
+    # The replay above independently verifies the complete source -> output mapping.
+    original_observations = tuple(
+        robustness_evidence.observation(r["source"]) for r in diagnostic["fault_records"]
+    )
     return {
-        **verify_noise(result, args, supported=True),
+        **verify_noise(result, args, supported=True, original_observations=original_observations),
         **check_plant(pack_history(result, result.mission), args),
     }

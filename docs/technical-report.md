@@ -67,6 +67,9 @@ passes that gate. The [standalone component](prearm-component.md) also passes
 reference and acquisition/handoff checks. A subsequent
 [supported-start comparison](supported-start-flight.md) passes the original
 hover limit at 2.51 cm peak and improves nominal/wind tracking, while mass
-mismatch remains a failure. The [next step](next-steps.md) is independent
-supported-start validation before normal mission integration.
+mismatch remains a failure. The subsequent
+[independent validation](independent-supported-start.md) improves all three
+fresh hover peaks, but one still reaches 10.18 cm against 8 cm. Normal mission
+integration is no-go. The [next step](next-steps.md) is a bounded diagnosis of
+that remaining error using the saved histories.
 These later diagnostic results are not part of report revision 2.0.

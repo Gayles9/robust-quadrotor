@@ -150,21 +150,43 @@ fails: aligned whole-flight RMSE is 42.526 cm with landing timeout at 25 s.
 The frozen startup comparison passes, while all-four-case flight qualification
 does not. The initializer remains experiment-only.
 
-## Next bounded task: independent supported-start validation
+## Completed: independent supported-start validation
 
-1. Audit this closeout and freeze one bounded independent seed/case protocol
-   before execution. Keep reserved geometric qualification seeds unopened.
-2. Check repeatability of the supported-start benefit and the existing
-   observation-loss/rejection/delay/recovery responses under the new prior.
-3. Retain the same physical fixture/release, original controller, full-flight
-   scoring and all performance/no-regression limits. Separate sampling variation
-   from a demonstrated implementation defect; do not tune after seeing outcomes.
-4. Preserve every outcome and decide explicitly whether normal mission integration
-   is justified within a stated supported-start operating boundary.
+The [independent campaign](independent-supported-start.md) freezes three fresh
+seeds across hover, nominal tracking and wind, plus the eight original fault
+patterns under a fourth seed. Clean pairs isolate alignment; fault pairs isolate
+supervision with the same aligned prior. Full histories, original pre-fault
+sensor records and all individual outcomes are preserved in the
+[verification record](progress/2026-09-28-independent-supported-start.md).
 
-The mass-induced offset is a separate open requirement. This next step must not
-silently combine the rejected integral candidate, reopen geometric tuning,
-claim hardware stationarity, or promote one known-seed success into qualification.
+All three fresh hover peaks improve, but one remains at 10.18 cm against the
+unchanged 8 cm limit. The other two reach 5.46 and 5.24 cm. All six nominal/wind
+tracking cases pass their flight conditions. The integration decision is no-go:
+repeatable improvement is not the same as satisfying every required condition.
+All eight observation-fault response comparisons pass with the original timing
+rules; recovery completes and persistent faults produce the required numerical
+abort. All 34 planned histories are retained.
+Keep the initializer experiment-only and retain the original controller default.
+
+## Next bounded task: residual supported-hover diagnosis
+
+1. Audit this closeout and authenticate the complete saved independent campaign.
+   Freeze a small offline diagnostic protocol before analysis or intervention.
+2. Decompose the failed seed-47001 hover into true tracking error, estimated
+   tracking error, navigation-estimation error, attitude/bias error and the
+   support-release transient. Use the two passing fresh seeds as descriptive
+   comparisons; do not treat different random draws as a causal intervention.
+3. Develop and check a quantitative causal explanation against the saved
+   equations/commands and full histories. Any truth-assisted counterfactual
+   must be separately bounded and labeled diagnostic, with unchanged scoring.
+4. Decide whether the evidence supports one concrete estimator/controller or
+   operating-boundary change. A diagnosis that rejects speculative tuning is
+   a valid outcome. Preserve the 8 cm and 15 cm limits and every failure.
+
+The mass-induced offset remains a separate open requirement. Do not silently
+combine the rejected integral candidate, reopen geometric tuning, claim hardware
+stationarity, run a new gain/seed sweep or integrate alignment into normal
+missions while the fresh-seed hover requirement remains unresolved.
 
 Any future project-completion percentage must declare an agreed weighted
 milestone denominator; campaign pass fractions are not project completion.

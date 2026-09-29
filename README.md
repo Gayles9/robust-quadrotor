@@ -56,7 +56,10 @@ acquisition/handoff checks. The [supported-start flight comparison](docs/support
 now reduces the scored hover peak from 8.59 cm without alignment to 2.51 cm
 with alignment under the same modeled support conditions, passing the 8 cm
 limit. Nominal and wind tracking also pass; mass mismatch still fails. The
-[next step](docs/next-steps.md) is independent repeatability and fault validation.
+[independent validation](docs/independent-supported-start.md) finds that alignment
+improves all three fresh hover peaks, but one still reaches 10.18 cm. Normal
+mission integration remains blocked. The [next step](docs/next-steps.md) is a
+bounded diagnosis of that remaining hover error using the saved histories.
 
 ## Run it
 

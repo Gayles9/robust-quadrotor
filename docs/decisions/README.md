@@ -26,6 +26,7 @@ the [next-step plan](../next-steps.md) for the present scope.
 - [0028: Nonlinear joint pre-arm uncertainty](0028-nonlinear-prearm-uncertainty.md)
 - [0029: Standalone supported pre-arm alignment](0029-standalone-prearm-alignment.md)
 - [0030: Physically supported-start flight comparison](0030-supported-start-flight-evaluation.md)
+- [0031: Independent supported-start repeatability and fault validation](0031-independent-supported-start-validation.md)
 
 ## Feedback control
 
@@ -52,7 +53,7 @@ the [next-step plan](../next-steps.md) for the present scope.
 
 ## Writing a new decision
 
-Use the next number and a descriptive filename, such as `0031-short-title.md`.
+Use the next number and a descriptive filename, such as `0032-short-title.md`.
 Explain the problem before the equations. State the evidence needed to accept
 the change and the limits that remain afterward.
 
