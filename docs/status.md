@@ -4,16 +4,19 @@ Updated 2026-09-29. The implemented Python stack covers simulation, estimation,
 planning and closed-loop virtual missions. The main open performance issue is
 hover and trajectory control with noisy estimated feedback.
 
-The latest [combined supported-prior experiment](combined-supported-prior.md)
-uses the verified nonlinear release correction and conditions velocity once on
-genuine simulated support. The three tested hover peaks are 6.75, 5.69 and
-5.56 cm, all below the original 8 cm limit. The first improves from 10.20 cm;
-the other two regress against their matched controls. The frozen no-regression
-requirement therefore fails, despite the improved worst hover case. The
-candidate remains experimental, fresh validation is incomplete, and production
-defaults remain unchanged. The full software gate passes 3,883 tests.
-All 25 candidate histories pass saved reconstruction. Four of nine clean
-no-regression comparisons and all eight fault-response comparisons pass.
+The latest [saved-history diagnosis](combined-prior-diagnosis.md) authenticates
+84 existing outcomes and reconstructs all 27 clean histories across the original,
+boundary-only and combined supported-prior versions. Independent update and
+physical-response checks pass; an unfitted hover model agrees within
+0.146..0.769 mm horizontal RMS. No correctable implementation defect is
+established. Changed navigation/attitude corrections explain the measured
+tradeoff, including a changed observation-gate disposition under the same policy.
+
+The combined candidate's three hover peaks remain below 8 cm, but its frozen
+no-regression comparison fails. This startup study is closed and the candidate
+remains experimental. Fresh validation and production integration are incomplete;
+controller defaults are unchanged. The full software gate passes 3,892 tests.
+The next step is a separate whole-flight estimation/control error-budget design.
 
 ## Implemented capabilities
 
