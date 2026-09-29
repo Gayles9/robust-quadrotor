@@ -65,9 +65,11 @@ an unfitted local model matches it to 0.76 mm horizontal RMS. The subsequent
 that failed hover peak to 1.99 cm using simulated true position/velocity only
 at the outer controller. This demonstrates headroom, not deployable feedback.
 The subsequent [supported velocity prior check](docs/supported-velocity-prior.md)
-rejects reducing velocity uncertainty with the current release integration.
-The [next step](docs/next-steps.md) is to correct and verify the first prediction
-interval at support removal before another flight comparison.
+rejects reducing velocity uncertainty with the original release integration.
+The [release correction](docs/release-prediction.md) now removes that deterministic
+ballistic error. Exact velocity conditioning remains deferred because the
+first-order joint covariance misses nonlinear uncertainty in singular directions.
+The [next step](docs/next-steps.md) is nonlinear release uncertainty before flight regression.
 
 ## Run it
 

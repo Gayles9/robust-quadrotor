@@ -1,6 +1,6 @@
 # Supported velocity prior: correct at release, overconfident after propagation
 
-The exact zero-velocity prior is **rejected with the current release integration**.
+The exact zero-velocity prior was **rejected with the original release integration**.
 Its conditioning algebra and support checks pass, but every one of the 17 saved
 release configurations fails the frozen necessary uncertainty screen. No new
 mission flights are run. The ordinary supported-hover result remains 10.18 cm
@@ -125,14 +125,11 @@ The result does not establish whether a velocity prior would improve hover after
 the release model is corrected. The previous truth-feedback oracle remains a
 separate demonstration of available navigation-channel headroom.
 
-The [next bounded task](next-steps.md) is a release-aware first prediction interval.
-Derive one causal, one-sided rule using the first post-release IMU measurement,
-with the existing gyro/sample-noise memory and explicit numerical-error limits.
-Verify its ballistic limit, derivatives and covariance before any flight change.
-Do not invent a second simultaneous measurement, substitute true velocity/force,
-reuse the supported force as a free-flight force, or tune Q/R to absorb the step.
-Ordinary intervals, controller selection, the mass requirement and integration
-qualification remain outside this correction's scope.
+The subsequent [release-aware first prediction](release-prediction.md) is now
+implemented and passes its component checks. It removes this ballistic error,
+but the exact velocity prior remains deferred: nonlinear rotation/noise products
+are absent from three singular covariance directions. The [current plan](next-steps.md)
+derives those joint moments before the frozen boundary-only flight comparison.
 
 ## Reproduce
 

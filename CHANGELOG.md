@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file following a 
 
 ## [Unreleased]
 
+### 2026-09-29 release-aware first prediction
+
+- Add an experiment-only one-sided release map using the existing post-release
+  IMU, full sample-noise memory and unchanged subsequent prediction intervals.
+- Verify all discrete derivatives, covariance, shared samples, first-only routing
+  and online/replay agreement; remove the analytic release bias in all 17 cases.
+- Retain exact velocity conditioning as no-go after analytic and finite nonlinear
+  checks expose omitted uncertainty in singular covariance directions. No new
+  scientific flights, production default or performance thresholds change.
+
 ### 2026-09-28 nonlinear pre-arm uncertainty
 
 - Derive the mixed heading/inclination error and propagate one local Gaussian
