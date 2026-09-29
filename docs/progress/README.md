@@ -12,6 +12,8 @@ results, seeds, thresholds and commit identities are preserved.
 
 ## Controller and planning studies
 
+- [2026-09-28: Supported velocity prior and release uncertainty](2026-09-28-supported-velocity-prior.md)
+
 - [2026-09-28: Causal early-flight diagnosis](2026-09-28-early-flight-diagnosis.md)
 - [2026-09-28: Technical report and operating boundary](2026-09-28-technical-report.md)
 - [2026-09-28: Bounded vertical compensation](2026-09-28-vertical-compensation.md)

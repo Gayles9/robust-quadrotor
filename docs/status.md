@@ -103,9 +103,13 @@ RMS. The subsequent [navigation-feedback isolation](navigation-feedback-isolatio
 reduces that failed peak from 10.18 to 1.99 cm and whole-flight RMSE from 6.49
 to 3.93 cm, passing the frozen diagnostic comparison. It changes only the outer
 controller's position/velocity inputs to simultaneous truth. The ordinary
-estimated-input configuration remains unqualified. Next is one supported
-zero-velocity prior candidate, using the existing stationary support boundary
-with explicit covariance handling and no in-flight truth or zero-velocity update.
+estimated-input configuration remains unqualified. The subsequent
+[supported velocity prior check](supported-velocity-prior.md) rejects a prior-only
+change: all 17 release configurations fail its necessary uncertainty screen.
+The analytic release case exposes a 1.226 cm/s deterministic velocity error,
+about 119 reported standard deviations after conditioning. No new flights run.
+Next is a release-aware first prediction interval, with independently checked
+derivatives, uncertainty and numerical-error limits before flight evaluation.
 All six nominal/wind tracking cases and all eight fault-response comparisons
 pass; the 34-flight campaign and its failed hover condition are retained.
 No hardware support procedure or general flight qualification is claimed.
@@ -163,7 +167,7 @@ has the same distinction between implementation and qualified flight behavior.
 [Controller problems and tradeoffs](controller-tradeoffs.md) explains why the
 remaining failures can coexist with correct equations and good true-state
 tracking. [Project review](project-review.md) records the current audit, and
-[the next-step plan](next-steps.md) defines the bounded supported-velocity prior candidate.
+[the next-step plan](next-steps.md) defines the bounded release-integration correction.
 Broader qualification and middleware integration remain separate deliverables.
 The updated report is pinned to its declared source; historical report revisions
 and dated records remain snapshots, not instructions to repeat old studies.

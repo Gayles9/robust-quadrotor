@@ -64,8 +64,10 @@ an unfitted local model matches it to 0.76 mm horizontal RMS. The subsequent
 [navigation-feedback isolation](docs/navigation-feedback-isolation.md) reduces
 that failed hover peak to 1.99 cm using simulated true position/velocity only
 at the outer controller. This demonstrates headroom, not deployable feedback.
-The [next step](docs/next-steps.md) is one supported zero-velocity prior candidate
-with explicit uncertainty and unchanged flight acceptance.
+The subsequent [supported velocity prior check](docs/supported-velocity-prior.md)
+rejects reducing velocity uncertainty with the current release integration.
+The [next step](docs/next-steps.md) is to correct and verify the first prediction
+interval at support removal before another flight comparison.
 
 ## Run it
 

@@ -83,10 +83,10 @@ is unavailable to an ordinary controller, and the experiment supplies no new
 sensor, hardware guarantee or general qualification. Mass mismatch remains a
 separate open requirement; geometric qualification remains unchanged.
 
-## Concrete next design: supported zero-velocity prior
+## Subsequent candidate: supported zero-velocity prior
 
-The next candidate will use information already promised by the supported
-operating boundary: the vehicle is stationary in the world frame through the
+The candidate identified by this experiment uses information already promised
+by the supported operating boundary: the vehicle is stationary in the world frame through the
 fresh release endpoint. The current navigation prior retains a 0.03 m/s velocity
 standard deviation from the free-flight initialization even under that support
 contract. Its mean is already zero; this is about conditioning uncertainty using
@@ -113,22 +113,17 @@ arbitrary positive floor or invert it as if it were full rank. A real support
 procedure with nonzero residual motion needs externally justified `R_s`; IMU
 quietness or this oracle's score cannot supply that justification.
 
-The next bounded step is to derive, implement and evaluate this single prior
-under a separately frozen protocol. Establish its release contract before
-implementation. It must preserve the full joint
-covariance, sample ownership and exact one-time conditioning; reject absent,
-stale or broken support; and use no in-flight zero-velocity update. Define checks
-for PSD/rank, physical support violations and independent uncertainty validation.
-Include the known support-to-flight force discontinuity and endpoint integration
-error in those checks: exact initial velocity does not imply error-free first-step
-propagation. Reject an overconfident design rather than hide it with a fitted
-covariance floor.
-Its flight comparison must retain all three recorded hover seeds, full startup
-scoring and the existing clean/fault conditions without gain or Q/R tuning.
-Those now-known seeds are regression cases; fresh validation remains necessary
-before ordinary mission integration. This is a principled candidate, not a promise
-that one initial velocity constraint will recover the oracle's 80.46% improvement
-or remove position error.
+The subsequent [supported velocity prior screen](supported-velocity-prior.md)
+derives and implements this single candidate under ADR 0034. Its conditioning,
+rank and support rejection checks pass, but all 17 release configurations fail
+the necessary uncertainty screen. The supported left-limit sample causes a
+deterministic integration error much larger than the conditioned prior's first
+propagated uncertainty. Under the frozen rule, no new mission flights run.
+
+The [next step](next-steps.md) is a release-aware first prediction interval before
+revisiting the prior. This oracle never guaranteed that a one-time velocity
+constraint would reproduce its 80.46% improvement or remove position error.
+Fresh validation remains necessary before ordinary mission integration.
 
 ## Reproduce
 
