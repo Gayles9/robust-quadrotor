@@ -70,9 +70,13 @@ The [release correction](docs/release-prediction.md) removes that deterministic
 ballistic error. Its [nonlinear joint moments](docs/nonlinear-release.md) now
 pass the full uncertainty checks under both priors. The isolated original-prior
 flight comparison still misses hover acceptance: the failed peak is 10.198 cm
-versus 10.181 cm previously. Mathematical correctness does not establish a useful
-flight gain. The correction remains experimental; the [next step](docs/next-steps.md)
-is a separately frozen combined-prior comparison, not default integration.
+versus 10.181 cm previously. The subsequent
+[combined supported-prior experiment](docs/combined-supported-prior.md) adds the
+known zero release velocity. All three tested hover peaks are now below 8 cm:
+6.75, 5.69 and 5.56 cm. The latter two regress slightly against their controls,
+so the frozen no-regression requirement still fails. This is an implemented
+experimental option with a measured tradeoff; it is not adopted into normal
+missions. The [next-step plan](docs/next-steps.md) retains that distinction.
 
 ## Run it
 

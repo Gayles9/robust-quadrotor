@@ -127,10 +127,11 @@ comparison; that is different from an execution or evidence exception. Saved
 verification reconstructs results without rerunning a scientific flight.
 Evidence is written through durable no-clobber staging and retained outside Git.
 
-The initializer and correction remain experimental. Any combined-prior study
-needs its own frozen comparison, using these boundary-only results as controls.
-Fresh validation must precede normal integration. Cascade remains the default;
-geometric qualification and mass compensation are separate unresolved work.
+The initializer and correction remain experimental. The subsequent
+[combined-prior study](combined-supported-prior.md) uses these boundary-only
+results as controls under its separately frozen scope. Fresh validation must
+precede normal integration. Cascade remains the default; geometric qualification
+and mass compensation are separate unresolved work.
 
 The completed 25-flight comparison passes six of nine clean no-regression
 comparisons and all eight fault-response comparisons. Only two of three hover
