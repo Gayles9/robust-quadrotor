@@ -22,11 +22,18 @@ The completed [error-budget review](whole-flight-error-budget.md) retains all
 27 full-flight Gram matrices and derives the original sampled cascade's input
 sensitivities. Correlations can outweigh a reduction in individual channel
 energies. Local information rank remains 11 with an added velocity observation
-and becomes 13 with independent inclination. The decision is go for a physical
-inclination-measurement contract and feasibility study, with no new scientific
-flights or component implementation yet. The full warning-strict software suite
-passes 3,918 tests. Source availability, error allocation
-and fresh nonlinear flight qualification remain to be established.
+and becomes 13 with independent inclination. That review justified a bounded
+inclination-measurement feasibility study; its software gate passed 3,918 tests.
+
+The completed [inclination contract](independent-inclination-feasibility.md)
+derives the measurement, correlations, bias and timing requirements. It concludes
+no-go for implementation: the existing scope has no justified independent
+orientation source/model and no complete joint allocation. With two unknown
+measurement biases, the local absolute tilt ambiguity returns. The sensor
+extension is closed under current assumptions, with no new scientific flights
+or production changes. Next consolidate the original-sensor operating envelope
+and technical report; fresh nonlinear flight qualification remains open. The
+latest full warning-strict software suite passes 3,949 tests.
 
 ## Implemented capabilities
 
@@ -197,7 +204,7 @@ has the same distinction between implementation and qualified flight behavior.
 [Controller problems and tradeoffs](controller-tradeoffs.md) explains why the
 remaining failures can coexist with correct equations and good true-state
 tracking. [Project review](project-review.md) records the current audit, and
-[the next-step plan](next-steps.md) defines the independent-inclination feasibility task.
+[the next-step plan](next-steps.md) defines operating-envelope and report consolidation.
 Broader qualification and middleware integration remain separate deliverables.
 The updated report is pinned to its declared source; historical report revisions
 and dated records remain snapshots, not instructions to repeat old studies.

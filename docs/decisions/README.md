@@ -33,6 +33,7 @@ the [next-step plan](../next-steps.md) for the present scope.
 - [0037: Combined supported velocity and nonlinear release comparison](0037-combined-supported-velocity-comparison.md)
 - [0038: Saved combined-prior tradeoff diagnosis](0038-combined-prior-tradeoff-diagnosis.md)
 - [0039: Whole-flight estimation/control error-budget review](0039-whole-flight-error-budget.md)
+- [0040: Independent-inclination contract and feasibility](0040-independent-inclination-feasibility.md)
 
 ## Feedback control
 

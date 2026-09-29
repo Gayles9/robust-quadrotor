@@ -280,20 +280,35 @@ This justifies a measurement feasibility hypothesis, not an implementable sensor
 under current assumptions. No new flight or production change was made. The
 original frozen comparison and fresh qualification remain unresolved.
 
-## Next bounded task: independent-inclination measurement contract and feasibility
+## Completed: independent-inclination measurement contract and feasibility
 
-1. Audit this review and freeze the new scope and acceptance before any work.
-2. Identify a physically justified source of body-down direction in the world
-   frame. Specify calibration, tangent-space noise and bias, timestamps/latency,
-   outages and correlations with existing position observations. Do not assume
-   hardware exists or treat accelerated-flight IMU gravity as independent data.
-3. Derive the two-coordinate measurement and Jacobian with heading unobserved,
-   and assess the joint error allocation against the existing sampled budget.
-   Keep bias coupling and changed innovation-gate sequences explicit.
-4. Establish a go/no-go for a standalone component under stated physical and
-   uncertainty assumptions. Stop if no defensible source/bounds are available.
-   No new scientific flight, startup tuning, gain/seed search, default adoption,
-   threshold relaxation or integration belongs in this feasibility task.
+The [contract](independent-inclination-feasibility.md) derives the tangent residual,
+right-local Jacobian, correlated uncertainty, calibration, age and availability
+requirements. Its [verification record](progress/2026-09-29-independent-inclination-feasibility.md)
+preserves independent geometric/Gaussian checks and the explicit missing inputs.
+Unknown constant inclination bias restores the local absolute tilt ambiguity.
+
+The mathematical contract passes, but source/model availability and the joint
+budget do not. No-go for a component under current assumptions. Close this
+sensor extension without a synthetic sensor campaign, scientific flight,
+production change or implicit expansion into vision/hardware. A source/model
+and justified calibration/timing/uncertainty would be required to reopen it.
+The previous failed flight and no-regression gates remain unchanged.
+
+## Next bounded task: original-sensor operating envelope and report consolidation
+
+1. Audit the merged closeout and freeze the documentation/report scope.
+2. Build one source-indexed capability/requirement table: implemented behavior,
+   passing evidence, failed or conditional requirements, default versus research
+   options, and unimplemented integration. Authenticate existing results.
+3. Update the existing editable LaTeX report and PDF from revision 2.0 to the
+   current merged mathematical stack and evidence. Include the completed
+   initialization/release work, whole-flight budget and sensor-study stopping
+   decision, without rewriting failed studies as qualification.
+4. Compile, inspect and independently check quantitative claims. Preserve the
+   report artifacts' identity/history and publish the repository documentation.
+   This step includes no new flight, tuning, sensor extension, threshold change,
+   default promotion or middleware integration. Report completion does not pass G2.
 
 The mass-induced offset remains a separate open requirement. Do not silently
 combine the rejected integral candidate, reopen geometric tuning, claim hardware

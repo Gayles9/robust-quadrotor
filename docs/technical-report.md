@@ -80,6 +80,13 @@ only to the outer controller; this is headroom, not qualification. The
 the prior-only change because the first release interval has unrepresented
 integration error. The subsequent [release correction](release-prediction.md)
 removes that analytic error and passes component checks, but identifies missing
-nonlinear uncertainty under exact velocity conditioning. The [next step](next-steps.md)
-derives those joint moments; no new flight improvement is claimed.
-These later diagnostic results are not part of report revision 2.0.
+nonlinear uncertainty under exact velocity conditioning. The subsequent
+[nonlinear release](nonlinear-release.md) and [combined prior](combined-supported-prior.md)
+studies are complete; the latter passes the three tested absolute hover limits
+but fails its frozen no-regression comparison. The [saved diagnosis](combined-prior-diagnosis.md)
+closes startup tuning. The [whole-flight budget](whole-flight-error-budget.md)
+and [inclination feasibility contract](independent-inclination-feasibility.md)
+are also complete; the sensor extension is no-go under existing assumptions.
+These later results are not part of report revision 2.0. The
+[next step](next-steps.md) is to update the report and consolidate the original-sensor
+operating envelope, preserving all failed and conditional requirements.
