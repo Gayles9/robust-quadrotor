@@ -1,92 +1,79 @@
 # Technical report and operating boundary
 
-Revision 2.0, dated 2026-09-28, updates the original prediction-only technical
-report to source baseline
-`92256d62722081f43f6ff0952888dcd3a7444d0d`.
+Revision 3.0, dated 2026-09-29, consolidates the implemented mathematical stack
+and retained evidence through merged software baseline
+`67499e9eb2c9a0acd72eb45d7be690f1bb2e3a2b` (PR #39).
 
-The separate PDF and complete editable LaTeX package retain the existing
-filenames `Robust_Quadrotor_Technical_Report_v1.pdf` and
-`Robust_Quadrotor_Report_v1.zip` for artifact continuity. The revision stated
-inside the report is authoritative. They are separate deliverables, not
-generated files committed to this repository.
+The existing PDF and editable LaTeX package keep the filenames
+`Robust_Quadrotor_Technical_Report_v1.pdf` and `Robust_Quadrotor_Report_v1.zip`
+and their artifact identities/history. The revision inside the report is
+authoritative. Generated reports and flight histories remain outside Git.
 
 ## What it covers
 
-- Frame conventions, plant, motors, numerical integration, sensors and timing.
-- ESKF prediction, correction/reset, endpoint noise memory and causal replay.
-- Minimum-snap planning, nominal reference bounds and bounded retiming.
-- Cascade and geometric control, derivative tradeoffs and bounded vertical compensation.
-- Observation availability, timed aborts, complete campaign results and retained failures.
-- Reproduction commands, exact source/report identities, current operating
-  limitations and a separately scoped future ROS 2/PX4 interface.
+- Frames, rigid-body plant, actuators, numerical integration, sensors and clocks.
+- ESKF prediction, correction/reset, shared endpoint noise memory and causal replay.
+- Supported stationary alignment, nonlinear attitude/bias uncertainty, one-time
+  exact velocity conditioning and the first prediction after support removal.
+- Minimum-snap planning, reference bounds, cascade/geometric control, observation
+  availability, timed numerical abort and bounded vertical compensation.
+- Original and supported-start flight results, correlated whole-flight error
+  budgets, independent-inclination feasibility and the stopping decision.
+- The [source-indexed operating envelope](operating-envelope.md), reproducible
+  audits, exact provenance and the separately scoped next integration contract.
 
-The default remains the original cascade. Geometric control and vertical
-compensation remain explicit research options. The heavier-mass candidate now
-completes and reduces final error to 6.02 cm, but full-flight RMSE is 17.57 cm
-against 15 cm; hover remains above 8 cm. Software correctness, response
-acceptance and flight qualification are different decisions.
+The combined supported-prior candidate passes all nine tested clean absolute
+flight limits, including hover peaks of 6.7539, 5.6943 and 5.5644 cm. Five clean
+comparisons nevertheless fail strict no-regression against one or both controls.
+These previously studied seeds are not fresh candidate qualification. The
+original cascade remains default; the mass and geometric requirements stay open.
+No new scientific flight, tuning, sensor or integration is part of this report.
 
-## Build and evidence
+## Build and audit
 
-From the source package's `report/` directory:
+From the package's `report/` directory:
 
 ```bash
 latexmk -pdf -interaction=nonstopmode -halt-on-error main.tex
 ```
 
-The package includes exact campaign summary JSON, numerical tables, bibliography,
-figures, an independent claim/payload audit, an authenticated plotting script,
-build instructions and current verification/traceability notes. Raw flight
-payloads remain in the two preserved campaign archives.
+The package includes a self-contained LaTeX build, bibliography, vector hover
+comparison, exact historical and current summary JSON, full unrounded data,
+independent audit scripts and source/verification indices. Raw flight payloads
+remain in their existing evidence archives. From the package root:
 
-| Identity | SHA-256 |
+```bash
+python tools/audit_report_evidence.py
+OPENBLAS_NUM_THREADS=1 python tools/audit_current_evidence.py
+```
+
+Optional `--original`, `--boundary` and `--combined` paths reauthenticate and
+rescore all 84 saved executions without running the flight implementation.
+`--render` regenerates the tables and vector figure from authenticated values.
+The numerical audit needs NumPy; figure regeneration additionally uses Matplotlib.
+No shell escape or Python is required to compile the included LaTeX.
+
+Fresh audit coverage is nine exact summary reports (two historical and seven
+current), 436 payload references across the three supported campaigns, 84
+full-grid metric reconstructions and 144 Gram windows. Full ESKF/command replay
+and the nonlinear calibration populations remain separately dated prior results;
+the report does not relabel them as newly executed verification.
+
+| Evidence | SHA-256 |
 | --- | --- |
-| Candidate execution source | `008470bec6b8b1137f7cb90db2760925e24329a475fcda5c2ef579b6618fceac` |
-| Original campaign report | `ec85a0d6b55acc278acb18b1c7af7b02cb56c6e985dc48eaf66fbc7fd520bb09` |
-| Candidate campaign report | `46a506cc25881cb86a22fd7c4a3aeb85ff1f6e28244d51b492305922dae8b4bc` |
-| Candidate protocol | `6bab1e089730485310a9d69a3d49361618c73982663b75f2a9efe8fc9fa9635e` |
+| Original supported campaign report | `b47297b76114f046915fc167ac114287bec3b15a195748bbde73151a41a70f63` |
+| Boundary-only report | `54f848a0593cef3abe705bb713db97eb584299d3d74fedac91ab309df4ff9cf2` |
+| Combined-prior report | `6d44ab913156fafe3846a630065cdaad9eee2dc9c64c1ea50234b82fbfa314fa` |
+| Whole-flight budget report | `b93b1fb050bab01b06b790b9bac7d795469cb99942572ea476ecfe47775798cb` |
+| Inclination feasibility report | `f0b03f6d39ec746bcad7d71aba337191d6bac9c43c63af4ead777a2be8280164` |
 
-The candidate ran before publication with a recorded dirty working tree;
-the execution fingerprint binds the subsequently published code. The report
-does not relabel that execution as a clean post-merge run.
+The complete index in the package also binds nonlinear release and saved-history
+diagnosis reports, source files and previous artifact hashes. Historical
+convergence measurements stay dated 2026-09-23. Earlier executions retain their
+own source/provenance; they are not relabelled as clean runs of PR #39.
 
-Historical convergence results remain explicitly dated 2026-09-23. Campaign
-pass fractions are not an overall project-completion percentage. Virtual
-landing is not touchdown/disarming, and numerical abort is not physical
-fallback flight.
-
-The [closeout](progress/2026-09-28-technical-report.md) records acceptance.
-The report's proposed [early-flight diagnosis](early-flight-diagnosis.md) is
-now complete in a subsequent, separately recorded milestone. The current
-[startup audit](attitude-startup-audit.md) is also complete and finds no
-demonstrated filter defect. The separately scoped
-[pre-arm alignment contract](prearm-alignment.md) is now defined and evaluated;
-its first-order joint covariance misses the frozen calibration limit. The
-[nonlinear uncertainty derivation](prearm-nonlinear-uncertainty.md) subsequently
-passes that gate. The [standalone component](prearm-component.md) also passes
-reference and acquisition/handoff checks. A subsequent
-[supported-start comparison](supported-start-flight.md) passes the original
-hover limit at 2.51 cm peak and improves nominal/wind tracking, while mass
-mismatch remains a failure. The subsequent
-[independent validation](independent-supported-start.md) improves all three
-fresh hover peaks, but one still reaches 10.18 cm against 8 cm. Normal mission
-integration is no-go. The [residual diagnosis](residual-supported-hover.md) now
-attributes most of the failed peak to saved navigation-error forcing and checks
-an unfitted model to 0.761 mm horizontal RMS. The subsequent
-[navigation oracle](navigation-feedback-isolation.md) reduces hover peak to
-1.99 cm and whole-flight RMSE to 3.93 cm with unchanged scoring. Truth is supplied
-only to the outer controller; this is headroom, not qualification. The
-[supported velocity prior screen](supported-velocity-prior.md) subsequently rejects
-the prior-only change because the first release interval has unrepresented
-integration error. The subsequent [release correction](release-prediction.md)
-removes that analytic error and passes component checks, but identifies missing
-nonlinear uncertainty under exact velocity conditioning. The subsequent
-[nonlinear release](nonlinear-release.md) and [combined prior](combined-supported-prior.md)
-studies are complete; the latter passes the three tested absolute hover limits
-but fails its frozen no-regression comparison. The [saved diagnosis](combined-prior-diagnosis.md)
-closes startup tuning. The [whole-flight budget](whole-flight-error-budget.md)
-and [inclination feasibility contract](independent-inclination-feasibility.md)
-are also complete; the sensor extension is no-go under existing assumptions.
-These later results are not part of report revision 2.0. The
-[next step](next-steps.md) is to update the report and consolidate the original-sensor
-operating envelope, preserving all failed and conditional requirements.
+The [revision 3.0 closeout](progress/2026-09-29-operating-envelope-report.md)
+records exact checks and deliverable hashes. The
+[revision 2.0 closeout](progress/2026-09-28-technical-report.md) remains historical.
+The [next task](next-steps.md) is a simulation-only ROS 2/PX4 interface and
+acceptance design, with estimated-flight G2 explicitly open.

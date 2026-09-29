@@ -128,8 +128,10 @@ separate demonstration of available navigation-channel headroom.
 The subsequent [release-aware first prediction](release-prediction.md) is now
 implemented and passes its component checks. It removes this ballistic error,
 but the exact velocity prior remains deferred: nonlinear rotation/noise products
-are absent from three singular covariance directions. The [current plan](next-steps.md)
-derives those joint moments before the frozen boundary-only flight comparison.
+are absent from three singular covariance directions. The later [nonlinear model](nonlinear-release.md) repairs that uncertainty, and
+the [combined comparison](combined-supported-prior.md) subsequently evaluates the
+prior with it. Those studies do not erase this original screen failure. The
+[current plan](next-steps.md) is authoritative.
 
 ## Reproduce
 

@@ -62,6 +62,7 @@ seed sets are reproduction cases, not fresh validation.
 
 ## Status and evidence
 
+- [Operating envelope](operating-envelope.md): source-indexed default/research capabilities, passing evidence and open requirements.
 - [Current status](status.md): implemented capabilities and measured limitations.
 - [Technical report](technical-report.md): consolidated LaTeX report, source/evidence identity and operating boundary.
 - [Controller tradeoffs](controller-tradeoffs.md): interpretation of the results.

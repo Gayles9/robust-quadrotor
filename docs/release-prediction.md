@@ -150,6 +150,7 @@ The subsequent [nonlinear joint model](nonlinear-release.md) now retains these
 rotation/bias/noise products and passes the full uncertainty checks. Its isolated
 original-prior flight comparison does not fix the failed hover requirement.
 That later result supersedes this component record's next action, not its
-first-order mathematics. A separately frozen combined-prior comparison is next;
-fresh validation remains necessary before normal mission integration. Mass
+first-order mathematics. The later [combined-prior comparison](combined-supported-prior.md) is also
+complete and fails no-regression; fresh validation remains necessary before
+normal mission integration. Mass
 compensation and geometric qualification remain separate.

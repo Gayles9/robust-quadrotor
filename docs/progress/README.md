@@ -10,6 +10,10 @@ They do not override the [current plan](../next-steps.md). Historical workstatio
 and scratch paths have been replaced with portable example paths; numerical
 results, seeds, thresholds and commit identities are preserved.
 
+## Report and operating boundary
+
+- [2026-09-29: Original-sensor operating envelope and report revision 3.0](2026-09-29-operating-envelope-report.md)
+
 ## Controller and planning studies
 
 - [2026-09-29: Saved combined-prior tradeoff diagnosis](2026-09-29-combined-prior-diagnosis.md)

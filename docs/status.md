@@ -31,8 +31,8 @@ no-go for implementation: the existing scope has no justified independent
 orientation source/model and no complete joint allocation. With two unknown
 measurement biases, the local absolute tilt ambiguity returns. The sensor
 extension is closed under current assumptions, with no new scientific flights
-or production changes. Next consolidate the original-sensor operating envelope
-and technical report; fresh nonlinear flight qualification remains open. The
+or production changes. The [operating envelope](operating-envelope.md) and [report revision 3.0](technical-report.md)
+now consolidate these results; fresh nonlinear flight qualification remains open. The
 latest full warning-strict software suite passes 3,949 tests.
 
 ## Implemented capabilities
@@ -204,7 +204,8 @@ has the same distinction between implementation and qualified flight behavior.
 [Controller problems and tradeoffs](controller-tradeoffs.md) explains why the
 remaining failures can coexist with correct equations and good true-state
 tracking. [Project review](project-review.md) records the current audit, and
-[the next-step plan](next-steps.md) defines operating-envelope and report consolidation.
+[the next-step plan](next-steps.md) defines a simulation-only ROS 2/PX4 interface
+and acceptance design.
 Broader qualification and middleware integration remain separate deliverables.
 The updated report is pinned to its declared source; historical report revisions
 and dated records remain snapshots, not instructions to repeat old studies.
