@@ -29,6 +29,7 @@ the [next-step plan](../next-steps.md) for the present scope.
 - [0031: Independent supported-start repeatability and fault validation](0031-independent-supported-start-validation.md)
 - [0034: Supported velocity prior and release uncertainty gate](0034-supported-velocity-prior.md)
 - [0035: Release-aware prediction and uncertainty gate](0035-release-aware-prediction.md)
+- [0036: Nonlinear release uncertainty and isolated flight comparison](0036-nonlinear-release-flight-comparison.md)
 
 ## Feedback control
 

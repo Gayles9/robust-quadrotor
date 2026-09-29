@@ -66,10 +66,13 @@ that failed hover peak to 1.99 cm using simulated true position/velocity only
 at the outer controller. This demonstrates headroom, not deployable feedback.
 The subsequent [supported velocity prior check](docs/supported-velocity-prior.md)
 rejects reducing velocity uncertainty with the original release integration.
-The [release correction](docs/release-prediction.md) now removes that deterministic
-ballistic error. Exact velocity conditioning remains deferred because the
-first-order joint covariance misses nonlinear uncertainty in singular directions.
-The [next step](docs/next-steps.md) is nonlinear release uncertainty before flight regression.
+The [release correction](docs/release-prediction.md) removes that deterministic
+ballistic error. Its [nonlinear joint moments](docs/nonlinear-release.md) now
+pass the full uncertainty checks under both priors. The isolated original-prior
+flight comparison still misses hover acceptance: the failed peak is 10.198 cm
+versus 10.181 cm previously. Mathematical correctness does not establish a useful
+flight gain. The correction remains experimental; the [next step](docs/next-steps.md)
+is a separately frozen combined-prior comparison, not default integration.
 
 ## Run it
 

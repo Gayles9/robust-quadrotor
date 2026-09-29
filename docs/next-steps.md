@@ -219,28 +219,42 @@ uncertainty in three supposedly exact relations. An analytic counterexample
 and independent quadrature confirm the omission. The prior remains deferred;
 zero new scientific flights run and ordinary hover remains at 10.18 cm.
 
-## Next bounded task: nonlinear joint release uncertainty
+## Completed: nonlinear joint release uncertainty and isolated comparison
 
-1. Audit ADR 0035 and freeze one nonlinear moment model for the corrected first
-   interval. Preserve genuinely supported acquisition and the existing IMU;
-   no in-flight stationarity, new sensor or truth-fed estimator is allowed.
-2. Derive the mean and full joint covariance, including rotation/bias/sample-noise
-   products, bias increments, and the new sample's correlations with navigation.
-   Resolve the demonstrated tangent-normal uncertainty without empirical floors,
-   Q/R tuning, deleting null directions or discarding sample memory.
-3. Check analytic limiting cases, positive covariance construction, independent
-   integration accuracy and fixed fresh nonlinear populations. Report numerical
-   rank and calibration rather than presuming that adding variance is correct.
-   Keep all later ordinary intervals unchanged and stop if uncertainty fails.
-4. Reconsider exact velocity conditioning only after this prerequisite. The
-   ADR 0035 boundary-only regression remains frozen: 25 candidate flights against
-   saved baselines, all three known hover seeds, clean/fault conditions, full
-   startup and original thresholds. Isolate the boundary change before any
-   separately frozen combined-prior comparison; require fresh validation before
-   integration. Publish the actual decision even if unsuccessful.
+The [nonlinear predictor](nonlinear-release.md) integrates conditional Gaussian
+moments with rotation/bias/sample-noise products and retained sample memory.
+All 17 cases pass full rank, calibration and quadrature accuracy for both priors;
+680,000 fixed nonlinear outcomes are retained. No covariance floor or tuning is
+used. The [record](progress/2026-09-29-nonlinear-release.md) separates those
+mathematical results from the boundary-only flight comparison.
 
-Correcting the first interval does not establish whole-flight improvement or
-recover the oracle's combined position/velocity-feedback benefit by itself.
+With the original velocity prior, the failed hover peak becomes 10.198 cm versus
+10.181 cm previously. The other two peaks also rise slightly. Whole-flight RMSE
+improvement is small and does not compensate for the failed hover/no-regression
+conditions. Keep the correction experimental; no exact velocity prior enters
+this comparison and no default is promoted.
+
+## Next bounded task: separately freeze a combined-prior comparison
+
+1. Audit ADR 0036 and authenticate all saved boundary-only results. Confirm the
+   original/exact-prior nonlinear covariance and ballistic gates still reproduce.
+2. Freeze one experiment adding exact supported zero-velocity conditioning to
+   the verified nonlinear first prediction. Use the just-completed boundary-only
+   histories as matched controls to isolate the prior's incremental effect.
+   Also retain the original uncorrected comparison, so an intermediate regression
+   cannot make an apparent improvement look like qualification.
+3. Preserve genuine mechanical support, the existing IMU, causal observations,
+   original controller/noise parameters and full startup/flight/fault limits.
+   Do not impose stationarity after release. Check complete online/replay equality,
+   initial prior ownership and new-sample correlations before a flight campaign.
+4. Predeclare all cases and stopping rules before running the combined candidate.
+   Retain every outcome, including failures; do not retune, loosen thresholds or
+   retry valid flights after inspection. Fresh validation remains a separate
+   prerequisite to integration even if the known-seed comparison succeeds.
+
+The uncertainty repair makes this follow-up test mathematically defensible. It
+does not predict that velocity conditioning will recover the oracle benefit or
+meet the hover requirement. No combined-prior flight has been executed yet.
 
 The mass-induced offset remains a separate open requirement. Do not silently
 combine the rejected integral candidate, reopen geometric tuning, claim hardware
