@@ -92,9 +92,14 @@ Support, timing, ownership and latched rejection are explicit. The subsequent
 startup acceptance: hover peak is 2.51 cm versus 8.59 cm in the same supported
 release without alignment (10.76 cm in the original moving/spinning baseline).
 Nominal and wind tracking pass; the mass case still fails at 42.53 cm RMSE.
-These are known-seed development results under modeled fixture support. Next
-is independent repeatability and fault validation; no hardware support procedure
-or general flight qualification is claimed.
+These are known-seed development results under modeled fixture support. The
+subsequent [independent validation](independent-supported-start.md) improves
+hover peaks on all three fresh seeds, but only two pass the 8 cm limit; the
+third reaches 10.18 cm. Normal mission integration remains no-go. The next
+bounded task is diagnosis of the residual hover error using the saved histories.
+All six nominal/wind tracking cases and all eight fault-response comparisons
+pass; the 34-flight campaign and its failed hover condition are retained.
+No hardware support procedure or general flight qualification is claimed.
 
 The latest [startup/hover closeout](progress/2026-09-26-geometric-transient-closeout.md)
 reproduces the original failures and rejects one frozen coherent-force candidate.

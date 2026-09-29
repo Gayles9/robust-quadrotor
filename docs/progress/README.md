@@ -35,6 +35,9 @@ results, seeds, thresholds and commit identities are preserved.
 
 ## State estimation
 
+- [2026-09-28: Independent supported-start validation](2026-09-28-independent-supported-start.md)
+- [2026-09-28: Supported-start flight comparison](2026-09-28-supported-start-flight.md)
+- [2026-09-28: Standalone supported pre-arm component](2026-09-28-prearm-component.md)
 - [2026-09-28: Nonlinear pre-arm uncertainty](2026-09-28-prearm-nonlinear-uncertainty.md)
 - [2026-09-28: Stationary pre-arm alignment design](2026-09-28-prearm-alignment-design.md)
 - [2026-09-28: Attitude-estimation startup audit](2026-09-28-attitude-startup-audit.md)

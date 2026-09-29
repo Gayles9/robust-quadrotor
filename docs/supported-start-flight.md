@@ -100,6 +100,11 @@ establish general qualification. Keep the initializer experiment-only until that
 validation is complete; the cascade remains default and the geometric and mass
 limitations remain separate.
 
+The later [independent validation](independent-supported-start.md) now confirms
+improvement in all three fresh hover pairs but retains one 10.18 cm failure.
+That later result blocks normal integration without changing this historical
+known-seed comparison or its acceptance.
+
 ## Acceptance and reproduction
 
 The full flight is scored, including startup. Hover keeps the inclusive 5..11 s
@@ -121,3 +126,6 @@ OPENBLAS_NUM_THREADS=1 uv run python -W error -m experiments.supported_start_val
 The baseline path must contain the authenticated original ADR 0023 campaign.
 Use a new output directory. A valid comparison that misses acceptance exits 1
 and retains its evidence; implementation or evidence errors raise separately.
+Full replay of this archived study requires its recorded source fingerprint;
+PR 29 preserves that revision. Later experiment additions change the global
+source fingerprint even when the original default behavior is retained.
