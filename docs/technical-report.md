@@ -72,6 +72,9 @@ mismatch remains a failure. The subsequent
 fresh hover peaks, but one still reaches 10.18 cm against 8 cm. Normal mission
 integration is no-go. The [residual diagnosis](residual-supported-hover.md) now
 attributes most of the failed peak to saved navigation-error forcing and checks
-an unfitted model to 0.761 mm horizontal RMS. The [next step](next-steps.md) is
-one bounded navigation-feedback isolation experiment before an implementable change.
+an unfitted model to 0.761 mm horizontal RMS. The subsequent
+[navigation oracle](navigation-feedback-isolation.md) reduces hover peak to
+1.99 cm and whole-flight RMSE to 3.93 cm with unchanged scoring. Truth is supplied
+only to the outer controller; this is headroom, not qualification. The
+[next step](next-steps.md) is one supported zero-velocity prior candidate.
 These later diagnostic results are not part of report revision 2.0.

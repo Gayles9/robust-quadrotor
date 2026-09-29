@@ -99,8 +99,13 @@ third reaches 10.18 cm. Normal mission integration remains no-go. The
 [residual diagnosis](residual-supported-hover.md) now reconstructs all six hover
 histories and explains most of the failed peak through navigation-error forcing.
 An unfitted sampled cascade model matches the failed flight to 0.761 mm horizontal
-RMS. The next bounded task is one navigation-feedback isolation experiment;
-the diagnosis itself changes no flight behavior or acceptance outcome.
+RMS. The subsequent [navigation-feedback isolation](navigation-feedback-isolation.md)
+reduces that failed peak from 10.18 to 1.99 cm and whole-flight RMSE from 6.49
+to 3.93 cm, passing the frozen diagnostic comparison. It changes only the outer
+controller's position/velocity inputs to simultaneous truth. The ordinary
+estimated-input configuration remains unqualified. Next is one supported
+zero-velocity prior candidate, using the existing stationary support boundary
+with explicit covariance handling and no in-flight truth or zero-velocity update.
 All six nominal/wind tracking cases and all eight fault-response comparisons
 pass; the 34-flight campaign and its failed hover condition are retained.
 No hardware support procedure or general flight qualification is claimed.
@@ -158,7 +163,7 @@ has the same distinction between implementation and qualified flight behavior.
 [Controller problems and tradeoffs](controller-tradeoffs.md) explains why the
 remaining failures can coexist with correct equations and good true-state
 tracking. [Project review](project-review.md) records the current audit, and
-[the next-step plan](next-steps.md) defines the bounded navigation-feedback experiment.
+[the next-step plan](next-steps.md) defines the bounded supported-velocity prior candidate.
 Broader qualification and middleware integration remain separate deliverables.
 The updated report is pinned to its declared source; historical report revisions
 and dated records remain snapshots, not instructions to repeat old studies.

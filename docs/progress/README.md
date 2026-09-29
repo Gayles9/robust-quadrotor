@@ -37,6 +37,7 @@ results, seeds, thresholds and commit identities are preserved.
 
 - [2026-09-28: Independent supported-start validation](2026-09-28-independent-supported-start.md)
 - [2026-09-28: Residual supported-hover diagnosis](2026-09-28-residual-supported-hover.md)
+- [2026-09-28: Navigation-feedback isolation](2026-09-28-navigation-feedback-isolation.md)
 - [2026-09-28: Supported-start flight comparison](2026-09-28-supported-start-flight.md)
 - [2026-09-28: Standalone supported pre-arm component](2026-09-28-prearm-component.md)
 - [2026-09-28: Nonlinear pre-arm uncertainty](2026-09-28-prearm-nonlinear-uncertainty.md)
