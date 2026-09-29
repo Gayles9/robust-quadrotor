@@ -1,8 +1,14 @@
 # Project status
 
-Updated 2026-09-28. The implemented Python stack covers simulation, estimation,
+Updated 2026-09-29. The implemented Python stack covers simulation, estimation,
 planning and closed-loop virtual missions. The main open performance issue is
 hover and trajectory control with noisy estimated feedback.
+
+The latest [release correction](release-prediction.md) passes its bounded
+component checks and removes the analytic first-interval velocity bias in all
+17 configurations. Exact zero-velocity conditioning remains deferred: nonlinear
+rotation/noise products are missing from three singular covariance directions.
+No new scientific flights run, and the 10.18 cm hover failure remains open.
 
 ## Implemented capabilities
 
@@ -108,8 +114,9 @@ estimated-input configuration remains unqualified. The subsequent
 change: all 17 release configurations fail its necessary uncertainty screen.
 The analytic release case exposes a 1.226 cm/s deterministic velocity error,
 about 119 reported standard deviations after conditioning. No new flights run.
-Next is a release-aware first prediction interval, with independently checked
-derivatives, uncertainty and numerical-error limits before flight evaluation.
+The subsequent [release correction](release-prediction.md) removes that analytic
+bias, but leaves the exact prior deferred because its first-order covariance
+omits nonlinear uncertainty in singular directions. Joint moments are next.
 All six nominal/wind tracking cases and all eight fault-response comparisons
 pass; the 34-flight campaign and its failed hover condition are retained.
 No hardware support procedure or general flight qualification is claimed.
@@ -167,7 +174,7 @@ has the same distinction between implementation and qualified flight behavior.
 [Controller problems and tradeoffs](controller-tradeoffs.md) explains why the
 remaining failures can coexist with correct equations and good true-state
 tracking. [Project review](project-review.md) records the current audit, and
-[the next-step plan](next-steps.md) defines the bounded release-integration correction.
+[the next-step plan](next-steps.md) defines the bounded nonlinear release-uncertainty derivation.
 Broader qualification and middleware integration remain separate deliverables.
 The updated report is pinned to its declared source; historical report revisions
 and dated records remain snapshots, not instructions to repeat old studies.

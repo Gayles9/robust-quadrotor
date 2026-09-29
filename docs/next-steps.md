@@ -204,29 +204,43 @@ all outcomes. Under the predeclared stopping rule, zero scientific flights run
 and all 25 conditional regression flights are skipped. The investigation succeeds
 and rejects this combination of prior and release map.
 
-## Next bounded task: release-aware first prediction interval
+## Completed: release-aware first prediction component
 
-1. Audit this closeout and freeze one causal boundary rule, its uncertainty
-   contract and acceptance. Preserve the genuinely stationary support and the
-   fresh supported sample; do not assume stationarity after release.
-2. Derive a one-sided first-interval prediction from the first post-release IMU
-   measurement, with the existing gyro endpoints and full sample-noise memory.
-   The left supported force cannot represent an open free-flight interval. Do
-   not invent a second simultaneous sample or read simulated true velocity/force.
-3. Check the exact ballistic limit, smooth-force consistency and bounded numerical
-   error at the chosen time step. Derive the complete discrete Jacobians and covariance;
-   verify them independently, including singular initial velocity uncertainty,
-   fresh-noise ownership and any changed cross terms. Reject overconfidence rather
-   than tune Q/R or add a covariance floor. Keep later prediction intervals intact.
-4. Implement only the derived experiment boundary after those checks. Freeze a
-   comparison that isolates the boundary change before combining it with velocity
-   conditioning. Preserve all known hover seeds, clean/fault conditions, full
-   startup and original thresholds; require fresh validation before integration.
-   Stop at the frozen decision and publish it, including an unsuccessful result.
+The [one-sided boundary](release-prediction.md) uses the first post-release force,
+existing gyro endpoints and full sample-noise memory. All 17 ballistic checks
+now pass with zero deterministic position/velocity error. Independent derivatives,
+batch conditioning and online/replay agreement pass. This closes the bounded
+component step, not the flight-performance gate.
 
-Correcting this small interval is a numerical/uncertainty prerequisite. It does
-not guarantee recovery of the oracle's whole-flight improvement or establish that
-velocity alone explains its combined position/velocity-feedback effect.
+The [verification record](progress/2026-09-29-release-aware-prediction.md) preserves
+85,000 paired Gaussian draws. Exact zero-velocity initialization gives a rank-18
+first-order covariance, but nonlinear rotation/noise products produce nonzero
+uncertainty in three supposedly exact relations. An analytic counterexample
+and independent quadrature confirm the omission. The prior remains deferred;
+zero new scientific flights run and ordinary hover remains at 10.18 cm.
+
+## Next bounded task: nonlinear joint release uncertainty
+
+1. Audit ADR 0035 and freeze one nonlinear moment model for the corrected first
+   interval. Preserve genuinely supported acquisition and the existing IMU;
+   no in-flight stationarity, new sensor or truth-fed estimator is allowed.
+2. Derive the mean and full joint covariance, including rotation/bias/sample-noise
+   products, bias increments, and the new sample's correlations with navigation.
+   Resolve the demonstrated tangent-normal uncertainty without empirical floors,
+   Q/R tuning, deleting null directions or discarding sample memory.
+3. Check analytic limiting cases, positive covariance construction, independent
+   integration accuracy and fixed fresh nonlinear populations. Report numerical
+   rank and calibration rather than presuming that adding variance is correct.
+   Keep all later ordinary intervals unchanged and stop if uncertainty fails.
+4. Reconsider exact velocity conditioning only after this prerequisite. The
+   ADR 0035 boundary-only regression remains frozen: 25 candidate flights against
+   saved baselines, all three known hover seeds, clean/fault conditions, full
+   startup and original thresholds. Isolate the boundary change before any
+   separately frozen combined-prior comparison; require fresh validation before
+   integration. Publish the actual decision even if unsuccessful.
+
+Correcting the first interval does not establish whole-flight improvement or
+recover the oracle's combined position/velocity-feedback benefit by itself.
 
 The mass-induced offset remains a separate open requirement. Do not silently
 combine the rejected integral candidate, reopen geometric tuning, claim hardware

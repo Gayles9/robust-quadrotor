@@ -73,6 +73,7 @@ seed sets are reproduction cases, not fresh validation.
 - [Residual supported-hover diagnosis](residual-supported-hover.md): navigation-error forcing, exact response accounting and the next isolation test.
 - [Navigation-feedback isolation](navigation-feedback-isolation.md): demonstrated channel headroom with diagnostic truth feedback.
 - [Supported velocity prior](supported-velocity-prior.md): exact conditioning, its failed release uncertainty screen and the next boundary correction.
+- [Release-aware prediction](release-prediction.md): corrected first interval, verified derivatives and the nonlinear covariance limitation.
 - [Standalone pre-arm component](prearm-component.md): support evidence, acquisition, rejection and one-time estimator handoff.
 - [Nonlinear pre-arm uncertainty](prearm-nonlinear-uncertainty.md): rotation/bias coupling, positive quadrature and passing independent calibration.
 - [Next-step plan](next-steps.md): the current bounded task and stopping rules.

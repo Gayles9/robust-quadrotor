@@ -78,5 +78,8 @@ an unfitted model to 0.761 mm horizontal RMS. The subsequent
 only to the outer controller; this is headroom, not qualification. The
 [supported velocity prior screen](supported-velocity-prior.md) subsequently rejects
 the prior-only change because the first release interval has unrepresented
-integration error. The [next step](next-steps.md) addresses that boundary map.
+integration error. The subsequent [release correction](release-prediction.md)
+removes that analytic error and passes component checks, but identifies missing
+nonlinear uncertainty under exact velocity conditioning. The [next step](next-steps.md)
+derives those joint moments; no new flight improvement is claimed.
 These later diagnostic results are not part of report revision 2.0.
