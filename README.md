@@ -58,8 +58,11 @@ with alignment under the same modeled support conditions, passing the 8 cm
 limit. Nominal and wind tracking also pass; mass mismatch still fails. The
 [independent validation](docs/independent-supported-start.md) finds that alignment
 improves all three fresh hover peaks, but one still reaches 10.18 cm. Normal
-mission integration remains blocked. The [next step](docs/next-steps.md) is a
-bounded diagnosis of that remaining hover error using the saved histories.
+mission integration remains blocked. The [residual diagnosis](docs/residual-supported-hover.md)
+now explains the failed trajectory mainly through navigation-error feedback;
+an unfitted local model matches it to 0.76 mm horizontal RMS. The
+[next step](docs/next-steps.md) is one bounded navigation-feedback isolation
+experiment before proposing an implementable change.
 
 ## Run it
 
