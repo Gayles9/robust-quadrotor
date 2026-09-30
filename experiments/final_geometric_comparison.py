@@ -45,6 +45,11 @@ from quadrotor_math.run_manifest import capture_software_provenance
 ROOT = Path(__file__).resolve().parents[1]
 ADR = ROOT / "docs/decisions/0042-final-geometric-comparison.md"
 ADR_SHA = "df78a8e97b863bf956bb42b3a50bf45f0dcb9e4e607790c49fcaa254e0cf9189"
+CORRECTION = ROOT / "docs/decisions/0043-geometric-regression-adapter.md"
+CORRECTION_SHA = "7031505e65738c826a5082c50d670e893ae903de63f2a84b3a2f17f0e73f1440"
+LEGACY_REPORT_SHA = "b2dc09a00206fbc1f6092c78ed6504a15879a17e8c4546fa1b5504371c0ed86a"
+LEGACY_SOURCE_SHA = "18af27137bd56d4328bf3227d901d84d119e77e341b72f3951d5a0352ce8fbe2"
+ALGORITHM_SHA = "77a2c1b140111142412e316b74cd3b1a508ce375e04d9ec1d9226f35be28b75d"
 STAGES = ("development", "regression", "validation")
 BASE_CASCADE = "cascade-f1"
 Job = previous.Job
@@ -105,7 +110,8 @@ def configure(args: dict[str, Any], profile: Profile) -> dict[str, Any]:
     )
     if profile.controller == "cascade":
         result.pop("geometric_controller", None)
-        result["allow_minimum_snap"] = True
+        if "estimator_configuration" in result:
+            result["allow_minimum_snap"] = True
     else:
         result["geometric_controller"] = replace(
             result["geometric_controller"], filter_pole_rad_s=profile.horizontal_pole
@@ -511,6 +517,7 @@ def definition(
 ) -> dict[str, Any]:
     ensure(stage in STAGES, "declared study stage")
     authenticated(ADR, ADR_SHA)
+    authenticated(CORRECTION, CORRECTION_SHA)
     local: dict[str, Any] = dict(
         horizontal={
             p.name: [
@@ -538,6 +545,7 @@ def definition(
     return dict(
         decision="ADR0042 final bounded geometric comparison",
         decision_sha256=ADR_SHA,
+        adapter_correction_sha256=CORRECTION_SHA,
         audited_commit="5eb932766db6fc3ef5f465bf551e390633561d43",
         source_sha256=source_sha256(ROOT),
         stage=stage,
@@ -558,11 +566,44 @@ def definition(
     )
 
 
+def algorithm_sha256() -> str:
+    """Bind all execution algorithms/dependencies except this corrected driver."""
+    paths = sorted(
+        [
+            *ROOT.glob("src/**/*.py"),
+            *ROOT.glob("experiments/**/*.py"),
+            ROOT / "pyproject.toml",
+            ROOT / "uv.lock",
+        ]
+    )
+    manifest = [
+        (p.relative_to(ROOT).as_posix(), hashlib.sha256(p.read_bytes()).hexdigest())
+        for p in paths
+        if p != Path(__file__).resolve()
+    ]
+    return hashlib.sha256(json.dumps(manifest, separators=(",", ":")).encode()).hexdigest()
+
+
+def parent_protocol(
+    raw: bytes, stage: str, selection: dict[str, Any] | None, parents: dict[str, str]
+) -> tuple[dict[str, Any], bool]:
+    """ADR 0043 admits one exact unaffected historical report, never arbitrary data."""
+    expected = definition(stage, selection, parents)
+    legacy = stage == "development" and hashlib.sha256(raw).hexdigest() == LEGACY_REPORT_SHA
+    if legacy:
+        ensure(algorithm_sha256() == ALGORITHM_SHA, "historical execution algorithms changed")
+        expected["source_sha256"] = LEGACY_SOURCE_SHA
+        del expected["adapter_correction_sha256"]
+    return expected, legacy
+
+
 def authenticate_report(
     output: Path, stage: str, selection: dict[str, Any] | None, parents: dict[str, str]
 ) -> dict[str, Any]:
-    report: dict[str, Any] = json.loads((output / "report.json").read_bytes())
-    equal_json(report["protocol"], definition(stage, selection, parents), "parent source/protocol")
+    raw = (output / "report.json").read_bytes()
+    report: dict[str, Any] = json.loads(raw)
+    expected, legacy = parent_protocol(raw, stage, selection, parents)
+    equal_json(report["protocol"], expected, "parent source/protocol")
     equal_json(
         json.loads((output / "protocol.json").read_bytes()), report["protocol"], "parent checkpoint"
     )
@@ -591,6 +632,19 @@ def authenticate_report(
         directory = output / name
         equal_json(json.loads((directory / "case.json").read_bytes()), row, "parent case")
         payloads(row, directory)
+        if legacy:
+            base = previous.prepare(Job(**row["job"]))
+            for arm, item in row["arms"].items():
+                _, selected = start(base, BY_NAME[arm])
+                configuration = {
+                    k: plain_configuration(v)
+                    for k, v in configuration_for(selected, "aligned").items()
+                }
+                equal_json(
+                    load_json(directory, f"configuration-{arm}.json", item["configuration"]),
+                    configuration,
+                    "historical estimated configuration under corrected adapter",
+                )
     return report
 
 

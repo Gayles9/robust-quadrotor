@@ -1,6 +1,7 @@
 """Fixed search, independent comparator selection, complete replay and held-out gates."""
 
 import copy
+import hashlib
 import json
 from dataclasses import asdict
 from unittest.mock import patch
@@ -167,3 +168,32 @@ def test_profile_changes_only_declared_controller_parameters_and_context_restore
             assert previous.shaped_reference is not original
             raise RuntimeError("injected")
     assert previous.shaped_reference is original
+
+
+def test_short_true_state_pipeline_accepts_both_controller_families(tmp_path):
+    short = previous.configuration(study.Job("hover", 40), "smoke")
+    del short["sensors"], short["estimator_configuration"]
+    names = ("axis-h10-f1.25", "cascade-f1.25")
+    for name in names:
+        assert "allow_minimum_snap" not in study.configure(short, study.BY_NAME[name])
+    with patch.object(study, "true_configuration", return_value=short):
+        row = study.execute_true("nominal", output=tmp_path, names=names)
+        assert all("metrics" in item and "error" not in item for item in row["arms"].values()), row
+        assert study.execute_true("nominal", output=tmp_path, names=names, verify=True) == row
+
+
+def test_historical_compatibility_requires_exact_report_and_unchanged_algorithms():
+    raw = b"synthetic exact historical report"
+    digest = hashlib.sha256(raw).hexdigest()
+    assert study.algorithm_sha256() == study.ALGORITHM_SHA
+    with patch.object(study, "LEGACY_REPORT_SHA", digest):
+        expected, legacy = study.parent_protocol(raw, "development", None, {})
+        assert legacy
+        assert expected["source_sha256"] == study.LEGACY_SOURCE_SHA
+        assert "adapter_correction_sha256" not in expected
+        changed, legacy = study.parent_protocol(raw + b" ", "development", None, {})
+        assert not legacy
+        assert changed["adapter_correction_sha256"] == study.CORRECTION_SHA
+        with patch.object(study, "algorithm_sha256", return_value="changed"):
+            with pytest.raises(ValueError, match="historical execution algorithms changed"):
+                study.parent_protocol(raw, "development", None, {})
