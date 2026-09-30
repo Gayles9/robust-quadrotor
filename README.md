@@ -17,27 +17,31 @@ mission runner connects these pieces for virtual takeoff, tracking and landing.
 Saved measurements can be replayed to check the estimator independently.
 
 The current limitation is control using noisy state estimates. The geometric
-controller tracks well when supplied with the simulated true state, but it does
-not yet meet the combined hover and control-effort requirements with estimated
-feedback. The cascade remains the default. The
+controller tracks well when supplied with the simulated true state. With estimated
+feedback, the latest supported-start option passes both full hovers and improves
+nominal spline RMSE, but misses the matched wind-tracking comparison. The cascade
+remains the default. The
 [controller discussion](docs/controller-tradeoffs.md) explains the observed
 problems, tested alternatives, and why an improvement in one metric can make
 another worse. [Project status](docs/status.md) lists the evidence and remaining
 work.
 
-The supported-start research now brings all three tested hover peaks below the
-8 cm limit, but the combined candidate fails five of nine strict no-regression
-comparisons. It remains experimental. The original mass-mismatch failure and
-geometric qualification are also unresolved; correct software is not the same
-as a qualified flight controller.
+The earlier supported-cascade research brings all three short-hold hover peaks
+below 8 cm, but fails five of nine strict no-regression comparisons. The new
+supported-geometric full-hold peaks are 5.21 and 4.62 cm, versus 8.73 and 18.10 cm
+with matched unaligned starts. Its wind RMSE is 3.73% worse than matched cascade,
+so its frozen comparison also fails. Both options remain experimental. The
+original mass-mismatch failure and fresh qualification are unresolved.
 
 The [operating envelope](docs/operating-envelope.md) is the source-indexed guide
 to what is implemented, what passes, and what remains conditional or failed.
 [Report revision 3.0](docs/technical-report.md) develops the mathematics, including
 supported alignment, nonlinear release uncertainty and the whole-flight error
-budget. Startup tuning and the independent-inclination sensor extension are
-closed under current assumptions. The [next task](docs/next-steps.md) is a
-simulation-only ROS 2/PX4 interface and acceptance design.
+budget. The [bounded supported geometric comparison](docs/supported-geometric.md)
+combines the existing startup fixes with one fixed geometric profile. The
+[next-step plan](docs/next-steps.md) pauses controller improvement after that
+experiment, with professor-facing report preparation reserved for a later task.
+Report revision 3.0 predates this final comparison.
 
 ## Run it
 

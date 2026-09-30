@@ -59,6 +59,7 @@ the [next-step plan](../next-steps.md) for the present scope.
 - [0018: Geometric estimator-correction study](0018-geometric-estimator-corrections.md)
 - [0019: Measured physical derivatives and development rejection](0019-measured-geometric-derivatives.md)
 - [0020: One coherent feedback-force shaping experiment](0020-coherent-geometric-force.md)
+- [0041: One supported-start geometric comparison, then pause](0041-supported-geometric-comparison.md)
 
 ## Writing a new decision
 

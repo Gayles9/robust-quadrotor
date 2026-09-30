@@ -4,7 +4,18 @@ Updated 2026-09-29. The implemented Python stack covers simulation, estimation,
 planning and closed-loop virtual missions. The main open performance issue is
 hover and trajectory control with noisy estimated feedback.
 
-The latest [saved-history diagnosis](combined-prior-diagnosis.md) authenticates
+The latest [supported geometric comparison](supported-geometric.md) combines
+the existing coherent-force controller with supported alignment, the exact
+initial velocity prior and nonlinear release. Full 60-second hover peaks improve
+from 8.73/18.10 cm to 5.21/4.62 cm. Nominal spline RMSE beats matched combined
+cascade by 19.03%; wind RMSE is 3.73% worse, failing the frozen comparison despite
+passing every candidate clean absolute limit. Fresh validation stays unopened.
+This is an implemented experimental improvement with a retained tradeoff, not
+default promotion or a proof that further improvement is impossible. Controller
+work pauses here; professor-facing report preparation is the next requested task
+for a later session. Report revision 3.0 predates this new study.
+
+The preceding [saved-history diagnosis](combined-prior-diagnosis.md) authenticates
 84 existing outcomes and reconstructs all 27 clean histories across the original,
 boundary-only and combined supported-prior versions. Independent update and
 physical-response checks pass; an unfitted hover model agrees within
@@ -33,7 +44,7 @@ measurement biases, the local absolute tilt ambiguity returns. The sensor
 extension is closed under current assumptions, with no new scientific flights
 or production changes. The [operating envelope](operating-envelope.md) and [report revision 3.0](technical-report.md)
 now consolidate these results; fresh nonlinear flight qualification remains open. The
-latest full warning-strict software suite passes 3,949 tests.
+latest full warning-strict software suite passes 3,965 tests.
 
 ## Implemented capabilities
 
@@ -45,7 +56,7 @@ latest full warning-strict software suite passes 3,949 tests.
 | Baseline control | Cascaded position/velocity and attitude/rate feedback; supervised takeoff, tracking, landing and abort | True-state cases pass; original estimated-hover qualifications retain failures |
 | Vertical compensation | Explicit bounded integral, health-gated learning, reset, conditional anti-windup and authenticated state reconstruction | One frozen research candidate; no default change or whole-flight qualification |
 | Planning | Fixed-duration minimum-snap splines, derivatives through snap, nominal reference bounds, bounded uniform retiming | No obstacle planning, time optimization or complete actuator-feasibility proof |
-| Geometric control | Rotation-based moment law, analytic force-to-attitude derivatives, causal filter, true/estimated missions and two optional derivative strategies | Six earlier profiles and one subsequent coherent-force candidate fail the joint requirements; the bounded study is closed |
+| Geometric control | Rotation-based moment law, analytic force-to-attitude derivatives, causal filter, true/estimated missions and two optional derivative strategies; a supported-start composition now improves full hover and nominal tracking | Older derivative profiles fail their joint requirements; the new startup composition misses wind RMSE versus matched cascade and fresh qualification stays open |
 | Integration | Earlier ROS 2/PX4/Gazebo compatibility checks and an x500 takeoff/hover/landing spike | The custom Python stack is not integrated into PX4 or validated on hardware |
 | Fault handling | Innovation rejection, per-stream health, opt-in timed abort and causal live faults with a frozen paired maneuver campaign | Declared campaign failures, broader fault diagnosis and physical fallback flight remain |
 

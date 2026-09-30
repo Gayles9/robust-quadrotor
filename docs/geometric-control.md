@@ -14,6 +14,11 @@ The [current implementation record](progress/2026-09-26-geometric-reimplementati
 and [tuning audit](progress/2026-09-26-geometric-project-audit.md) document its
 fresh verification under [ADR 0017](decisions/0017-geometric-reimplementation.md).
 
+The later [supported-start comparison](supported-geometric.md) combines the
+existing coherent-force profile with supported alignment, exact initial velocity
+and nonlinear release prediction. It has its own prospective gate and does not
+change the recorded decisions for the earlier geometric studies.
+
 | Responsibility | Source |
 | --- | --- |
 | Rotation derivatives and moment law | [geometric_control.py](../src/quadrotor_math/geometric_control.py) |

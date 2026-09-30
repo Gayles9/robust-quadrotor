@@ -25,6 +25,13 @@ from quadrotor_math.eskf_replay import (
 )
 from quadrotor_math.eskf_run_replay import _first_delivery_index
 from quadrotor_math.estimated_mission import EstimatedMissionResult
+from quadrotor_math.geometric_control import GeometricDomainError, compute_geometric_control
+from quadrotor_math.geometric_filter import FeedbackDerivativeFilter
+from quadrotor_math.geometric_reference import (
+    build_geometric_reference,
+    projected_collective_thrust,
+    reference_jerk_snap,
+)
 from quadrotor_math.missions import (
     MissionPhase,
     MissionState,
@@ -94,6 +101,25 @@ def audit_result(
         "diagnostic schema mismatch",
     )
     args = configuration(case, partition)
+    geometric = args.get("geometric_controller")
+    ensure(
+        geometric is None
+        or (
+            compensation_policy is None
+            and not geometric.rebase_estimator_corrections
+            and not geometric.use_measured_acceleration
+        ),
+        "geometric replay supports the correction-force channel only",
+    )
+    memory = (
+        None
+        if geometric is None
+        else FeedbackDerivativeFilter(
+            args["numerics"].time_step_s * args["numerics"].position_stride,
+            geometric.filter_pole_rad_s,
+        )
+    )
+    geometric_reference = None
     mission, estimates = result.mission, result.estimates
     times, dt = mission.time_s, args["numerics"].time_step_s
     ensure(np.array_equal(times, np.arange(len(times)) * dt), "noncanonical mission clock")
@@ -241,30 +267,61 @@ def audit_result(
             state, args["plan"], float(time), estimate.position_W, estimate.velocity_W, reason
         )
         if state.phase not in (MissionPhase.COMPLETE, MissionPhase.ABORT):
-            if k % args["numerics"].position_stride == 0:
-                if compensation is None:
-                    held = compute_position_control(
-                        estimate.position_W,
-                        estimate.velocity_W,
-                        reference,
-                        args["position_controller"],
+            try:
+                if k % args["numerics"].position_stride == 0:
+                    if geometric is not None:
+                        assert memory is not None
+                        jerk, snap = reference_jerk_snap(args["plan"], float(time))
+                        geometric_reference, memory = build_geometric_reference(
+                            estimate.position_W,
+                            estimate.velocity_W,
+                            reference,
+                            jerk,
+                            snap,
+                            args["position_controller"],
+                            memory,
+                            k // args["numerics"].position_stride,
+                        )
+                        held = geometric_reference.position_command
+                    elif compensation is None:
+                        held = compute_position_control(
+                            estimate.position_W,
+                            estimate.velocity_W,
+                            reference,
+                            args["position_controller"],
+                        )
+                    else:
+                        assert health.latest is not None
+                        held = compensation.step(
+                            float(time),
+                            estimate.position_W,
+                            estimate.velocity_W,
+                            reference,
+                            observations_healthy=(
+                                health.latest.local_position.state is ObservationHealthState.HEALTHY
+                                and health.latest.barometric_altitude.state
+                                is ObservationHealthState.HEALTHY
+                            ),
+                            previous_inner_limited=previous_inner_limited,
+                        )
+                if geometric is not None and k % args["numerics"].attitude_stride == 0:
+                    assert geometric_reference is not None
+                    projected = projected_collective_thrust(
+                        geometric_reference, estimate.q_WB, args["position_controller"]
                     )
-                else:
-                    assert health.latest is not None
-                    held = compensation.step(
-                        float(time),
-                        estimate.position_W,
-                        estimate.velocity_W,
-                        reference,
-                        observations_healthy=(
-                            health.latest.local_position.state is ObservationHealthState.HEALTHY
-                            and health.latest.barometric_altitude.state
-                            is ObservationHealthState.HEALTHY
-                        ),
-                        previous_inner_limited=previous_inner_limited,
+                    control = compute_geometric_control(
+                        estimate.q_WB,
+                        result.angular_velocity_estimate_B[k],
+                        geometric_reference.rotation,
+                        projected,
+                        args["attitude_controller"],
+                        geometric,
                     )
+            except GeometricDomainError as error:
+                state = MissionState(MissionPhase.ABORT, float(time), reason=str(error))
             if (
-                np.linalg.norm(attitude_error_body(estimate.q_WB, held.q_reference_WB))
+                state.phase is not MissionPhase.ABORT
+                and np.linalg.norm(attitude_error_body(estimate.q_WB, held.q_reference_WB))
                 > args["attitude_controller"].maximum_attitude_error_rad
             ):
                 state = MissionState(MissionPhase.ABORT, float(time), reason="attitude_domain")
@@ -292,13 +349,14 @@ def audit_result(
                 )
             outer_row += 1
         if k % args["numerics"].attitude_stride == 0:
-            control = compute_attitude_control(
-                estimate.q_WB,
-                result.angular_velocity_estimate_B[k],
-                held.q_reference_WB,
-                held.collective_thrust,
-                args["attitude_controller"],
-            )
+            if geometric is None:
+                control = compute_attitude_control(
+                    estimate.q_WB,
+                    result.angular_velocity_estimate_B[k],
+                    held.q_reference_WB,
+                    held.collective_thrust,
+                    args["attitude_controller"],
+                )
             previous_inner_limited = bool(
                 control.rate_limited
                 or control.moment_limited
@@ -306,7 +364,7 @@ def audit_result(
             )
             values: dict[str, Any] = {
                 "q_reference_WB": held.q_reference_WB,
-                "collective_thrust": held.collective_thrust,
+                "collective_thrust": held.collective_thrust if geometric is None else projected,
                 "commanded_rotor_omega": control.allocation.commanded_rotor_omega,
                 "moment_requested_B": control.moment_requested_B,
                 "moment_limited_B": control.moment_limited_B,
