@@ -60,6 +60,8 @@ the [next-step plan](../next-steps.md) for the present scope.
 - [0019: Measured physical derivatives and development rejection](0019-measured-geometric-derivatives.md)
 - [0020: One coherent feedback-force shaping experiment](0020-coherent-geometric-force.md)
 - [0041: One supported-start geometric comparison, then pause](0041-supported-geometric-comparison.md)
+- [0042: Final bounded geometric improvement and fresh comparison](0042-final-geometric-comparison.md)
+- [0043: Correct the true-state geometric regression adapter](0043-geometric-regression-adapter.md)
 
 ## Writing a new decision
 

@@ -13,6 +13,7 @@ results, seeds, thresholds and commit identities are preserved.
 ## Report and operating boundary
 
 - [2026-09-29: Original-sensor operating envelope and report revision 3.0](2026-09-29-operating-envelope-report.md)
+- [2026-09-30: Final geometric improvement and comparison](2026-09-30-final-geometric-comparison.md)
 - [2026-09-29: Supported-start geometric comparison](2026-09-29-supported-geometric-comparison.md)
 
 ## Controller and planning studies

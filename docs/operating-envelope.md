@@ -3,7 +3,8 @@
 The original E01–E13 source-indexed ledger was consolidated at software baseline
 `67499e9eb2c9a0acd72eb45d7be690f1bb2e3a2b` (merged PR #39) on 2026-09-29.
 E14 adds the supported geometric follow-up frozen against merged PR #40 and
-completed on 2026-09-30 UTC. This describes the finite scenarios actually checked;
+completed on 2026-09-30 UTC. E15 adds the final axis-dependent study frozen against
+merged PR #41. This describes the finite scenarios actually checked;
 it is not a continuous safe operating region or a hardware qualification.
 The original sensors remain IMU, local position and barometric altitude.
 
@@ -11,7 +12,7 @@ The original sensors remain IMU, local position and barometric altitude.
 
 Passing component checks, passing an absolute flight limit and passing a paired
 candidate comparison are separate claims. No row below promotes a rejected
-research option. E01–E13 also appear in report revision 3.0; E14 is newer evidence.
+research option. E01–E13 also appear in report revision 3.0; E14–E15 are newer evidence.
 
 | ID / capability | Current status and passing evidence | Failed or conditional requirement | Source |
 | --- | --- | --- | --- |
@@ -19,7 +20,7 @@ research option. E01–E13 also appear in report revision 3.0; E14 is newer evid
 | E02 State estimation | **Core component; G3 conditional.** 15-state ESKF with correction/reset, gates, causal replay and 21-coordinate endpoint noise memory; the declared standalone study reports 95.29% NEES coverage over 380 replays. | Explicit priors and local noise/motion assumptions; no delayed-state rewind or general closed-loop qualification. | [Record/guide](progress/2026-09-23-eskf-endpoint-calibration.md); [implementation](../src/quadrotor_math/eskf_endpoint.py) |
 | E03 Trajectory planning | **Implemented reference generator.** Degree-seven minimum-snap, continuous reference bounds and bounded uniform retiming pass their declared checks. | No obstacle planning, time optimization or complete actuator-feasibility proof. | [Record/guide](trajectories.md); [implementation](../src/quadrotor_math/minimum_snap.py) |
 | E04 Cascade missions | **Original default; G2 open.** True-state cases pass. Original integrated campaign passes 12 response cases and 3 of 5 required flight cases. | Estimated hover reaches 10.7563 cm versus 8 cm; heavier mass reaches 42.3933 cm RMSE versus 15 cm. | [Record/guide](progress/2026-09-28-integrated-robustness.md); [implementation](../src/quadrotor_math/estimated_mission.py) |
-| E05 Geometric control | **Explicit research option.** Fifteen original true-state regression executions pass their comparisons; rotation-based control and derivative strategies are implemented. See E14 for the later startup combination. | Six earlier profiles and the original coherent-force candidate fail their joint noisy-hover/tracking/effort acceptance. | [Record/guide](progress/2026-09-26-geometric-transient-closeout.md); [implementation](../src/quadrotor_math/geometric_control.py) |
+| E05 Geometric control | **Explicit research option.** Fifteen original true-state regression executions pass their comparisons; rotation-based control and derivative strategies are implemented. See E14–E15 for the later startup and filtering improvements. | Six earlier profiles and the original coherent-force candidate fail their joint noisy-hover/tracking/effort acceptance. | [Record/guide](progress/2026-09-26-geometric-transient-closeout.md); [implementation](../src/quadrotor_math/geometric_control.py) |
 | E06 Observation response | **Passive monitor and opt-in supervisor.** Availability, recovery and latched timeout decisions pass the declared fault comparisons, with complete recorded response timing. | Availability is not accuracy. Numerical abort stops simulated commands; physical fallback is unimplemented. | [Record/guide](progress/2026-09-28-observation-loss-supervision.md); [implementation](../src/quadrotor_math/observation_supervision.py) |
 | E07 Mass compensation | **Rejected promotion; explicit research option.** Bounded vertical integral removes the tested timeout and reduces final error to 6.02 cm. | 17.57 cm whole-flight RMSE exceeds 15 cm; hover comparison regresses. Not combined with later startup candidates. | [Record/guide](progress/2026-09-28-vertical-compensation.md); [implementation](../src/quadrotor_math/vertical_compensation.py) |
 | E08 Supported alignment | **Standalone component; experimental flights.** Nonlinear joint alignment covariance passes its fixed calibration; 200 acquisition/release sessions pass. Known-seed hover improves to 2.506 cm. | External support and fresh sample ownership are mandatory. One independent-seed aligned hover still reaches 10.1808 cm. No hardware support claim or normal integration. | [Record/guide](progress/2026-09-28-independent-supported-start.md); [implementation](../src/quadrotor_math/prearm_alignment.py) |
@@ -29,6 +30,7 @@ research option. E01–E13 also appear in report revision 3.0; E14 is newer evid
 | E12 Independent inclination | **Conditional contract only; extension closed.** Direction Jacobian, correlated conditioning and local information ranks are verified. Calibrated direction gives rank 13 of 15. | Unknown inclination bias gives rank 13 of 17. Source/model, calibration, timing and joint allocation remain unsupported; component no-go. | [Record/guide](progress/2026-09-29-independent-inclination-feasibility.md); [implementation](../experiments/inclination_feasibility.py) |
 | E13 ROS 2/PX4 and hardware | **Custom integration unimplemented.** Historical environment compatibility and x500 takeoff/hover/landing spike only. | No custom adapter, command authority, real-time guarantee, contact model or hardware qualification. Interface design is deferred under the latest request. | [Record/guide](progress/2026-08-16-week-02-compatibility-spike.md) |
 | E14 Supported geometric combination | **Implemented experimental improvement; then pause.** Full-hold peaks fall from 8.73/18.10 cm to 5.21/4.62 cm. All four candidate clean flights meet absolute limits and effort comparisons; nominal spline RMSE is 19.03% below matched combined cascade. | Wind RMSE is 3.73% above cascade (6.87 versus 6.63 cm), failing the frozen comparison. Geometric hover RMSE and spline peaks also exceed cascade's. Fresh validation stays unopened; no default promotion. | [Record/guide](progress/2026-09-29-supported-geometric-comparison.md); [implementation](../experiments/supported_geometric_comparison.py) |
+| E15 Axis-dependent geometric control | **Implemented and evaluated on reserved cases.** Fourteen corrected true-state checks and all twenty-four selected-controller clean flights pass absolute conditions. Fresh geometric hold peaks are 4.8540..5.7295 cm; balanced RMSE is 4.7717% below selected cascade and 20.2899% below original cascade. | The 10% balanced improvement target is missed. Against selected cascade, hover RMSE is 1.6100% higher, balanced whole-flight peaks 15.2880% higher and moment effort 1.6736% higher. This is a bounded accuracy tradeoff, with no default promotion or general superiority theorem. | [Record/guide](progress/2026-09-30-final-geometric-comparison.md); [implementation](../experiments/axis_shaped_geometric.py) |
 
 ## Conditions on the measured flight results
 
@@ -73,8 +75,8 @@ authenticates 436 saved payload references, independently rescores 84 existing
 executions and checks 144 Gram windows, with no new scientific flights.
 These counts measure audit coverage, not independent trials or project completion.
 
-The latest request supersedes interface design with one
-[supported geometric comparison](supported-geometric.md), then a pause in
+The latest request supersedes interface design with the
+[final axis-dependent geometric comparison](final-geometric.md), then a pause in
 controller improvement. The [next-step plan](next-steps.md) reserves
 professor-facing report preparation for a later task. Report revision 3.0
 retains its stated earlier baseline and does not yet include this new study.

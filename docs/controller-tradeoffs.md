@@ -1,4 +1,4 @@
-# Controller problems and tradeoffs
+# Controller performance and tradeoffs
 
 The main unresolved problem is keeping the vehicle sufficiently close to its
 reference when control uses noisy state estimates. The geometric controller
@@ -19,15 +19,33 @@ combined cascade, with less moment effort. Wind RMSE is 3.73% higher, and
 geometric average hover error and spline peak errors are also higher than
 cascade's. All absolute candidate limits and eight fault comparisons pass;
 the frozen joint gate still fails on wind, so fresh validation remains unopened.
-The implementation is retained as an experimental option and this work pauses.
+The implementation is retained as an experimental option. The later
+[final axis-dependent study](final-geometric.md) addresses its vertical release
+delay, gives both controller families the same outer-gain choices and locks the
+selected profiles for fresh comparisons. That study has its own prospective
+accuracy and effort tradeoffs; it does not rewrite the earlier failed gate.
+
+On twelve reserved cases, that final profile lowers balanced RMSE by 4.7717%
+against the independently selected cascade. Nominal tracking improves 13.7942%
+and wind tracking 1.4117%; hover RMSE is 1.6100% higher. All four hold peaks
+are slightly lower, but balanced whole-flight peaks are 15.2880% higher and
+moment effort 1.6736% higher. The 10% balanced improvement target is missed.
+This supports an average tracking advantage under the tested assumptions while
+retaining peak-error and effort tradeoffs. The improvement remains useful
+evidence even though the stronger acceptance claim is not met.
 
 ## What the requirements measure
 
 The hover test checks the largest position error at every saved sample from
 5 to 65 seconds. A brief excursion can fail it even if the rest of the hold is
 accurate. Spline tracking uses root-mean-square error (RMSE), which summarizes
-error over the complete flight. The geometric controller must not regress
-against its paired cascade, and its effort must stay within twice the cascade's.
+error over the complete flight. The earlier studies require no RMSE regression
+against the paired cascade and effort within twice the cascade's. The final
+study separately declares a 10% balanced RMSE improvement target, with at most
+5% category regression, 10% individual regression, 25% balanced effort increase
+and twice the effort on any individual case. Absolute limits remain mandatory.
+Those frozen engineering criteria are separate from describing the size of an
+observed improvement; a smaller gain still belongs in the reported results.
 
 Effort here means the time integral of squared actual body moment, in N² m² s.
 It is a useful comparison of torque demand, not a measurement of battery energy

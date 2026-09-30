@@ -7,9 +7,11 @@ tested true-state flights, but requires reliable derivatives of the desired
 force. With noisy estimated feedback, that derivative calculation is the main
 design difficulty.
 
-I keep this controller opt-in because it still fails the combined noisy hover,
-tracking and effort requirements. Read [controller problems and tradeoffs](controller-tradeoffs.md)
-for the explanation and measured comparison before the equations below.
+I keep this controller opt-in while its measured benefits, remaining tradeoffs
+and integration requirements are assessed. Read
+[controller problems and tradeoffs](controller-tradeoffs.md) and the
+[final bounded comparison](final-geometric.md) for the current evidence before
+the equations below.
 The [current implementation record](progress/2026-09-26-geometric-reimplementation.md)
 and [tuning audit](progress/2026-09-26-geometric-project-audit.md) document its
 fresh verification under [ADR 0017](decisions/0017-geometric-reimplementation.md).
@@ -19,6 +21,12 @@ existing coherent-force profile with supported alignment, exact initial velocity
 and nonlinear release prediction. It has its own prospective gate and does not
 change the recorded decisions for the earlier geometric studies.
 
+The [final axis-dependent shaping study](final-geometric.md) implements separate
+horizontal and vertical force-filter poles with coherent derivative jets. It
+compares independently selected geometric and cascade gains, then locks both
+profiles for regression and reserved validation. The experiment remains outside
+the default mission path and preserves the original rotation-based moment law.
+
 | Responsibility | Source |
 | --- | --- |
 | Rotation derivatives and moment law | [geometric_control.py](../src/quadrotor_math/geometric_control.py) |
@@ -26,6 +34,8 @@ change the recorded decisions for the earlier geometric studies.
 | Causal derivative-filter memory | [geometric_filter.py](../src/quadrotor_math/geometric_filter.py) |
 | Measurements and accepted-correction inputs | [estimated_mission.py](../src/quadrotor_math/estimated_mission.py) |
 | Declared comparison profiles and evidence gate | [geometric_correction_validation.py](../experiments/geometric_correction_validation.py) |
+| Experimental axis-dependent force shaping | [axis_shaped_geometric.py](../experiments/axis_shaped_geometric.py) |
+| Final selection and reserved validation | [final_geometric_comparison.py](../experiments/final_geometric_comparison.py) |
 
 ## Frames and force reference
 

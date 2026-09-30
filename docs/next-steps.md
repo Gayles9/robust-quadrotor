@@ -307,7 +307,7 @@ the sensor extension's stopping decision. The
 independent rescoring and compilation/layout checks. Existing artifact identities
 and failed gates are preserved. No scientific flight or production change occurs.
 
-## Current decision: one supported geometric comparison, then pause
+## Completed: one supported geometric comparison
 
 The explicit request after the operating-envelope review supersedes middleware
 design with [one fixed supported geometric comparison](supported-geometric.md).
@@ -323,9 +323,30 @@ The frozen overall gate fails, so fresh validation remains unopened. The
 implemented combination remains experimental; this result is an improvement
 with a measured tradeoff, not a proof that no better design exists.
 
+## Current decision: final axis-dependent comparison, then pause
+
+A further explicit request authorizes the
+[final axis-dependent geometric study](final-geometric.md).
+[ADR 0042](decisions/0042-final-geometric-comparison.md) freezes six new geometric
+profiles, two cascade gain choices, independent selection, a true-state check
+and a conditional reserved ledger. The selected pair is `axis-h10-f1.25` and
+`cascade-f1.25`; balanced development RMSE improves 7.0703% against that selected
+cascade. All fourteen corrected true-state checks pass. The
+[complete record](progress/2026-09-30-final-geometric-comparison.md) preserves
+every result, the narrow adapter correction and the final acceptance decision.
+
+The reserved clean comparison finds 4.7717% lower balanced RMSE than selected
+cascade, with 13.7942% lower nominal tracking error, 1.4117% lower wind tracking
+error and 1.6100% higher hover RMSE. All selected clean flights pass their absolute
+limits. The gain falls short of the frozen 10% target; whole-flight peaks and
+moment effort remain higher. Retain the implemented improvement and the measured
+tradeoff without claiming universal dominance or impossibility of further gains.
+All eight fault-response pairs and all 52 saved validation audits pass. The only
+failed primary acceptance condition is the 10% balanced-improvement target.
+
 After this bounded study, pause controller improvement. The next requested task
 is preparing a report for the professor to review, in a later session. Begin that
-task by auditing the final published source and this study's saved evidence, then
+task by auditing the final published source and both geometric studies' evidence, then
 adapt the existing editable report with a clear account of actual improvements,
 failed gates, assumptions and open research questions. The current experiment
 does not itself revise or send that report.

@@ -16,32 +16,37 @@ cascaded and geometric controllers; and minimum-snap trajectory planning. A
 mission runner connects these pieces for virtual takeoff, tracking and landing.
 Saved measurements can be replayed to check the estimator independently.
 
-The current limitation is control using noisy state estimates. The geometric
-controller tracks well when supplied with the simulated true state. With estimated
-feedback, the latest supported-start option passes both full hovers and improves
-nominal spline RMSE, but misses the matched wind-tracking comparison. The cascade
+The current research focus is control using noisy state estimates. The geometric
+controller tracks well when supplied with the simulated true state. The latest
+experimental change filters vertical and horizontal feedback forces separately,
+reducing the startup transient while retaining analytic trajectory feedforward.
+The [final comparison](docs/final-geometric.md) independently selects a cascade
+comparator and checks fresh hover, trajectory and fault cases. The cascade
 remains the default. The
 [controller discussion](docs/controller-tradeoffs.md) explains the observed
 problems, tested alternatives, and why an improvement in one metric can make
 another worse. [Project status](docs/status.md) lists the evidence and remaining
 work.
 
-The earlier supported-cascade research brings all three short-hold hover peaks
-below 8 cm, but fails five of nine strict no-regression comparisons. The new
-supported-geometric full-hold peaks are 5.21 and 4.62 cm, versus 8.73 and 18.10 cm
-with matched unaligned starts. Its wind RMSE is 3.73% worse than matched cascade,
-so its frozen comparison also fails. Both options remain experimental. The
-original mass-mismatch failure and fresh qualification are unresolved.
+On twelve reserved cases, the final geometric profile reduces balanced RMSE by
+4.8% versus the independently selected cascade and 20.3% versus its original
+settings. Its whole-flight peaks and moment effort remain higher. The measured
+gain is retained even though it misses the predeclared 10% improvement target.
+
+The earlier supported-start studies retain their passing absolute limits and
+failed comparisons. The final geometric study implements a further improvement
+and reports average tracking error, peak error and moment effort separately.
+The original mass-mismatch failure and broader flight qualification remain open.
 
 The [operating envelope](docs/operating-envelope.md) is the source-indexed guide
 to what is implemented, what passes, and what remains conditional or failed.
 [Report revision 3.0](docs/technical-report.md) develops the mathematics, including
 supported alignment, nonlinear release uncertainty and the whole-flight error
-budget. The [bounded supported geometric comparison](docs/supported-geometric.md)
+budget. The [preceding supported geometric comparison](docs/supported-geometric.md)
 combines the existing startup fixes with one fixed geometric profile. The
-[next-step plan](docs/next-steps.md) pauses controller improvement after that
-experiment, with professor-facing report preparation reserved for a later task.
-Report revision 3.0 predates this final comparison.
+[next-step plan](docs/next-steps.md) pauses controller improvement after the
+final bounded study, with professor-facing report preparation reserved for a
+later task. Report revision 3.0 predates both geometric follow-ups.
 
 ## Run it
 
@@ -64,7 +69,7 @@ reproducibility details.
 | If you want to understand… | Start here |
 | --- | --- |
 | How the complete system fits together | [System design](docs/system-design.md) |
-| Why the controller still misses its targets | [Controller problems and tradeoffs](docs/controller-tradeoffs.md) |
+| Controller gains, remaining failures and measured tradeoffs | [Controller performance and tradeoffs](docs/controller-tradeoffs.md) |
 | The equations, interfaces and source for a subsystem | [Technical documentation](docs/README.md) |
 | What has been demonstrated and what remains | [Operating envelope](docs/operating-envelope.md) and [current status](docs/status.md) |
 | The next bounded piece of work | [Next-step plan](docs/next-steps.md) |
