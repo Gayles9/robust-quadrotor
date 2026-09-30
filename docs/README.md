@@ -68,6 +68,7 @@ seed sets are reproduction cases, not fresh validation.
 - [Technical report](technical-report.md): consolidated LaTeX report, source/evidence identity and operating boundary.
 - [Controller tradeoffs](controller-tradeoffs.md): interpretation of the results.
 - [Supported geometric comparison](supported-geometric.md): frozen initialization/controller combination and conditional validation.
+- [Final geometric comparison](final-geometric.md): axis-dependent force shaping, independent controller selection and a locked fresh comparison.
 - [Early-flight diagnosis](early-flight-diagnosis.md): distinct mass and hover mechanisms, oracle limits and reproduction.
 - [Attitude startup audit](attitude-startup-audit.md): first-position update explanation, information limits and justified no-go.
 - [Stationary pre-arm alignment](prearm-alignment.md): support contract, uncertainty, rejection, sample ownership and calibration limitation.

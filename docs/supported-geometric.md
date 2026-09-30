@@ -89,6 +89,9 @@ against order seven. `--verify /tmp/new-supported-geometric` replays saved data
 without new scientific flights. Exit code 1 denotes failed performance; preserve
 the complete report and individual outcomes rather than rerunning a seed.
 
-The accepted next action after this bounded study is to pause controller
-improvement and later prepare the professor-facing report. No middleware,
-independent sensor, integral combination or automatic follow-up tuning is implied.
+A subsequent explicit request authorized the
+[final axis-dependent geometric study](final-geometric.md) under a new frozen
+protocol. This study's failed gate and unopened conditional stage remain
+historical results. After the final study, pause controller improvement and
+later prepare the professor-facing report. No middleware, independent sensor,
+integral combination or automatic follow-up tuning is implied.

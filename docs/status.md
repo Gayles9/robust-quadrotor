@@ -1,19 +1,36 @@
 # Project status
 
-Updated 2026-09-29. The implemented Python stack covers simulation, estimation,
+Updated 2026-09-30. The implemented Python stack covers simulation, estimation,
 planning and closed-loop virtual missions. The main open performance issue is
 hover and trajectory control with noisy estimated feedback.
 
-The latest [supported geometric comparison](supported-geometric.md) combines
+The latest [final geometric study](final-geometric.md) implements axis-dependent
+force filtering and independently selects both controller families' outer gains.
+On twelve reserved cases, geometric balanced RMSE is **4.7717% below the selected
+cascade** and **20.2899% below the original cascade**. Nominal tracking improves
+13.7942%, mild-wind tracking improves 1.4117%, and whole-flight hover RMSE is
+1.6100% higher against the selected cascade. All twenty-four selected-controller
+clean flights pass absolute limits; geometric hold peaks are 4.8540..5.7295 cm.
+Balanced whole-flight peaks are 15.2880% higher and moment effort 1.6736% higher.
+The measured accuracy benefit does not reach the predeclared 10% target.
+All eight fresh fault-response comparisons and all 52 saved execution audits pass.
+The [complete record](progress/2026-09-30-final-geometric-comparison.md) preserves
+selection, regression, every fresh outcome and the adapter correction. The
+corrected source passes **4,002 warning-strict software tests**. Controller work
+pauses after this bounded study; professor-facing report preparation remains
+the next requested task for later. Report revision 3.0 predates both geometric
+follow-ups. The original cascade remains default.
+
+The preceding [supported geometric comparison](supported-geometric.md) combines
 the existing coherent-force controller with supported alignment, the exact
 initial velocity prior and nonlinear release. Full 60-second hover peaks improve
 from 8.73/18.10 cm to 5.21/4.62 cm. Nominal spline RMSE beats matched combined
 cascade by 19.03%; wind RMSE is 3.73% worse, failing the frozen comparison despite
 passing every candidate clean absolute limit. Fresh validation stays unopened.
 This is an implemented experimental improvement with a retained tradeoff, not
-default promotion or a proof that further improvement is impossible. Controller
-work pauses here; professor-facing report preparation is the next requested task
-for a later session. Report revision 3.0 predates this new study.
+default promotion or a proof that further improvement is impossible. The final
+axis-dependent study follows under a separate frozen protocol; the earlier
+comparison and its unopened conditional stage retain their original status.
 
 The preceding [saved-history diagnosis](combined-prior-diagnosis.md) authenticates
 84 existing outcomes and reconstructs all 27 clean histories across the original,
@@ -44,7 +61,7 @@ measurement biases, the local absolute tilt ambiguity returns. The sensor
 extension is closed under current assumptions, with no new scientific flights
 or production changes. The [operating envelope](operating-envelope.md) and [report revision 3.0](technical-report.md)
 now consolidate these results; fresh nonlinear flight qualification remains open. The
-latest full warning-strict software suite passes 3,965 tests.
+full warning-strict software suite at that milestone passed 3,965 tests.
 
 ## Implemented capabilities
 
@@ -56,13 +73,14 @@ latest full warning-strict software suite passes 3,965 tests.
 | Baseline control | Cascaded position/velocity and attitude/rate feedback; supervised takeoff, tracking, landing and abort | True-state cases pass; original estimated-hover qualifications retain failures |
 | Vertical compensation | Explicit bounded integral, health-gated learning, reset, conditional anti-windup and authenticated state reconstruction | One frozen research candidate; no default change or whole-flight qualification |
 | Planning | Fixed-duration minimum-snap splines, derivatives through snap, nominal reference bounds, bounded uniform retiming | No obstacle planning, time optimization or complete actuator-feasibility proof |
-| Geometric control | Rotation-based moment law, analytic force-to-attitude derivatives, causal filter, true/estimated missions and two optional derivative strategies; a supported-start composition now improves full hover and nominal tracking | Older derivative profiles fail their joint requirements; the new startup composition misses wind RMSE versus matched cascade and fresh qualification stays open |
+| Geometric control | Rotation-based moment law, coherent analytic derivatives and optional axis-dependent filtering; the final selected profile improves balanced fresh RMSE by 4.7717% against selected cascade, with all selected clean absolute conditions passing | The 10% improvement target is missed; whole-flight peaks and moment effort are higher. Broader qualification and default integration remain open |
 | Integration | Earlier ROS 2/PX4/Gazebo compatibility checks and an x500 takeoff/hover/landing spike | The custom Python stack is not integrated into PX4 or validated on hardware |
 | Fault handling | Innovation rejection, per-stream health, opt-in timed abort and causal live faults with a frozen paired maneuver campaign | Declared campaign failures, broader fault diagnosis and physical fallback flight remain |
 
 Estimated minimum-snap missions are available experimentally through the
 geometric controller or explicit cascade `allow_minimum_snap=True`. That support
-is an implementation capability, not a passing noisy-trajectory qualification.
+is an implementation capability; the bounded fresh results do not establish
+general noisy-trajectory qualification.
 
 ## Evidence that matters
 
@@ -162,13 +180,13 @@ pass in that boundary-only study. Both the original 34-flight campaign and the
 below 8 cm but regresses two peaks, failing its frozen comparison. It does not
 establish a hardware support procedure or general flight qualification.
 
-The latest [startup/hover closeout](progress/2026-09-26-geometric-transient-closeout.md)
+The earlier [startup/hover closeout](progress/2026-09-26-geometric-transient-closeout.md)
 reproduces the original failures and rejects one frozen coherent-force candidate.
 It passes the seed-30 spline comparison at 6.77 cm RMSE and 0.85 times cascade
 effort, but its full-hover maxima are 10.87 and 17.33 cm against 8 cm. No production
 algorithm or controller default changed. That milestone's software gate passed
 3,338 tests; sampled-model checks include both horizontal frame directions.
-The reserved qualification seeds remain unopened. Observation health monitoring
+That study's reserved qualification seeds remain unopened. Observation health monitoring
 and bounded supervisor responses are implemented; the separate integrated
 evaluation retains the original controller settings and performance limits.
 
@@ -215,8 +233,8 @@ has the same distinction between implementation and qualified flight behavior.
 [Controller problems and tradeoffs](controller-tradeoffs.md) explains why the
 remaining failures can coexist with correct equations and good true-state
 tracking. [Project review](project-review.md) records the current audit, and
-[the next-step plan](next-steps.md) defines a simulation-only ROS 2/PX4 interface
-and acceptance design.
+[the next-step plan](next-steps.md) pauses controller improvement after the final
+geometric study and reserves professor-facing report preparation for a later task.
 Broader qualification and middleware integration remain separate deliverables.
 The updated report is pinned to its declared source; historical report revisions
 and dated records remain snapshots, not instructions to repeat old studies.

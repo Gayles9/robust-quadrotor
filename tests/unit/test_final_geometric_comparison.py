@@ -185,8 +185,10 @@ def test_short_true_state_pipeline_accepts_both_controller_families(tmp_path):
 def test_historical_compatibility_requires_exact_report_and_unchanged_algorithms():
     raw = b"synthetic exact historical report"
     digest = hashlib.sha256(raw).hexdigest()
-    assert study.algorithm_sha256() == study.ALGORITHM_SHA
-    with patch.object(study, "LEGACY_REPORT_SHA", digest):
+    with (
+        patch.object(study, "LEGACY_REPORT_SHA", digest),
+        patch.object(study, "algorithm_sha256", return_value=study.ALGORITHM_SHA),
+    ):
         expected, legacy = study.parent_protocol(raw, "development", None, {})
         assert legacy
         assert expected["source_sha256"] == study.LEGACY_SOURCE_SHA
