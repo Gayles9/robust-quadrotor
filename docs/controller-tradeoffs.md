@@ -2,14 +2,24 @@
 
 The main unresolved problem is keeping the vehicle sufficiently close to its
 reference when control uses noisy state estimates. The geometric controller
-performs well in the tested true-state flights. With the ESKF in the loop,
-hover excursions exceed the original 8 cm limit and its feedforward can demand
-much more moment than the cascade.
+performs well in the tested true-state flights. Earlier estimated-feedback
+profiles exceed the original 8 cm hover limit or demand too much moment.
+The later supported-start combination below resolves both tested full hovers
+while retaining a wind-tracking tradeoff.
 
 I have kept the original requirements and failed cases. The aim is to explain
 what causes the tradeoff before choosing another design. The evidence currently
 supports several interacting mechanisms; it does not identify a single defect
 whose removal would guarantee the required performance.
+
+The later [supported-start geometric comparison](supported-geometric.md) adds
+positive evidence under its explicit stationary fixture. Full-hold peaks fall
+from 8.73/18.10 cm to 5.21/4.62 cm. Nominal spline RMSE is 19.03% below matched
+combined cascade, with less moment effort. Wind RMSE is 3.73% higher, and
+geometric average hover error and spline peak errors are also higher than
+cascade's. All absolute candidate limits and eight fault comparisons pass;
+the frozen joint gate still fails on wind, so fresh validation remains unopened.
+The implementation is retained as an experimental option and this work pauses.
 
 ## What the requirements measure
 

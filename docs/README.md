@@ -40,6 +40,7 @@ reproducibility. Run experiment modules from the repository root with
 | `trajectory_mission_validation` | Reference retiming and five true-state spline flights |
 | `geometric_reimplementation_validation` | Original geometric true/estimated comparisons |
 | `geometric_correction_validation` | Reproduce the six rejected derivative/gain profiles |
+| `supported_geometric_comparison` | One fixed geometric/startup combination, matched cascade and full hover/fault evidence |
 | `robustness_validation` | Frozen paired observation-fault and model-mismatch flights with complete evidence reconstruction |
 | `vertical_compensation_validation` | One frozen vertical candidate compared with the authenticated original robustness campaign |
 | `early_flight_diagnostic`, `early_flight_oracle` | Authenticated mass/hover decomposition and one attitude-only diagnostic intervention; never qualification |
@@ -66,6 +67,7 @@ seed sets are reproduction cases, not fresh validation.
 - [Current status](status.md): implemented capabilities and measured limitations.
 - [Technical report](technical-report.md): consolidated LaTeX report, source/evidence identity and operating boundary.
 - [Controller tradeoffs](controller-tradeoffs.md): interpretation of the results.
+- [Supported geometric comparison](supported-geometric.md): frozen initialization/controller combination and conditional validation.
 - [Early-flight diagnosis](early-flight-diagnosis.md): distinct mass and hover mechanisms, oracle limits and reproduction.
 - [Attitude startup audit](attitude-startup-audit.md): first-position update explanation, information limits and justified no-go.
 - [Stationary pre-arm alignment](prearm-alignment.md): support contract, uncertainty, rejection, sample ownership and calibration limitation.

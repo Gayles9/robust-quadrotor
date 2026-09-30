@@ -307,39 +307,46 @@ the sensor extension's stopping decision. The
 independent rescoring and compilation/layout checks. Existing artifact identities
 and failed gates are preserved. No scientific flight or production change occurs.
 
-## Next bounded task: simulation-only ROS 2/PX4 interface and acceptance design
+## Current decision: one supported geometric comparison, then pause
 
-1. Audit this merged documentation/report closeout against current source and
-   the operating-envelope ledger. Keep G2 explicitly open and defaults unchanged.
-2. Select and justify one initial interface boundary for the existing custom
-   stack. Record what remains in Python and what ROS 2/PX4 would own; do not
-   silently substitute PX4 estimation/control for the custom implementation.
-3. Specify frames, quaternion direction/order, units, acquisition/delivery clocks,
-   sequence identity, held-command semantics, rates, latency/jitter budgets,
-   bounded queues, readiness, reset, authority and loss-of-link handling.
-4. Define deterministic offline message/replay fixtures and future simulation
-   acceptance for sign/frame/timing parity, nominal equivalence, fault responses
-   and evidence integrity. Separate interface acceptance from flight qualification.
-5. Record unresolved decisions and a go/no-go before an adapter is implemented.
-   This is design only: no dependency/system changes, middleware code, new flight
-   campaign, hardware action, new sensor, tuning, reserved seeds or default promotion.
+The explicit request after the operating-envelope review supersedes middleware
+design with [one fixed supported geometric comparison](supported-geometric.md).
+[ADR 0041](decisions/0041-supported-geometric-comparison.md) freezes the candidate,
+matched arms, full hover window, permitted tradeoffs and stopping rule before
+execution. The [record](progress/2026-09-29-supported-geometric-comparison.md)
+preserves implementation, every result and the acceptance decision.
 
-Numerical abort does not establish a physical fallback, and the old x500 spike
-does not establish custom-stack integration. A future adapter requires its own
-bounded implementation step after the interface contract passes review.
+The comparison is complete: 28 saved/audited flights, both full hovers below
+8 cm, 19.03% lower nominal spline RMSE than matched cascade, but 3.73% higher
+wind RMSE. Three of four clean comparisons and all eight fault comparisons pass.
+The frozen overall gate fails, so fresh validation remains unopened. The
+implemented combination remains experimental; this result is an improvement
+with a measured tradeoff, not a proof that no better design exists.
 
-The mass-induced offset remains a separate open requirement. Do not silently
-combine the rejected integral candidate, reopen geometric tuning, claim hardware
-stationarity, run a new gain/seed sweep or integrate alignment into normal
-missions while the fresh-seed hover requirement remains unresolved.
+After this bounded study, pause controller improvement. The next requested task
+is preparing a report for the professor to review, in a later session. Begin that
+task by auditing the final published source and this study's saved evidence, then
+adapt the existing editable report with a clear account of actual improvements,
+failed gates, assumptions and open research questions. The current experiment
+does not itself revise or send that report.
+
+Better performance remains a project goal. A later controller/estimator step
+requires a specific mechanism, a justified scope and prospective acceptance;
+the pause is not a conclusion that improvement is impossible. Do not automatically
+start another gain/seed sweep, combine the mass-compensation candidate, introduce
+a new sensor, claim hardware stationarity or promote an experimental default.
 
 Any future project-completion percentage must declare an agreed weighted
 milestone denominator; campaign pass fractions are not project completion.
 
 ## Later milestones
 
-- Implement custom ROS 2/PX4 integration under separate acceptance criteria.
+- Return to the unresolved estimation/control requirements under a new scoped study.
+- Design the simulation-only ROS 2/PX4 interface and acceptance contract before
+  implementing custom integration. Preserve ownership of the custom algorithms,
+  frame/clock semantics, readiness and fault-response boundaries. Numerical abort
+  does not establish physical fallback; the historical x500 spike does not
+  establish custom-stack integration.
 
-The reserved geometric qualification seeds remain unopened. Reopening controller
-design needs a new, evidence-based scope; another gain or cutoff search is not
-the automatic next action.
+Reserved seeds may be opened only after the specific preceding gate passes.
+Another gain or cutoff search is not the automatic next action.
