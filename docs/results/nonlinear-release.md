@@ -28,28 +28,32 @@ orientation increment. The supported accelerometer value does not cross the
 force discontinuity. Let the 33 Gaussian latents be the old joint state/sample
 error, six fresh sample errors and six bias increments:
 
-\[
+```math
 X\sim\mathcal N(0,\Sigma),\qquad
 \Sigma=\operatorname{diag}(C_0,R_{IMU},hQ_b).
-\]
+```
 
 The nonlinear dependence is limited to six rotation variables. Define
 
-\[
+```math
 \eta=T X=[\delta\theta_0,\delta\phi],\qquad
 \delta\phi=-h\delta b_g-\frac h2(n_{g0}+n_{g1}+\Delta b_g).
-\]
+```
 
 Define the 18 affine variables
-\(Z=U X=[\delta p_0,\delta v_0,\delta b_1,n_1]\).
+$`Z=U X=[\delta p_0,\delta v_0,\delta b_1,n_1]`$.
 The terminal accelerometer bias plus fresh accelerometer noise is a selector
-\(E Z\). All old cross-correlations remain in \(\Sigma\). Gaussian conditioning
+$`E Z`$. All old cross-correlations remain in $`\Sigma`$. Gaussian conditioning
 gives
 
-\[
-V=T\Sigma T^T,\quad K=U\Sigma T^T V^{-1},\quad
-D=U\Sigma U^T-KV K^T,\qquad Z\mid\eta\sim\mathcal N(K\eta,D).
-\]
+```math
+\begin{aligned}
+V&=T\Sigma T^T, \\
+K&=U\Sigma T^T V^{-1}, \\
+D&=U\Sigma U^T-KV K^T, \\
+Z\mid\eta&\sim\mathcal N(K\eta,D).
+\end{aligned}
+```
 
 The implementation uses scaled Cholesky solves rather than an inverse. It removes
 only exactly deterministic zero rows. It neither deletes small positive
@@ -57,24 +61,23 @@ variances nor adds a covariance floor. Unsupported nonstructural singularity is
 rejected explicitly.
 
 At a quadrature node,
-\(R_i=R_0\operatorname{Exp}(\delta\theta_0)
-\operatorname{Exp}(\phi+\delta\phi)\).
+$`R_i=R_0\operatorname{Exp}(\delta\theta_0) \operatorname{Exp}(\phi+\delta\phi)`$.
 For the non-attitude output, let F preserve the affine variables and add
-\(h\delta v_0\) to position. Let G have position block \(h^2I/2\), velocity
-block \(hI\), and zeros elsewhere. Relative to the deterministic nominal,
+$`h\delta v_0`$ to position. Let G have position block $`h^2I/2`$, velocity
+block $`hI`$, and zeros elsewhere. Relative to the deterministic nominal,
 
-\[
+```math
 Y_i=FZ+G[R_i(f_1-EZ)-R_{nom}f_1]
      =b_i+M_iZ,\quad M_i=F-GR_iE.
-\]
+```
 
-Consequently the conditional mean is \(m_i=b_i+M_iK\eta_i\), and its
-conditional covariance is \(M_iDM_i^T\). The total moments are
+Consequently the conditional mean is $`m_i=b_i+M_iK\eta_i`$, and its
+conditional covariance is $`M_iDM_i^T`$. The total moments are
 
-\[
+```math
 \bar Y=\sum_iw_i m_i,\qquad
 C_{YY}=\sum_iw_i\{M_iDM_i^T+(m_i-\bar Y)(m_i-\bar Y)^T\}.
-\]
+```
 
 Compute the intrinsic quaternion mean, express each node's right-local attitude
 error there, and retain its covariance and cross-covariance with Y. This yields

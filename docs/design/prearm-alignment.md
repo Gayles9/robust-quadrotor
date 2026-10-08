@@ -59,25 +59,27 @@ separately by `PrearmAlignmentSession` in `src/quadrotor_math/prearm_alignment.p
 The world frame is North–East–Down (NED), and the body frame is
 Forward–Right–Down (FRD). With body-to-world rotation R, supported stationarity gives
 
-\[
- f_k=-R^T g_W+b_{a,k}+n_{a,k},\qquad
+```math
+f_k=-R^T g_W+b_{a,k}+n_{a,k},\qquad
  \omega_k=b_{g,k}+n_{g,k},\qquad g_W=(0,0,g)^T.
-\]
+```
 
 In particular a level supported accelerometer reads approximately **-g on body
 z**. This equation relies on the support reaction; arbitrary accelerated flight
 does not supply this observation. Let s=mean(f)-the prior accelerometer-bias
 mean, and retain the prior heading psi. Then
 
-\[
- \hat\phi=\operatorname{atan2}(-s_y,-s_z),\quad
- \hat\theta=\operatorname{atan2}(s_x,\sqrt{s_y^2+s_z^2}),\quad
- \hat R=R_z(\psi)R_y(\hat\theta)R_x(\hat\phi),
-\]
+```math
+\begin{aligned}
+\hat\phi&=\operatorname{atan2}(-s_y,-s_z), \\
+\hat\theta&=\operatorname{atan2}(s_x,\sqrt{s_y^2+s_z^2}), \\
+\hat R&=R_z(\psi)R_y(\hat\theta)R_x(\hat\phi),
+\end{aligned}
+```
 
-\[
- \hat b_{a,T}=\hat b_{a,0},\qquad \hat b_{g,T}=\operatorname{mean}(\omega).
-\]
+```math
+\hat b_{a,T}=\hat b_{a,0},\qquad \hat b_{g,T}=\operatorname{mean}(\omega).
+```
 
 Gravity supplies two inclination directions. It supplies no heading. A single
 orientation cannot separate transverse accelerometer bias from inclination;
@@ -99,9 +101,9 @@ is a prerequisite for hardware use.
 For N samples separated by dt=0.0025 s, T=(N-1)dt. If bias increments have
 covariance W dt, define
 
-\[
- A_N=\frac{dt(N-1)(2N-1)}{6N},\qquad B_N=\frac{T}{2}.
-\]
+```math
+A_N=\frac{dt(N-1)(2N-1)}{6N},\qquad B_N=\frac{T}{2}.
+```
 
 The average walk has covariance W A_N, its covariance with the terminal walk
 is W B_N, and the terminal walk has covariance W T. These follow by giving
@@ -132,17 +134,19 @@ Let J be the right-local derivative of the inclination estimate with respect
 to s, u=R_hat^T e_D the retained-heading direction, and Sigma_a/g the
 per-sample white-noise covariance. With the stated independent priors,
 
-\[
- V_a=P_{a,0}+W_a A_N+\Sigma_a/N,\qquad
+```math
+V_a=P_{a,0}+W_a A_N+\Sigma_a/N,\qquad
  C_a=P_{a,0}+W_a B_N,
-\]
+```
 
-\[
- P_{\theta\theta}=J V_aJ^T+\sigma_\psi^2 uu^T,\quad
- P_{\theta a}=-J C_a,\quad
- P_{aa}=P_{a,0}+W_aT,\quad
- P_{gg}=\Sigma_g/N+W_g A_N.
-\]
+```math
+\begin{aligned}
+P_{\theta\theta}&=J V_aJ^T+\sigma_\psi^2 uu^T, \\
+P_{\theta a}&=-J C_a, \\
+P_{aa}&=P_{a,0}+W_aT, \\
+P_{gg}&=\Sigma_g/N+W_g A_N.
+\end{aligned}
+```
 
 All other blocks are zero under the stated independence assumptions, and
 P_a-theta is the transpose. The attitude/bias cross block is essential. At
@@ -152,19 +156,19 @@ differences and an independently assembled latent-increment covariance.
 
 For completeness, with r=sqrt(s_y²+s_z²), the inclination derivative is
 
-\[
- D=\begin{bmatrix}0&s_z/r^2&-s_y/r^2\\
+```math
+D=\begin{bmatrix}0&s_z/r^2&-s_y/r^2\\
  r/\|s\|^2&-s_xs_y/(r\|s\|^2)&-s_xs_z/(r\|s\|^2)\end{bmatrix},\quad
  J=E_{:,1:2}D,
-\]
+```
 
 where E maps ZYX Euler perturbations to right-local rotation perturbations:
 
-\[
- E=\begin{bmatrix}1&0&-\sin\theta\\
+```math
+E=\begin{bmatrix}1&0&-\sin\theta\\
  0&\cos\phi&\sin\phi\cos\theta\\
  0&-\sin\phi&\cos\phi\cos\theta\end{bmatrix},\qquad u=E_{:,3}.
-\]
+```
 
 The world body-z/thrust-axis direction is d=R e_3. Its first-order error is
 -R[e_3]x delta-theta. The two nonzero covariance eigenvalues are those of

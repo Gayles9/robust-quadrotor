@@ -32,39 +32,39 @@ uses the separate [streaming interface](0013-estimated-state-mission-feedback.md
 
 ## Clock, initialization and IMU interval
 
-Let the run clock have `N+1` rows $T_j=j\Delta t$, $j=0,\ldots,N$, where $\Delta t>0$
+Let the run clock have `N+1` rows $`T_j=j\Delta t`$, $`j=0,\ldots,N`$, where $`\Delta t>0`$
 is the truth time step in seconds. The producer samples only completed nonzero truth rows;
-there is no IMU sample at $T_0$. The supported run adapter requires both IMU streams at
-every $T_j$, $j=1,\ldots,N$, with zero delay and actual delivery at that same row.
+there is no IMU sample at $`T_0`$. The supported run adapter requires both IMU streams at
+every $`T_j`$, $`j=1,\ldots,N`$, with zero delay and actual delivery at that same row.
 
 The replay clock is
 
-$$
+```math
 t_i=T_{i+1},\qquad i=0,\ldots,N-1.
-$$
+```
 
-Consequently, the caller's initial prior $(\hat x_0^-,P_0^-)$ belongs at $t_0=\Delta t$,
+Consequently, the caller's initial prior $`(\hat x_0^-,P_0^-)`$ belongs at $`t_0=\Delta t`$,
 not at the simulator's zero epoch. `initial_time_s` must exactly equal `time_s[0]`.
 The caller supplies this prior independently; the adapter never copies a truth row or
 silently replaces its IMU bias estimates. No prediction is performed before the first row.
 If the desired prior is at time zero, obtaining a time-zero IMU sample or defining another
 initialization method requires a separate contract; future samples are not backfilled.
 
-For each subsequent row $i>0$, the previous paired sample is held over the interval:
+For each subsequent row $`i>0`$, the previous paired sample is held over the interval:
 
-$$
+```math
 (\hat x_i^-,P_i^-)=\operatorname{Predict}_{\text{ADR 0004}}
 \left(\hat x_{i-1}^+,P_{i-1}^+,f^m_{B,i-1},\omega^m_{B,i-1},
 g,Q_c,t_i-t_{i-1}\right).
-$$
+```
 
-Here $f^m_B\in\mathbb R^3$ is measured FRD specific force in m/s², not gravitational
-acceleration; $\omega^m_B\in\mathbb R^3$ is measured FRD rigid-body angular velocity
+Here $`f^m_B\in\mathbb R^3`$ is measured FRD specific force in m/s², not gravitational
+acceleration; $`\omega^m_B\in\mathbb R^3`$ is measured FRD rigid-body angular velocity
 in rad/s, not rotor speed. `Predict` subtracts estimated biases, applies the body-to-world
 rotation and positive-down NED gravity, and propagates the same 15-state error covariance
 as before. No prediction or covariance equation is changed.
 
-This left-endpoint hold is causal: a measurement acquired at $t_i$ cannot affect the
+This left-endpoint hold is causal: a measurement acquired at $`t_i`$ cannot affect the
 state reported at an earlier time. The final IMU row has no following interval and is
 validated but not used for an extra extrapolation. The mathematical input supports
 strictly increasing nonuniform times and uses the actual interval difference; the run
@@ -134,12 +134,12 @@ rather than treated as an ordinary skipped position observation.
 
 The eligibility test reuses the scheduler's comparison:
 
-$$
+```math
 t_{\mathrm{scheduled}}\le t_{\mathrm{clock}}+
 16\epsilon_{64}\max(1,|t_{\mathrm{scheduled}}|,|t_{\mathrm{clock}}|),
-$$
+```
 
-where $\epsilon_{64}$ is float64 machine epsilon. A binary search finds the first
+where $`\epsilon_{64}`$ is float64 machine epsilon. A binary search finds the first
 eligible row. Acquisition membership is exact; the adapter does not snap an off-grid
 acquisition time or resample an IMU vector. These execution restrictions are intentionally
 narrower than generic artifact storage. Valid older artifacts with incompatible sensor
@@ -159,9 +159,9 @@ ADR 0007 appends optional `innovation_policy=None`; this default retains unscore
 execution. A supplied policy enables pre-update diagnostics and optional rejection.
 
 The 12-component continuous noise order and units remain ADR 0004. For example, an
-accelerometer white-noise diagonal in $Q_c$ has units $(\mathrm{m/s^2})^2\,\mathrm{s}$,
+accelerometer white-noise diagonal in $`Q_c`$ has units $`(\mathrm{m/s^2})^2\,\mathrm{s}`$,
 while an accelerometer-bias random-walk diagonal has units
-$(\mathrm{m/s^2})^2/\mathrm{s}$. Their roles are different. The caller supplies $Q_c$
+$`(\mathrm{m/s^2})^2/\mathrm{s}`$. Their roles are different. The caller supplies $`Q_c`$
 explicitly. The nominal configuration's per-sample IMU standard deviations are not silently
 treated as continuous-time densities.
 
@@ -172,7 +172,7 @@ observation standard deviations. Position axes are independent in that configura
 the resulting position covariance is diagonal. Direct configuration also accepts a
 correlated `(3,3)` covariance. Positive standard deviations whose square overflows or
 underflows to zero are rejected; exact zero and representable subnormal variances are not
-silently inflated. The explicit initial state, covariance and $Q_c$ are preserved.
+silently inflated. The explicit initial state, covariance and $`Q_c`$ are preserved.
 
 All covariance matrices must be finite, symmetric and PSD under the existing locally
 scaled validation. Every scored or fused innovation covariance must additionally be numerically
@@ -197,9 +197,9 @@ protect ordinary use, not deliberate hostile mutation. No RNG is owned or advanc
 | `EskfReplayEvent` | Observation, exhaustive status, optional full `EskfMeasurementUpdate`, and optional pre-update score/threshold under ADR 0007 |
 | `EskfReplayResult` | Time vector, tuple of `n` nominal states, `(n,15,15)` covariance history and all event outcomes |
 | `eskf_replay_input_from_run_artifact` | Strict clock/sensor adapter; no truth payload access |
-| `eskf_replay_configuration_from_nominal` | Explicit nominal world/sensor mapping; caller still owns prior and $Q_c$ |
+| `eskf_replay_configuration_from_nominal` | Explicit nominal world/sensor mapping; caller still owns prior and $`Q_c`$ |
 
-History row $i$ is the posterior after *all* fused observations at $t_i$. A fused event's
+History row $`i`$ is the posterior after *all* fused observations at $`t_i`$. A fused event's
 update retains the state and covariance immediately after that *individual* correction,
 plus innovation, innovation covariance, gain and injected error. It may therefore differ
 from the final history row if altitude follows position. The correction remains diagnostic

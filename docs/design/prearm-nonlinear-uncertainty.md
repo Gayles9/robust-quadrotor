@@ -26,16 +26,16 @@ Let R_0 be the inclination estimate at retained zero heading, u=R_0^T e_D,
 eta the accelerometer-mean error, and psi the independent heading error. Define
 t=Log(R_0^T R(s-eta,0)). The exact relative rotation is
 
-\[
- R_0^T R(s-\eta,\psi)=\operatorname{Exp}(u\psi)\operatorname{Exp}(t).
-\]
+```math
+R_0^T R(s-\eta,\psi)=\operatorname{Exp}(u\psi)\operatorname{Exp}(t).
+```
 
 The leading terms of its logarithm are
 
-\[
- \delta\theta=t+u\psi+\tfrac12(u\psi\times t)+\cdots,
+```math
+\delta\theta=t+u\psi+\tfrac12(u\psi\times t)+\cdots,
  \qquad t\simeq-J\eta.
-\]
+```
 
 The mixed heading/inclination term therefore has derivative
 -0.5 u cross J[:,j] with respect to psi and eta_j. Independent matrix finite
@@ -44,9 +44,9 @@ not imply that this nonlinear product has zero variance.
 
 Near level, the leading extra transverse variance is
 
-\[
- \frac{\sigma_\psi^2 V_a}{4g^2}.
-\]
+```math
+\frac{\sigma_\psi^2 V_a}{4g^2}.
+```
 
 The first-order transverse variance conditional on terminal accelerometer bias
 is (V_a-C_a²/P_aT)/g². At the specified profile, their ratio is **0.07811**.
@@ -76,19 +76,19 @@ The model uses the window covariance sums from the stationary alignment design.
 The joint Gaussian model of
 mean accelerometer error eta and terminal accelerometer-bias error b has
 
-\[
- \operatorname{Cov}(\eta)=V_a,\quad
+```math
+\operatorname{Cov}(\eta)=V_a,\quad
  \operatorname{Cov}(b,\eta)=C_a,\quad
  \operatorname{Cov}(b)=P_{aT}.
-\]
+```
 
 All are scalar multiples of identity in this fixed profile. Equivalently,
 
-\[
- b=K\eta+\epsilon,\quad K=C_a V_a^{-1},\quad
+```math
+b=K\eta+\epsilon,\quad K=C_a V_a^{-1},\quad
  \operatorname{Cov}(\epsilon)=D=P_{aT}-C_aV_a^{-1}C_a^T,
  \quad \epsilon\perp\eta.
-\]
+```
 
 This is a Gaussian conditional decomposition, not a new accelerometer-bias
 measurement. The bias prior mean stays zero. The total terminal bias covariance
@@ -104,11 +104,11 @@ rotation calculation, then computes the resulting joint mean and covariance.
 
 Use four independent standard-normal latent coordinates z. Set
 
-\[
- \eta_i=\sqrt{V_a}\,z_{i,1:3},\qquad
+```math
+\eta_i=\sqrt{V_a}\,z_{i,1:3},\qquad
  \psi_i=\sigma_\psi z_{i,4},\qquad
  R_i=R(s-\eta_i,\psi_i),\qquad b_i=K\eta_i.
-\]
+```
 
 The inverse gravity-direction map R is the same ZYX inclination construction
 as the first-order model, evaluated at every latent point. Five-point
@@ -120,22 +120,22 @@ independent standard-normal moment tests verify the implementation.
 
 Starting at R_0, compute the rotation mean by
 
-\[
- \mu=\sum_i w_i\operatorname{Log}(\bar R^T R_i),\qquad
+```math
+\mu=\sum_i w_i\operatorname{Log}(\bar R^T R_i),\qquad
  \bar R\leftarrow\bar R\operatorname{Exp}(\mu).
-\]
+```
 
 Require ||mu||<=1e-13 rad with at most eight corrections. Failure rejects the
 candidate. The solver recomputes all moments at the final rotation mean, so it
 does not reuse a covariance expressed around the old mean without transport.
 Let e_i=Log(R_bar^T R_i)-mu. The joint covariance is
 
-\[
- P=\sum_i w_i
+```math
+P=\sum_i w_i
  \begin{bmatrix}e_i\\b_i\\0\end{bmatrix}
  \begin{bmatrix}e_i\\b_i\\0\end{bmatrix}^T
  +\operatorname{diag}(0_{3\times3},D,P_{gT}).
-\]
+```
 
 This representation retains attitude/bias cross terms and adds only the
 mathematically required independent residual. Positive weights and positive

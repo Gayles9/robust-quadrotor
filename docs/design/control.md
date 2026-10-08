@@ -64,9 +64,9 @@ Let R = R_WB and R_d = R_reference_WB. The relative rotation RᵀR_d is expresse
 the **current body** coordinates. Its principal rotation vector e_B has direction
 along the required rotation axis and norm equal to the shortest angular error:
 
-$$
+```math
 \mathbf e_B=\operatorname{Log}(R^\mathsf{T}R_d)^\vee.
-$$
+```
 
 Here Log maps a rotation to a skew-symmetric matrix; vee extracts its three-vector.
 The implementation computes the equivalent relative quaternion
@@ -75,10 +75,10 @@ multiplication. Write q_e = (w_e, v_e) and choose the representation with nonneg
 scalar part. At an exact half-turn, use the first nonzero positive vector component.
 For s = ||v_e|| > 0:
 
-$$
+```math
 \theta=2\operatorname{atan2}(s,w_e),\qquad
 \mathbf e_B=\frac{\theta}{s}\mathbf v_e,\qquad 0\leq\theta\leq\pi.
-$$
+```
 
 At s < 10⁻⁸, the code uses the continuous small-angle limit
 2 v_e / ||q_e|| to avoid division by a very small s. The local controller rejects
@@ -90,21 +90,21 @@ expression at nonidentity attitudes, signed principal axes and either input sign
 The outer proportional loop requests body rate; the inner proportional loop requests
 angular acceleration. With componentwise clipping and multiplication (⊙),
 
-$$
+```math
 \boldsymbol\omega_d=
 \operatorname{clip}(K_a\odot\mathbf e_B,-\boldsymbol\omega_{\max},\boldsymbol\omega_{\max}),
 \qquad
 \boldsymbol\alpha_d=K_r\odot(\boldsymbol\omega_d-\boldsymbol\omega_B),
-$$
+```
 
-$$
+```math
 \boldsymbol\tau_{\rm req}
 =I_n\boldsymbol\alpha_d+
 \boldsymbol\omega_B\times(I_n\boldsymbol\omega_B),
 \qquad
 \boldsymbol\tau_{\rm lim}
 =\operatorname{clip}(\boldsymbol\tau_{\rm req},-\boldsymbol\tau_{\max},\boldsymbol\tau_{\max}).
-$$
+```
 
 All vectors above are (3,) current-body vectors. K_a and K_r are positive diagonal
 gain vectors in s⁻¹; omega is rigid-body rate in rad/s, alpha angular acceleration in
@@ -131,11 +131,11 @@ defined above; it does not implement PX4's complete flight-control law.
 Near a constant reference, on a matched principal inertia axis, with no limits or motor
 lag, a small signed orientation deviation theta obeys
 
-$$
+```math
 \ddot\theta+K_r\dot\theta+K_rK_a\theta=0,\qquad
 \omega_n=\sqrt{K_rK_a},\qquad
 \zeta=\frac{K_r}{2\sqrt{K_rK_a}}.
-$$
+```
 
 Finite differences of the composed controller and physical acceleration verify this local
 linearization. The declared example uses K_a = [3,3,2] and K_r = [12,12,8] s⁻¹:
@@ -147,9 +147,9 @@ example uses rate-demand bounds [2,2,1.5] rad/s, moment bounds [.8,.8,.3] N m an
 
 With a constant principal-axis external torque d, equilibrium requires
 
-$$
+```math
 \theta_{\rm eq}=\frac{d}{I K_rK_a}.
-$$
+```
 
 There is no integral accumulator and therefore no integral windup or anti-windup state.
 The controller resists persistent torque with a nonzero orientation offset. The fixed
@@ -163,7 +163,7 @@ region.
 The existing rotor model has FRD thrust along negative z and reaction-moment sign
 −spin. For squared speed s_i = Omega_i², its allocation matrix is
 
-$$
+```math
 A=
 \begin{bmatrix}
 k_f&k_f&k_f&k_f\\
@@ -172,7 +172,7 @@ x_1k_f&x_2k_f&x_3k_f&x_4k_f\\
 -\sigma_1k_m&-\sigma_2k_m&-\sigma_3k_m&-\sigma_4k_m
 \end{bmatrix},\qquad
 A\mathbf s=\begin{bmatrix}T\\\boldsymbol\tau_B\end{bmatrix}.
-$$
+```
 
 x_i,y_i are rotor positions in body metres, sigma_i ∈ {−1,+1} the documented rotor
 spin directions, k_f thrust coefficient and k_m reaction-moment coefficient. T ≥ 0 is
@@ -180,10 +180,10 @@ collective thrust **magnitude**, not body-z force; F_rotor,B = [0,0,−T] N.
 
 For a feasible zero-moment collective anchor, define
 
-$$
+```math
 \mathbf s_0=A^{-1}[T,0,0,0]^\mathsf{T},\qquad
 \mathbf d=A^{-1}[0,\boldsymbol\tau_{\rm lim}^\mathsf{T}]^\mathsf{T}.
-$$
+```
 
 Find the largest a ∈ [0,1] satisfying
 Omega_min² ≤ s_0,i + a d_i ≤ Omega_max² for every rotor.
@@ -225,9 +225,9 @@ The declared acceptance campaign itself uses matched parameters.
 With held target Omega_c and actual speed Omega_0 at the interval start, each motor is
 evaluated exactly at an RK4 stage's elapsed time u:
 
-$$
+```math
 \Omega(u)=\Omega_c+(\Omega_0-\Omega_c)\exp(-u/\tau_m).
-$$
+```
 
 Stages at u = 0, h/2, h/2, h compose the existing rotor wrench, stage-specific
 wind-relative quadratic drag, supplied body disturbance and body-wrench rigid-body

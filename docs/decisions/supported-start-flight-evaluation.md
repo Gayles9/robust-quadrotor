@@ -35,10 +35,14 @@ spinning motors. No state is teleported at release.
 During the entire 0..0.5025 s supported interval, the fixture balances gravity
 and existing wind drag:
 
-\[
- F_{support,W}=-mg_W-R_{WB}F_{drag,B},\qquad
- a_W=0,\quad\omega_B=0,\quad f_B=-R_{WB}^Tg_W.
-\]
+```math
+\begin{aligned}
+F_{support,W}&=-mg_W-R_{WB}F_{drag,B}, \\
+a_W&=0, \\
+\omega_B&=0, \\
+f_B&=-R_{WB}^Tg_W.
+\end{aligned}
+```
 
 Rotors are off; no rotor torque or drag moment is modeled. Saved equilibrium
 residuals, pose, motion and motor histories substantiate the simulated support

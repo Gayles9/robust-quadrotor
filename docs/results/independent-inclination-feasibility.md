@@ -25,9 +25,9 @@ An eligible source would observe the orientation of a rigid target `C` in an
 external reference frame `E`, using information beyond the current IMU/position
 measurements. With known registration `R_WE` and mounting calibration `R_CB`,
 
-\[
+```math
 d_W=R_{WE}R_{EC}R_{CB}e_3,\qquad e_3=(0,0,1)^T.
-\]
+```
 
 Every rotation maps the right subscript frame into the left subscript frame.
 The external reference must be registered to the project's NED world; the body
@@ -52,17 +52,17 @@ Let the nominal body-down direction be `d_hat=R_hat_WB e3`. Choose a fixed local
 basis `E_W` with two orthonormal columns perpendicular to `d_hat`. For a unit
 observed direction `z_W`, define a tangent **chord** residual
 
-\[
+```math
 r=E_W^T(z_W-\hat d_W).
-\]
+```
 
 The chart is fixed for this linearization. Under the existing right-local
 attitude convention `R_true=R_hat Exp([delta_theta_B]x)`,
 
-\[
+```math
 H_\theta=-E_W^T\hat R_{WB}[e_3]_\times,\qquad
 H=[0\;0\;H_\theta\;0\;0\;0_{2\times6}].
-\]
+```
 
 The full row has 21 columns, including the six endpoint IMU-noise coordinates.
 Zero direct measurement columns for those six coordinates do not mean their
@@ -91,10 +91,10 @@ unchanged. Basis changes must not be treated as an extra source of information.
 
 For small left/world angular noise `epsilon_W` on external orientation,
 
-\[
+```math
 \delta d_W=-[d_W]_\times\epsilon_W,\qquad
 J=-E_W^T[d_W]_\times,\qquad R_t=J C_\epsilon J^T.
-\]
+```
 
 This is first-order uncertainty propagation. Mounting/reference calibration
 errors, persistent bias, nonlinear curvature and temporal correlation require
@@ -106,12 +106,13 @@ measurement model and must be retained.
 For state error `delta_x`, observation noise `n`, and
 `U=Cov(delta_x,n)`, the linear Gaussian innovation and cross covariance are
 
-\[
+```math
 S=HPH^T+HU+U^TH^T+R,\quad C=PH^T+U,
-\]
-\[
+```
+
+```math
 \delta\hat x=CS^{-1}r,\qquad P^+=P-CS^{-1}C^T.
-\]
+```
 
 Both `[[P,U],[U.T,R]]` and the innovation covariance must satisfy their covariance
 conditions: the joint covariance is positive semidefinite, and the innovation
@@ -125,11 +126,11 @@ injection/reset and every corresponding covariance transformation.
 When noise is independent of state (`U=0`) but position and direction noise are
 correlated, a correct sequential factorization uses
 
-\[
+```math
 L=R_{tp}R_{pp}^{-1},\quad
 \tilde r_t=r_t-Lr_p,\quad\tilde H_t=H_t-LH_p,
 \quad\tilde R_t=R_{tt}-LR_{pt}.
-\]
+```
 
 After the position update, use innovation
 `tilde_r_t - tilde_H_t delta_x_p` for the second linear conditioning. This agrees
@@ -151,11 +152,11 @@ and it is not directly valid for nonzero `U` or an unaccounted intervening reset
 
 Known direction-rate bounds would give
 
-\[
+```math
 \angle(d(t_a),d(t_d))\leq
 \min\!\left(\pi,\int_{t_a}^{t_d}\|\omega(t)\|\,dt\right)
 \leq\min(\pi,\Omega_{max}(t_d-t_a)).
-\]
+```
 
 The required bound is on **true** motion. Clipped desired rates are not such a
 bound. Using the old single-input angle ceiling, an illustrative true-rate
@@ -176,9 +177,9 @@ remain separate events.
 If each of `N` zero-mean tangent noise marginals has covariance bounded by
 `sigma_max² I`, a union bound gives a sequence radius
 
-\[
+```math
 s=\sigma_{max}\sqrt{2\log(N/\alpha)}
-\]
+```
 
 with failure probability at most `alpha`. Temporal independence is unnecessary
 for this upper bound. The dimensionless example `N=1000`, `alpha=0.01` gives
@@ -198,10 +199,10 @@ prove impossibility in every maneuver.
 
 The prospective controller screen still requires
 
-\[
+```math
 b_p\epsilon_p+b_v\epsilon_v+b_\eta\epsilon_\eta
 +b_{\dot\eta}\epsilon_{\dot\eta}+b_{initial}+\rho\leq0.08\;\mathrm m.
-\]
+```
 
 Use the unrounded [saved coefficients](whole-flight-error-budget.md). Raw angular
 measurement noise is not a bound on the estimator's inclination error, and a

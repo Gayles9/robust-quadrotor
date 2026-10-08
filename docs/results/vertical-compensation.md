@@ -22,10 +22,10 @@ it is not the default controller and does not meet the full flight requirements.
 
 With NED position, the new state is an acceleration correction:
 
-$$
+```math
 a_{command}=a_{PD}+[0,0,I]^T, \qquad
 \dot I=K_i(z_{reference}-\hat z), \qquad |I|\le I_{max}.
-$$
+```
 
 An aircraft below its reference has a negative reference-minus-estimate error,
 so the correction becomes negative: more upward thrust. The existing feasible

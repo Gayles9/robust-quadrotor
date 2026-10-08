@@ -16,11 +16,11 @@ The whole-flight budget is exact accounting of a saved trajectory. Let `e_c[k]`
 be each of the eleven existing physical response channels, with reference
 position subtracted from the reference channel. Then
 
-\[
+```math
 e[k]=\sum_c e_c[k],\qquad
 G_{cd}=\frac1N\sum_k e_c[k]^T e_d[k],\qquad
 \mathrm{MSE}=\mathbf1^T G\mathbf1.
-\]
+```
 
 `G` is an **uncentred** Gram matrix: it retains mean offsets as well as varying
 errors. The diagonal sum is not generally the total MSE. All signed cross terms
@@ -36,10 +36,10 @@ estimation errors predict future errors. The physical state is
 `x=[p,v,u,w,alpha]`, where `u` is inclination-induced horizontal acceleration,
 `w=du/dt`, and `alpha=dw/dt`. Between controller updates:
 
-\[
+```math
 \dot p=v,\quad\dot v=u,\quad\dot u=w,\quad\dot w=\alpha,
 \quad\tau\dot\alpha=\alpha_h-\alpha.
-\]
+```
 
 At each outer update `u_h=-Kp(p+e_p)-Kv(v+e_v)`. At each inner update
 `alpha_h=Kr[Ka(u_h-u-g eta)-(w+g eta_dot)]`. Here `eta` is the difference in
@@ -52,17 +52,17 @@ time constant 25 ms, `Kp=1`, `Kv=1.8`, `Ka=3`, `Kr=12`, `g=9.81` in SI units.
 Every outer period has six input slots: one position sample, one velocity sample,
 and two pairs of inclination/rate samples. Exact lifting gives
 
-\[
+```math
 x_{m+1}=Ax_m+Bu_m,\qquad p_{m,j}=C_jx_m+D_ju_m.
-\]
+```
 
 The matrices retain the original update order and all eight intersample output
 phases. For sinusoidal inputs, phase the two inner samples at their actual
 acquisition times. With that input map `W(omega)`, the frequency response is
 
-\[
+```math
 H_j(\omega)=\left[C_j(e^{i\omega T}I-A)^{-1}B+D_j\right]W(\omega).
-\]
+```
 
 The grid contains DC and 241 fixed frequencies from 0.01 to 25 Hz. It is an
 analysis grid, not a gain search or a continuous-frequency maximum proof.
@@ -76,9 +76,9 @@ current-period coefficient is `D_j`. Sum their absolute values by input family
 to obtain `b_c(m,j)`. For a bound `epsilon_c` on the **horizontal vector norm**
 of every sample of input family `c`, triangle inequality gives
 
-\[
+```math
 \|p_{m,j}\|_2\leq\sum_c b_c(m,j)\epsilon_c.
-\]
+```
 
 No independence assumption or extra factor of square root of two is needed.
 Adversarial signs aligned with one fixed horizontal direction attain each
@@ -97,10 +97,10 @@ These ceilings are **not simultaneous allowances**. A prospective joint screen
 must include all four terms, the initial response, and a justified allowance
 `rho` for vertical error, physical disturbances and local-model discrepancy:
 
-\[
+```math
 0.999866\epsilon_p+1.799760\epsilon_v+9.808690\epsilon_\eta
 +3.269563\epsilon_{\dot\eta}+b_{\rm initial}+\rho\leq0.08\;\mathrm m.
-\]
+```
 
 Use unrounded saved coefficients for numerical evaluation. This is a sufficient
 local-model screen only when its input bounds and residual allowance are actually

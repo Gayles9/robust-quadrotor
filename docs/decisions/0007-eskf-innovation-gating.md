@@ -23,77 +23,81 @@ to call them.
 
 ## Observation mathematics
 
-Let $\hat x^-$ be the nominal state immediately before one observation, and let
-$P^-\in\mathbb R^{15\times15}$ be its right-local error covariance in ADR 0004 order.
-For measurement $z\in\mathbb R^m$, model prediction $h(\hat x^-)\in\mathbb R^m$,
-error Jacobian $H\in\mathbb R^{m\times15}$ and discrete observation-noise covariance
-$R\in\mathbb R^{m\times m}$, the linearized observation error is
+Let $`\hat x^-`$ be the nominal state immediately before one observation, and let
+$`P^-\in\mathbb R^{15\times15}`$ be its right-local error covariance in ADR 0004 order.
+For measurement $`z\in\mathbb R^m`$, model prediction $`h(\hat x^-)\in\mathbb R^m`$,
+error Jacobian $`H\in\mathbb R^{m\times15}`$ and discrete observation-noise covariance
+$`R\in\mathbb R^{m\times m}`$, the linearized observation error is
 
-$$
-z-h(\hat x^-)\simeq H\delta x+v,\qquad
-\mathbb E[\delta x]=0,\quad \operatorname{Cov}(\delta x)=P^-,\quad
-\mathbb E[v]=0,\quad \operatorname{Cov}(v)=R.
-$$
+```math
+\begin{aligned}
+z-h(\hat x^-)&\simeq H\delta x+v, \\
+\mathbb E[\delta x]&=0, \\
+\operatorname{Cov}(\delta x)&=P^-, \\
+\mathbb E[v]&=0, \\
+\operatorname{Cov}(v)&=R.
+\end{aligned}
+```
 
-The model assumes observation noise $v$ is independent of prior error $\delta x$.
+The model assumes observation noise $`v`$ is independent of prior error $`\delta x`$.
 The **innovation** is the measured-minus-predicted residual, and its predicted covariance is
 
-$$
+```math
 r=z-h(\hat x^-),\qquad S=H P^- H^T+R.
-$$
+```
 
-$S$ represents uncertainty from both the prior and the measurement. Dividing an error only
+$`S`$ represents uncertainty from both the prior and the measurement. Dividing an error only
 by a sensor standard deviation would omit the prior uncertainty. `compute_eskf_linear_innovation`
-validates $P^-$ and $R$ as finite symmetric positive semidefinite matrices, then forms $r$
-and $S$ with the same multiplication/symmetrization order as the correction core.
+validates $`P^-`$ and $`R`$ as finite symmetric positive semidefinite matrices, then forms $`r`$
+and $`S`$ with the same multiplication/symmetrization order as the correction core.
 
 The replay models are exactly those in ADR 0005:
 
 | Observation | Dimension | Model | Nonzero Jacobian block |
 | --- | --- | --- | --- |
-| Local position | $m=3$ | $h_p=\hat p_W+b^{\mathrm{nom}}_{p,W}$ | $H_p[:,0:3]=I_3$ |
-| Barometric altitude | $m=1$ | $h_a=h_{\mathrm{ref}}-\hat p_{W,z}+b^{\mathrm{nom}}_a$ | $H_a[0,2]=-1$ |
+| Local position | $`m=3`$ | $`h_p=\hat p_W+b^{\mathrm{nom}}_{p,W}`$ | $`H_p[:,0:3]=I_3`$ |
+| Barometric altitude | $`m=1`$ | $`h_a=h_{\mathrm{ref}}-\hat p_{W,z}+b^{\mathrm{nom}}_a`$ | $`H_a[0,2]=-1`$ |
 
-$\hat p_W$ and local-position residuals use NED coordinates in metres. Altitude is a
-positive-up scalar in metres, while $\hat p_{W,z}$ is positive down. Sensor biases and
+$`\hat p_W`$ and local-position residuals use NED coordinates in metres. Altitude is a
+positive-up scalar in metres, while $`\hat p_{W,z}`$ is positive down. Sensor biases and
 the altitude datum are explicit nominal assumptions; neither is recovered from truth.
-For these two models $r$ has units m and $S$ has units m². The generic function also
+For these two models $`r`$ has units m and $`S`$ has units m². The generic function also
 supports other positive observation dimensions when the caller supplies consistent units.
 
 ## Whitening and NIS without an inverse
 
-The implementation requires $S$ to be numerically positive definite. Define the diagonal
-matrix $D=\operatorname{diag}(\sqrt{S_{11}},\ldots,\sqrt{S_{mm}})$ and factor the
+The implementation requires $`S`$ to be numerically positive definite. Define the diagonal
+matrix $`D=\operatorname{diag}(\sqrt{S_{11}},\ldots,\sqrt{S_{mm}})`$ and factor the
 dimensionless correlation-scaled matrix:
 
-$$
+```math
 C=D^{-1}SD^{-1}=LL^T,\qquad y=L^{-1}D^{-1}r,
 \qquad \epsilon_\nu=y^Ty=r^TS^{-1}r.
-$$
+```
 
-$L\in\mathbb R^{m\times m}$ is lower triangular. The **whitened innovation**
-$y\in\mathbb R^m$ is dimensionless, as is NIS $\epsilon_\nu\ge0$. NIS measures
+$`L\in\mathbb R^{m\times m}`$ is lower triangular. The **whitened innovation**
+$`y\in\mathbb R^m`$ is dimensionless, as is NIS $`\epsilon_\nu\ge0`$. NIS measures
 squared residual length relative to its predicted uncertainty, including correlations.
 The equalities use inverses as mathematical notation; code divides by diagonal scales
 and solves a Cholesky system. It never constructs a matrix inverse.
 
-`EskfInnovation` accepts only $r$ and $S$, computes $y$ and NIS itself, and stores all
+`EskfInnovation` accepts only $`r`$ and $`S`$, computes $`y`$ and NIS itself, and stores all
 three arrays as independent C-contiguous read-only float64 copies. Callers cannot supply
 an inconsistent precomputed NIS. `math.hypot` computes the norm before squaring so that
 individually underflowing squared components can still yield a representable total.
 Normal float64 rounding remains, including zero for a total below representable precision.
 
 Shapes must be exact, arrays real and finite, and the locally scaled PSD/symmetry rules
-remain those of the ESKF core. Singular $S$, failed factorization, nonfinite arithmetic,
+remain those of the ESKF core. Singular $`S`$, failed factorization, nonfinite arithmetic,
 or unrepresentable whitening/NIS raises `ValueError`. There is no pseudoinverse, jitter,
 variance floor, clipping or covariance inflation. Numerical failure is not an outlier
-classification. For example, zero residual does not make singular $S$ acceptable.
+classification. For example, zero residual does not make singular $`S`$ acceptable.
 
 ## Explicit statistical policy
 
-For a correctly specified zero-mean Gaussian innovation with covariance $S$, whitening
+For a correctly specified zero-mean Gaussian innovation with covariance $`S`$, whitening
 yields independent standard-normal components. NIS then follows a chi-square distribution
-with $m$ degrees of freedom. An upper-tail test compares NIS with a fixed critical value.
+with $`m`$ degrees of freedom. An upper-tail test compares NIS with a fixed critical value.
 NIST's [distribution definition][nist-distribution] and [critical-value table][nist-table]
 provide the reference for the explicit preset below.
 
@@ -115,7 +119,7 @@ sequence-wide false-alarm guarantee, an outlier-detection guarantee or measured 
 consistency. Successive filter innovations need not satisfy the ideal model in practice.
 
 Thresholds must be chosen before evaluation. The implementation does not estimate them
-from observed residuals, retry rejected values, alter $Q_c/R$, consult truth labels, or
+from observed residuals, retry rejected values, alter $`Q_c/R`$, consult truth labels, or
 adapt confidence levels. A poor prior, incorrect bias/noise assumptions or a large
 linearization error can reject a valid physical measurement. Prolonged rejection can
 leave the filter drifting. Statistical gating alone does not establish robustness.
@@ -148,7 +152,7 @@ The runner retains the ADR 0006 precedence and position-before-altitude order:
 1. Pending records remain pending; delivered older acquisitions become `STALE`.
 2. A fresh observation with its fusion flag off becomes `DISABLED`.
 3. A fresh enabled observation is scored only when a policy is present.
-4. With threshold $\tau$, reject if and only if $\epsilon_\nu>\tau$. Equality is accepted.
+4. With threshold $`\tau`$, reject if and only if $`\epsilon_\nu>\tau`$. Equality is accepted.
 5. Otherwise invoke the unchanged sensor-specific correction, injection and reset.
 
 `REJECTED` never reaches correction. Its state and covariance remain exactly the

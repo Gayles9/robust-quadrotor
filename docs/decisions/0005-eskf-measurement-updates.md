@@ -17,10 +17,12 @@ about the corrected state. These routines do not schedule sensor delivery.
 The existing nominal state has 16 stored scalars and a unit-quaternion constraint. Its
 15-dimensional local error remains
 
-$$
-\delta x=(\delta p_W,\delta v_W,\delta\theta_B,\delta b_{a,B},\delta b_{g,B}),
-\qquad R_{\mathrm{true},WB}=R_{\mathrm{nominal},WB}\operatorname{Exp}([\delta\theta_B]_\times).
-$$
+```math
+\begin{aligned}
+\delta x&=(\delta p_W,\delta v_W,\delta\theta_B,\delta b_{a,B},\delta b_{g,B}), \\
+R_{\mathrm{true},WB}&=R_{\mathrm{nominal},WB}\operatorname{Exp}([\delta\theta_B]_\times).
+\end{aligned}
+```
 
 Position and velocity errors are in metres and metres per second; attitude error is in
 radians; IMU bias errors are in metres per second squared and radians per second. Covariance
@@ -31,17 +33,19 @@ signs retain ADR 0004.
 
 The position model, expressed in the NED world frame, is
 
-$$
+```math
 h_p(x)=p_W+\bar b_{p,W},\qquad H_p=[I_3\;0\;0\;0\;0]\in\mathbb R^{3\times15}.
-$$
+```
 
 The positive-up altitude model is
 
-$$
-h_h(x)=h_{\mathrm{ref}}-e_3^T p_W+\bar b_h,
-\qquad H_h=[-e_3^T\;0\;0\;0\;0]\in\mathbb R^{1\times15},
-\qquad e_3=(0,0,1)^T.
-$$
+```math
+\begin{aligned}
+h_h(x)&=h_{\mathrm{ref}}-e_3^T p_W+\bar b_h, \\
+H_h&=[-e_3^T\;0\;0\;0\;0]\in\mathbb R^{1\times15}, \\
+e_3&=(0,0,1)^T.
+\end{aligned}
+```
 
 The overbars identify explicit *assumed* constant sensor biases. These parameters and the
 reference altitude are supplied by the caller, normally from nominal sensor configuration.
@@ -65,25 +69,25 @@ state, interpolate, reject stale data, or reinterpret a delayed measurement as c
 ## Correction and Joseph covariance
 
 For a generic observation dimension `m > 0`, define the prior covariance
-$P\in\mathbb R^{15\times15}$, observation $z\in\mathbb R^m$, prediction
-$h\in\mathbb R^m$, error Jacobian $H\in\mathbb R^{m\times15}$, and noise covariance
-$R\in\mathbb R^{m\times m}$. The local error mean before each call is zero. The update uses
+$`P\in\mathbb R^{15\times15}`$, observation $`z\in\mathbb R^m`$, prediction
+$`h\in\mathbb R^m`$, error Jacobian $`H\in\mathbb R^{m\times15}`$, and noise covariance
+$`R\in\mathbb R^{m\times m}`$. The local error mean before each call is zero. The update uses
 
-$$
+```math
 r=z-h,\qquad S=HPH^T+R,\qquad SK^T=HP,\qquad \widehat{\delta x}=Kr.
-$$
+```
 
 Here `r` is the innovation, `S` is its predicted covariance, and `K` is the Kalman gain.
 The implementation solves for the gain without forming a matrix inverse. Let
-$D=\operatorname{diag}(\sqrt{S_{ii}})$ and factor
-$D^{-1}SD^{-1}=LL^T$. Two linear solves followed by unscaling recover `K`. Diagonal scaling
+$`D=\operatorname{diag}(\sqrt{S_{ii}})`$ and factor
+$`D^{-1}SD^{-1}=LL^T`$. Two linear solves followed by unscaling recover `K`. Diagonal scaling
 reduces sensitivity to disparate measurement variances; it does not cure rank deficiency.
 
 The covariance before coordinate reset uses Joseph form:
 
-$$
+```math
 A=I_{15}-KH,\qquad P_J=APA^T+KRK^T.
-$$
+```
 
 Both terms are positive semidefinite analytically. The implementation removes floating-point
 antisymmetry using the existing exact-entry-preserving symmetrizer and validates the result.
@@ -103,30 +107,29 @@ error is then defined about this updated nominal state, so its covariance must a
 coordinates. This reset operation follows the ESKF construction in Solà (2017), Section 6;
 the implementation specializes it to the project's fixed-gravity 15-state convention.
 
-Write $\phi=\widehat{\delta\theta_B}$ and perturb the pre-reset attitude error about that
-correction by $\epsilon$. The post-reset rotation error is
+Write $`\phi=\widehat{\delta\theta_B}`$ and perturb the pre-reset attitude error about that
+correction by $`\epsilon`$. The post-reset rotation error is
 
-$$
+```math
 g(\epsilon)=\operatorname{Log}\left(\operatorname{Exp}(-[\phi]_\times)
 \operatorname{Exp}([\phi+\epsilon]_\times)\right).
-$$
+```
 
 The right Jacobian identity
-$\operatorname{Exp}(\phi+\epsilon)\simeq\operatorname{Exp}(\phi)
-\operatorname{Exp}(J_r(\phi)\epsilon)$ gives $Dg(0)=J_r(\phi)$. Using the closed form
+$`\operatorname{Exp}(\phi+\epsilon)\simeq\operatorname{Exp}(\phi) \operatorname{Exp}(J_r(\phi)\epsilon)`$ gives $`Dg(0)=J_r(\phi)`$. Using the closed form
 from Solà, Deray, and Atchuthan, equation (143),
 
-$$
+```math
 J_r(\phi)=I_3-\frac{1-\cos\theta}{\theta^2}[\phi]_\times
 +\frac{\theta-\sin\theta}{\theta^3}[\phi]_\times^2,
 \qquad \theta=\|\phi\|.
-$$
+```
 
 Thus
 
-$$
+```math
 \Gamma=\operatorname{diag}(I_6,J_r(\phi),I_6),\qquad P^+=\Gamma P_J\Gamma^T.
-$$
+```
 
 All attitude cross-covariances are transformed. IMU bias coordinates remain body/sensor
 coordinates, so their reset blocks are identity. The code evaluates the exact local

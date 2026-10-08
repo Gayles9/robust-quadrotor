@@ -143,11 +143,19 @@ At `t[k+1]` both endpoint samples are available. After subtracting estimated bia
 the old sample's conditional noise mean, let the two specific forces be `f0,f1` and
 body rates `w0,w1`. For `h=t[k+1]-t[k]>0`, `R=R_WB[k]` and NED gravity `g_W`,
 
-$$\phi=\tfrac h2(\omega_0+\omega_1),\qquad
-R_1=R\operatorname{Exp}([\phi]_\times),$$
-$$a_0=g_W+Rf_0,\qquad a_1=g_W+R_1f_1,$$
-$$v_1=v+h(a_0+a_1)/2,\qquad
-p_1=p+hv+h^2(2a_0+a_1)/6.$$
+```math
+\phi=\tfrac h2(\omega_0+\omega_1),\qquad
+R_1=R\operatorname{Exp}([\phi]_\times),
+```
+
+```math
+a_0=g_W+Rf_0,\qquad a_1=g_W+R_1f_1,
+```
+
+```math
+v_1=v+h(a_0+a_1)/2,\qquad
+p_1=p+hv+h^2(2a_0+a_1)/6.
+```
 
 Here `phi` is a body-local rotation vector in radians, `R` and `R1` map body to world,
 accelerations are NED m/s², velocity is NED m/s and position is NED metres. Translation
@@ -168,7 +176,9 @@ bias endpoint increment with covariance `W*h`, and discards the previous noise v
 after its final use. `eskf_endpoint_map` returns the nominal state and analytic
 matrices `A (21,21)` and `B (21,12)`; prediction uses
 
-$$C_1=AC A^T+B\operatorname{diag}(\Sigma,Wh)B^T.$$
+```math
+C_1=AC A^T+B\operatorname{diag}(\Sigma,Wh)B^T.
+```
 
 `C` is joint covariance and `W` is bias-increment spectral density. The 12 driver
 coordinates are new accelerometer/gyro noise followed by accelerometer/gyro bias
@@ -255,20 +265,27 @@ ownership; they are not a security boundary against deliberate buffer mutation.
 Synthetic motion does not call ESKF propagation or numerical plant integration. For each
 NED axis, the exact position, velocity and acceleration are
 
-$$p_i(t)=A_i\sin(w_i t+\alpha_i)+u_i t,$$
-$$v_i(t)=A_i w_i\cos(w_i t+\alpha_i)+u_i,\qquad
-a_i(t)=-A_i w_i^2\sin(w_i t+\alpha_i).$$
+```math
+p_i(t)=A_i\sin(w_i t+\alpha_i)+u_i t,
+```
+
+```math
+v_i(t)=A_i w_i\cos(w_i t+\alpha_i)+u_i,\qquad
+a_i(t)=-A_i w_i^2\sin(w_i t+\alpha_i).
+```
 
 Here `A` is in metres, `w` in radians/second, `alpha` in radians and `u` in m/s. The
 roll/pitch/yaw angles have an analogous sinusoidal form plus optional constant Euler
 rates. For roll `phi`, pitch `theta` and yaw `psi`, the body-to-world rotation is
 `Rz(psi) Ry(theta) Rx(phi)`. Its differentiated body angular velocity is
 
-$$\omega_B=\begin{bmatrix}
+```math
+\omega_B=\begin{bmatrix}
 \dot\phi-\dot\psi\sin\theta\\
 \dot\theta\cos\phi+\dot\psi\sin\phi\cos\theta\\
 -\dot\theta\sin\phi+\dot\psi\cos\phi\cos\theta
-\end{bmatrix},\qquad f_B=R_{WB}^{T}(a_W-[0,0,g]^T).$$
+\end{bmatrix},\qquad f_B=R_{WB}^{T}(a_W-[0,0,g]^T).
+```
 
 Central differences independently verify `p_dot=v`, `v_dot=a` and
 `R_dot=R skew(omega_B)`. Noise-free strapdown integration is checked under step refinement;

@@ -27,21 +27,21 @@ world `z`.
 `R_WB` is an active rotation that maps components expressed in the body frame
 into components expressed in the world frame:
 
-$$
+```math
 v_W = R_{WB} v_B
-$$
+```
 
 Its transpose performs the inverse mapping:
 
-$$
+```math
 v_B = R_{WB}^{T} v_W
-$$
+```
 
 Rotation composition follows
 
-$$
+```math
 R_{WC} = R_{WB} R_{BC},
-$$
+```
 
 where the rightmost rotation acts first.
 
@@ -50,11 +50,11 @@ quaternion convention, scalar-first ordering `[w, x, y, z]`, and unit norm.
 The quaternions `q_WB` and `-q_WB` represent the same physical orientation.
 Its action on a body vector is
 
-$$
+```math
 [0, v_W] = q_{WB} \otimes [0, v_B] \otimes q_{WB}^{*},
-$$
+```
 
-where $\otimes$ is the Hamilton product and $*$ is quaternion conjugation.
+where $`\otimes`$ is the Hamilton product and $`*`$ is quaternion conjugation.
 
 ## Initial Simulator Truth State
 
@@ -68,15 +68,15 @@ where $\otimes$ is the Hamilton product and $*$ is quaternion conjugation.
 
 Gravity expressed in world coordinates is
 
-$$
+```math
 gravity_W = [0, 0, g]\ \mathrm{m/s^2}.
-$$
+```
 
 Collective thrust force expressed in body coordinates is
 
-$$
+```math
 force_B = [0, 0, -T]\ \mathrm{N}.
-$$
+```
 
 The body moment is `moment_B`, expressed in `B`, with shape `(3,)` and units
 N·m.
@@ -104,28 +104,28 @@ quadratic coefficients along the FRD body axes.
 
 The exact equations are
 
-$$
+```math
 velocity\_air_W = velocity_W - wind\_velocity_W,
-$$
+```
 
-$$
+```math
 velocity\_air_B = R_{WB}^{T} velocity\_air_W,
-$$
+```
 
 and, element by element,
 
-$$
+```math
 force\_drag_B = -quadratic\_drag\_coefficient_B
 \odot |velocity\_air_B| \odot velocity\_air_B.
-$$
+```
 
-Here $\odot$ denotes elementwise multiplication. Because every coefficient is nonnegative,
+Here $`\odot`$ denotes elementwise multiplication. Because every coefficient is nonnegative,
 the force cannot add power relative to the air:
 
-$$
+```math
 force\_drag_B^{T} velocity\_air_B
 = -\sum_i c_i |v_i|^3 \le 0.
-$$
+```
 
 For the identity attitude, a vehicle moving north at `+2 m/s` in calm air has positive
 forward relative-air velocity and therefore negative-forward drag. A stationary vehicle in
