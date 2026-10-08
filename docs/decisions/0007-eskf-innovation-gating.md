@@ -6,7 +6,7 @@
   [ADR 0006](0006-eskf-sensor-replay.md)
 - Implementation: `eskf_innovation.py`, `eskf_replay.py`, `eskf_run_replay.py`
 - Evidence: `test_eskf_innovation.py`, `test_eskf_gating.py`, `test_eskf_run_replay.py`,
-  [verification record](../progress/2026-09-23-eskf-innovation-gating.md)
+  [verification record](../archive/records/eskf-innovation-gating.md)
 
 ## Context and scope
 

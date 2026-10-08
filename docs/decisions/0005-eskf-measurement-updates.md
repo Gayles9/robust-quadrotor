@@ -5,7 +5,7 @@
 - Extends: [ADR 0004](0004-eskf-error-state-conventions.md)
 - Implementation: `src/quadrotor_math/eskf.py`
 - Evidence: `tests/unit/test_eskf_update.py` and the
-  [verification record](../progress/2026-09-23-eskf-measurement-updates-and-contract-audit.md)
+  [verification record](../archive/records/eskf-measurement-updates-and-contract-audit.md)
 
 ## Context and scope
 

@@ -2,7 +2,7 @@
 
 Status: frozen before implementation and candidate flights, 2026-09-28.
 Outcome: implemented and evaluated; candidate rejected. The
-[complete record](../progress/2026-09-28-vertical-compensation.md) retains all
+[complete record](../archive/records/vertical-compensation.md) retains all
 24 executions, 12 passing response cases, and the mass-RMSE and hover comparison
 failures. The frozen policy and acceptance conditions below are unchanged.
 

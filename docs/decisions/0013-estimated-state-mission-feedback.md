@@ -128,10 +128,10 @@ The implementation and unit/static gates pass; the first noisy hover exceeds
 the inherited .08 m hold-peak target (.107563 m). That fixed case remains a failed
 acceptance condition even though it completes without limiting. The code, gains,
 seeds and criteria were not changed to turn it into a pass. The complete
-[verification record](../progress/2026-09-24-estimated-state-feedback.md) separates
+[verification record](../archive/records/estimated-state-feedback.md) separates
 algorithm/interface correctness, previous-path compatibility and measured performance.
 
 The subsequent bounded gain/prior design is recorded separately in
 [ADR 0014](0014-estimated-feedback-bandwidth.md) and its
-[qualification record](../progress/2026-09-24-feedback-design.md).
+[qualification record](../archive/records/feedback-design.md).
 It preserves this original profile and its measured miss.

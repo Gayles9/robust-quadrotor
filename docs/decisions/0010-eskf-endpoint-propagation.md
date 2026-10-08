@@ -3,7 +3,7 @@
 - Date: 2026-09-23
 - Baseline: `bf767d913967b7fa1a9ac11c32413658bf94fa1c`
 - Status: Implemented and verified; design fixed before implementation and held-out evaluation
-- Evidence: [calibration verification record](../progress/2026-09-23-eskf-endpoint-calibration.md)
+- Evidence: [calibration verification record](../archive/records/eskf-endpoint-calibration.md)
 - Extends: ADRs 0004–0009
 
 ## Evidence and scope

@@ -2,7 +2,7 @@
 
 These records explain why I chose an interface, model or validation protocol,
 what alternatives I considered, and what would justify changing the decision.
-They preserve the reasoning at the time. Use [current status](../status.md) and
+They preserve the reasoning at the time. Use [current status](../results/README.md) and
 the [next-step plan](../next-steps.md) for the present scope.
 
 ## Foundations
@@ -65,7 +65,7 @@ the [next-step plan](../next-steps.md) for the present scope.
 
 ## Writing a new decision
 
-Use the next number and a descriptive filename, such as `0034-short-title.md`.
+Use the next unused number and a descriptive filename.
 Explain the problem before the equations. State the evidence needed to accept
 the change and the limits that remain afterward.
 

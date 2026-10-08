@@ -4,8 +4,8 @@
 - Audited baseline: 4dded6210a6e07953f309e6426ec7d615060c4fd
 - Status: Accepted; design frozen before implementation, verified in the linked record
 
-See the [interface guide](../position-control.md) and
-[verification record](../progress/2026-09-24-position-control-and-missions.md).
+See the [interface guide](../design/position-control.md) and
+[verification record](../archive/records/position-control-and-missions.md).
 
 ## Scope and audit decision
 

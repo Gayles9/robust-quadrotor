@@ -5,7 +5,7 @@
 - Depends on: [error convention](0004-eskf-error-state-conventions.md),
   [correction](0005-eskf-measurement-updates.md),
   [replay](0006-eskf-sensor-replay.md), [NIS](0007-eskf-innovation-gating.md)
-- Evidence: [verification record](../progress/2026-09-23-eskf-consistency-evaluation.md)
+- Evidence: [verification record](../archive/records/eskf-consistency-evaluation.md)
 
 ## Responsibility and isolation
 

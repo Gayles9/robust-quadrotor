@@ -11,7 +11,7 @@
 - Implementation: `src/quadrotor_math/eskf_replay.py`,
   `src/quadrotor_math/eskf_run_replay.py`
 - Evidence: `tests/unit/test_eskf_replay.py`, `tests/unit/test_eskf_run_replay.py`,
-  [verification record](../progress/2026-09-23-eskf-sensor-replay.md)
+  [verification record](../archive/records/eskf-sensor-replay.md)
 
 ## Context and selected scope
 

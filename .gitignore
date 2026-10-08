@@ -39,3 +39,7 @@ htmlcov/
 logs/
 results/
 generated/
+
+# Maintained result explanations are documentation, not generated output
+!/docs/results/
+!/docs/results/**

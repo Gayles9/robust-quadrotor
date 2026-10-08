@@ -3,7 +3,7 @@
 - Date: 2026-09-23
 - Baseline: `a95fbfcc2054a9a18151cb4c7d58d3b5817d4642`
 - Status: Implemented; protocol specified before implementation and held-out execution
-- Evidence: [completion verification record](../progress/2026-09-23-eskf-completion.md)
+- Evidence: [completion verification record](../archive/records/eskf-completion.md)
 
 ## Completion boundary
 

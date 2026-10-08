@@ -4,8 +4,8 @@
 - Baseline: 8fef0ce6c811b64dc2e2ab4558591111254e5628
 - Status: Accepted; implemented and verified in the linked record
 
-See the [control guide](../control.md) and
-[verification record](../progress/2026-09-24-baseline-attitude-control.md).
+See the [control guide](../design/control.md) and
+[verification record](../archive/records/baseline-attitude-control.md).
 
 ## Scope
 
