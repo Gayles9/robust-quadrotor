@@ -46,7 +46,7 @@ use FRD; $`R_{WB}`$ maps body coordinates to world coordinates. The 15-vector is
 \boldsymbol e = \begin{bmatrix}
 \boldsymbol p_W^\star-\hat{\boldsymbol p}_W\\
 \boldsymbol v_W^\star-\hat{\boldsymbol v}_W\\
-\operatorname{Log}(\hat R_{WB}^{T}R_{WB}^\star)\\
+\mathrm{Log}(\hat R_{WB}^{T}R_{WB}^\star)\\
 \boldsymbol b_{a,B}^\star-\hat{\boldsymbol b}_{a,B}\\
 \boldsymbol b_{g,B}^\star-\hat{\boldsymbol b}_{g,B}
 \end{bmatrix}.
@@ -54,7 +54,7 @@ use FRD; $`R_{WB}`$ maps body coordinates to world coordinates. The 15-vector is
 
 Here `Log` returns a three-dimensional rotation vector, not a matrix logarithm.
 The block units are m, m/s, rad, m/s² and rad/s. The attitude error is right-local:
-$`R_{WB}^\star=\hat R_{WB}\operatorname{Exp}([\boldsymbol e_\theta]_\times)`$.
+$`R_{WB}^\star=\hat R_{WB}\mathrm{Exp}([\boldsymbol e_\theta]_\times)`$.
 It is expressed in the nominal body's local coordinates, consistent with injection
 and the covariance in ADR 0004; it is not an Euler-angle subtraction or world-local error.
 
@@ -64,7 +64,7 @@ $`w\ge0`$. With $`s=\|\boldsymbol u\|`$, the principal rotation vector is
 
 ```math
 \boldsymbol e_\theta=
-\frac{2\operatorname{atan2}(s,w)}{s}\boldsymbol u,
+\frac{2\mathrm{atan2}(s,w)}{s}\boldsymbol u,
 \qquad s>0.
 ```
 
@@ -93,7 +93,7 @@ $`P\in\mathbb R^{15\times15}`$,
 The dimensionless statistic expresses error relative to predicted uncertainty, including
 cross-correlations. `normalized_estimation_error_squared` requires finite, symmetric,
 numerically positive-definite $`P`$. It reuses the core's covariance validation and
-diagonally scaled Cholesky factorization. If $`D=\operatorname{diag}(\sqrt{P_{ii}})`$ and
+diagonally scaled Cholesky factorization. If $`D=\mathrm{diag}(\sqrt{P_{ii}})`$ and
 $`D^{-1}PD^{-1}=LL^T`$, solve $`L\boldsymbol z=D^{-1}\boldsymbol e`$ and return
 $`\|\boldsymbol z\|^2`$. A scaled Euclidean norm avoids premature square underflow.
 No inverse, pseudoinverse, jitter or covariance floor is used.
@@ -114,7 +114,7 @@ The core uses $`Q_d=GQ_cG^T\Delta t`$. Matching the leading velocity and attitud
 increments therefore gives
 
 ```math
-Q_c=\operatorname{diag}\!\left(
+Q_c=\mathrm{diag}\!\left(
 \boldsymbol\sigma_a^{\odot2}\Delta t,
 \boldsymbol\sigma_g^{\odot2}\Delta t,
 \boldsymbol\eta_a^{\odot2},
@@ -176,7 +176,7 @@ probabilities
 
 ```math
 Q_{2r}(x)=e^{-t}\sum_{j=0}^{r-1}\frac{t^j}{j!},\qquad
-Q_{2r+1}(x)=\operatorname{erfc}(\sqrt t)+
+Q_{2r+1}(x)=\mathrm{erfc}(\sqrt t)+
 \sum_{j=0}^{r-1}\frac{e^{-t}t^{j+1/2}}{\Gamma(j+3/2)}.
 ```
 

@@ -53,7 +53,7 @@ initialization method requires a separate contract; future samples are not backf
 For each subsequent row $`i>0`$, the previous paired sample is held over the interval:
 
 ```math
-(\hat x_i^-,P_i^-)=\operatorname{Predict}_{\text{ADR 0004}}
+(\hat x_i^-,P_i^-)=\mathrm{Predict}_{\text{ADR 0004}}
 \left(\hat x_{i-1}^+,P_{i-1}^+,f^m_{B,i-1},\omega^m_{B,i-1},
 g,Q_c,t_i-t_{i-1}\right).
 ```

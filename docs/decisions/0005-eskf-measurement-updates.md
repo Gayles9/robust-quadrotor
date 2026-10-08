@@ -20,7 +20,7 @@ The existing nominal state has 16 stored scalars and a unit-quaternion constrain
 ```math
 \begin{aligned}
 \delta x&=(\delta p_W,\delta v_W,\delta\theta_B,\delta b_{a,B},\delta b_{g,B}), \\
-R_{\mathrm{true},WB}&=R_{\mathrm{nominal},WB}\operatorname{Exp}([\delta\theta_B]_\times).
+R_{\mathrm{true},WB}&=R_{\mathrm{nominal},WB}\mathrm{Exp}([\delta\theta_B]_\times).
 \end{aligned}
 ```
 
@@ -79,7 +79,7 @@ r=z-h,\qquad S=HPH^T+R,\qquad SK^T=HP,\qquad \widehat{\delta x}=Kr.
 
 Here `r` is the innovation, `S` is its predicted covariance, and `K` is the Kalman gain.
 The implementation solves for the gain without forming a matrix inverse. Let
-$`D=\operatorname{diag}(\sqrt{S_{ii}})`$ and factor
+$`D=\mathrm{diag}(\sqrt{S_{ii}})`$ and factor
 $`D^{-1}SD^{-1}=LL^T`$. Two linear solves followed by unscaling recover `K`. Diagonal scaling
 reduces sensitivity to disparate measurement variances; it does not cure rank deficiency.
 
@@ -111,12 +111,12 @@ Write $`\phi=\widehat{\delta\theta_B}`$ and perturb the pre-reset attitude error
 correction by $`\epsilon`$. The post-reset rotation error is
 
 ```math
-g(\epsilon)=\operatorname{Log}\left(\operatorname{Exp}(-[\phi]_\times)
-\operatorname{Exp}([\phi+\epsilon]_\times)\right).
+g(\epsilon)=\mathrm{Log}\left(\mathrm{Exp}(-[\phi]_\times)
+\mathrm{Exp}([\phi+\epsilon]_\times)\right).
 ```
 
 The right Jacobian identity
-$`\operatorname{Exp}(\phi+\epsilon)\simeq\operatorname{Exp}(\phi) \operatorname{Exp}(J_r(\phi)\epsilon)`$ gives $`Dg(0)=J_r(\phi)`$. Using the closed form
+$`\mathrm{Exp}(\phi+\epsilon)\simeq\mathrm{Exp}(\phi) \mathrm{Exp}(J_r(\phi)\epsilon)`$ gives $`Dg(0)=J_r(\phi)`$. Using the closed form
 from Solà, Deray, and Atchuthan, equation (143),
 
 ```math
@@ -128,7 +128,7 @@ J_r(\phi)=I_3-\frac{1-\cos\theta}{\theta^2}[\phi]_\times
 Thus
 
 ```math
-\Gamma=\operatorname{diag}(I_6,J_r(\phi),I_6),\qquad P^+=\Gamma P_J\Gamma^T.
+\Gamma=\mathrm{diag}(I_6,J_r(\phi),I_6),\qquad P^+=\Gamma P_J\Gamma^T.
 ```
 
 All attitude cross-covariances are transformed. IMU bias coordinates remain body/sensor

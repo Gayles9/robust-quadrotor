@@ -33,9 +33,9 @@ $`R\in\mathbb R^{m\times m}`$, the linearized observation error is
 \begin{aligned}
 z-h(\hat x^-)&\simeq H\delta x+v, \\
 \mathbb E[\delta x]&=0, \\
-\operatorname{Cov}(\delta x)&=P^-, \\
+\mathrm{Cov}(\delta x)&=P^-, \\
 \mathbb E[v]&=0, \\
-\operatorname{Cov}(v)&=R.
+\mathrm{Cov}(v)&=R.
 \end{aligned}
 ```
 
@@ -67,7 +67,7 @@ supports other positive observation dimensions when the caller supplies consiste
 ## Whitening and NIS without an inverse
 
 The implementation requires $`S`$ to be numerically positive definite. Define the diagonal
-matrix $`D=\operatorname{diag}(\sqrt{S_{11}},\ldots,\sqrt{S_{mm}})`$ and factor the
+matrix $`D=\mathrm{diag}(\sqrt{S_{11}},\ldots,\sqrt{S_{mm}})`$ and factor the
 dimensionless correlation-scaled matrix:
 
 ```math

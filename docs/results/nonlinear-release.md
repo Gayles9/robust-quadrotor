@@ -30,7 +30,7 @@ error, six fresh sample errors and six bias increments:
 
 ```math
 X\sim\mathcal N(0,\Sigma),\qquad
-\Sigma=\operatorname{diag}(C_0,R_{IMU},hQ_b).
+\Sigma=\mathrm{diag}(C_0,R_{IMU},hQ_b).
 ```
 
 The nonlinear dependence is limited to six rotation variables. Define
@@ -61,7 +61,7 @@ variances nor adds a covariance floor. Unsupported nonstructural singularity is
 rejected explicitly.
 
 At a quadrature node,
-$`R_i=R_0\operatorname{Exp}(\delta\theta_0) \operatorname{Exp}(\phi+\delta\phi)`$.
+$`R_i=R_0\mathrm{Exp}(\delta\theta_0) \mathrm{Exp}(\phi+\delta\phi)`$.
 For the non-attitude output, let F preserve the affine variables and add
 $`h\delta v_0`$ to position. Let G have position block $`h^2I/2`$, velocity
 block $`hI`$, and zeros elsewhere. Relative to the deterministic nominal,

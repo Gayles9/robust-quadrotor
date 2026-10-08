@@ -71,14 +71,14 @@ mean, and retain the prior heading psi. Then
 
 ```math
 \begin{aligned}
-\hat\phi&=\operatorname{atan2}(-s_y,-s_z), \\
-\hat\theta&=\operatorname{atan2}(s_x,\sqrt{s_y^2+s_z^2}), \\
+\hat\phi&=\mathrm{atan2}(-s_y,-s_z), \\
+\hat\theta&=\mathrm{atan2}(s_x,\sqrt{s_y^2+s_z^2}), \\
 \hat R&=R_z(\psi)R_y(\hat\theta)R_x(\hat\phi),
 \end{aligned}
 ```
 
 ```math
-\hat b_{a,T}=\hat b_{a,0},\qquad \hat b_{g,T}=\operatorname{mean}(\omega).
+\hat b_{a,T}=\hat b_{a,0},\qquad \hat b_{g,T}=\mathrm{mean}(\omega).
 ```
 
 Gravity supplies two inclination directions. It supplies no heading. A single

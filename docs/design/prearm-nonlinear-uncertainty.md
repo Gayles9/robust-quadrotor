@@ -27,7 +27,7 @@ eta the accelerometer-mean error, and psi the independent heading error. Define
 t=Log(R_0^T R(s-eta,0)). The exact relative rotation is
 
 ```math
-R_0^T R(s-\eta,\psi)=\operatorname{Exp}(u\psi)\operatorname{Exp}(t).
+R_0^T R(s-\eta,\psi)=\mathrm{Exp}(u\psi)\mathrm{Exp}(t).
 ```
 
 The leading terms of its logarithm are
@@ -77,16 +77,16 @@ The joint Gaussian model of
 mean accelerometer error eta and terminal accelerometer-bias error b has
 
 ```math
-\operatorname{Cov}(\eta)=V_a,\quad
- \operatorname{Cov}(b,\eta)=C_a,\quad
- \operatorname{Cov}(b)=P_{aT}.
+\mathrm{Cov}(\eta)=V_a,\quad
+ \mathrm{Cov}(b,\eta)=C_a,\quad
+ \mathrm{Cov}(b)=P_{aT}.
 ```
 
 All are scalar multiples of identity in this fixed profile. Equivalently,
 
 ```math
 b=K\eta+\epsilon,\quad K=C_a V_a^{-1},\quad
- \operatorname{Cov}(\epsilon)=D=P_{aT}-C_aV_a^{-1}C_a^T,
+ \mathrm{Cov}(\epsilon)=D=P_{aT}-C_aV_a^{-1}C_a^T,
  \quad \epsilon\perp\eta.
 ```
 
@@ -121,8 +121,8 @@ independent standard-normal moment tests verify the implementation.
 Starting at R_0, compute the rotation mean by
 
 ```math
-\mu=\sum_i w_i\operatorname{Log}(\bar R^T R_i),\qquad
- \bar R\leftarrow\bar R\operatorname{Exp}(\mu).
+\mu=\sum_i w_i\mathrm{Log}(\bar R^T R_i),\qquad
+ \bar R\leftarrow\bar R\mathrm{Exp}(\mu).
 ```
 
 Require ||mu||<=1e-13 rad with at most eight corrections. Failure rejects the
@@ -134,7 +134,7 @@ Let e_i=Log(R_bar^T R_i)-mu. The joint covariance is
 P=\sum_i w_i
  \begin{bmatrix}e_i\\b_i\\0\end{bmatrix}
  \begin{bmatrix}e_i\\b_i\\0\end{bmatrix}^T
- +\operatorname{diag}(0_{3\times3},D,P_{gT}).
+ +\mathrm{diag}(0_{3\times3},D,P_{gT}).
 ```
 
 This representation retains attitude/bias cross terms and adds only the

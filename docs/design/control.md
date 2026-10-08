@@ -65,7 +65,7 @@ the **current body** coordinates. Its principal rotation vector e_B has directio
 along the required rotation axis and norm equal to the shortest angular error:
 
 ```math
-\mathbf e_B=\operatorname{Log}(R^\mathsf{T}R_d)^\vee.
+\mathbf e_B=\mathrm{Log}(R^\mathsf{T}R_d)^\vee.
 ```
 
 Here Log maps a rotation to a skew-symmetric matrix; vee extracts its three-vector.
@@ -76,7 +76,7 @@ scalar part. At an exact half-turn, use the first nonzero positive vector compon
 For s = ||v_e|| > 0:
 
 ```math
-\theta=2\operatorname{atan2}(s,w_e),\qquad
+\theta=2\mathrm{atan2}(s,w_e),\qquad
 \mathbf e_B=\frac{\theta}{s}\mathbf v_e,\qquad 0\leq\theta\leq\pi.
 ```
 
@@ -92,7 +92,7 @@ angular acceleration. With componentwise clipping and multiplication (⊙),
 
 ```math
 \boldsymbol\omega_d=
-\operatorname{clip}(K_a\odot\mathbf e_B,-\boldsymbol\omega_{\max},\boldsymbol\omega_{\max}),
+\mathrm{clip}(K_a\odot\mathbf e_B,-\boldsymbol\omega_{\max},\boldsymbol\omega_{\max}),
 \qquad
 \boldsymbol\alpha_d=K_r\odot(\boldsymbol\omega_d-\boldsymbol\omega_B),
 ```
@@ -103,7 +103,7 @@ angular acceleration. With componentwise clipping and multiplication (⊙),
 \boldsymbol\omega_B\times(I_n\boldsymbol\omega_B),
 \qquad
 \boldsymbol\tau_{\rm lim}
-=\operatorname{clip}(\boldsymbol\tau_{\rm req},-\boldsymbol\tau_{\max},\boldsymbol\tau_{\max}).
+=\mathrm{clip}(\boldsymbol\tau_{\rm req},-\boldsymbol\tau_{\max},\boldsymbol\tau_{\max}).
 ```
 
 All vectors above are (3,) current-body vectors. K_a and K_r are positive diagonal

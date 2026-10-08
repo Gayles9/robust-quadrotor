@@ -33,7 +33,7 @@ conditional noise mean. Preserve the existing orientation rule:
 
 ```math
 \phi=\frac h2(\omega_0+\omega_1),\quad
-R_1=R_0\operatorname{Exp}(\phi),\quad a_1=g_W+R_1 f_1.
+R_1=R_0\mathrm{Exp}(\phi),\quad a_1=g_W+R_1 f_1.
 ```
 
 Use the first post-release specific force for the open interval:
@@ -80,7 +80,7 @@ Attitude, bias and fresh-noise rows retain their existing definitions. Split
 these rows into A21x21 and B21x12 and propagate
 
 ```math
-C_1=AC_0A^T+B\operatorname{diag}(R_{IMU},hQ_b)B^T.
+C_1=AC_0A^T+B\mathrm{diag}(R_{IMU},hQ_b)B^T.
 ```
 
 Independent finite perturbations check every column and the full covariance.
@@ -121,11 +121,11 @@ r_y&=-hz\sin\psi.
 For yaw variance s² and force variance sigma_z²,
 
 ```math
-\operatorname{Var}(r_y)=h^2\sigma_z^2(1-e^{-2s^2})/2,
+\mathrm{Var}(r_y)=h^2\sigma_z^2(1-e^{-2s^2})/2,
 ```
 
 ```math
-\operatorname{Var}(r_x)=h^2\sigma_z^2
+\mathrm{Var}(r_x)=h^2\sigma_z^2
 (3/2-2e^{-s^2/2}+e^{-2s^2}/2).
 ```
 

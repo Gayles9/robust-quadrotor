@@ -145,7 +145,7 @@ body rates `w0,w1`. For `h=t[k+1]-t[k]>0`, `R=R_WB[k]` and NED gravity `g_W`,
 
 ```math
 \phi=\tfrac h2(\omega_0+\omega_1),\qquad
-R_1=R\operatorname{Exp}([\phi]_\times),
+R_1=R\mathrm{Exp}([\phi]_\times),
 ```
 
 ```math
@@ -177,7 +177,7 @@ after its final use. `eskf_endpoint_map` returns the nominal state and analytic
 matrices `A (21,21)` and `B (21,12)`; prediction uses
 
 ```math
-C_1=AC A^T+B\operatorname{diag}(\Sigma,Wh)B^T.
+C_1=AC A^T+B\mathrm{diag}(\Sigma,Wh)B^T.
 ```
 
 `C` is joint covariance and `W` is bias-increment spectral density. The 12 driver
