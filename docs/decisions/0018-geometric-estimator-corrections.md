@@ -17,14 +17,18 @@ on that same history reduces desired-acceleration moment RMS from 0.016614 to
 ## Bounded correction
 
 The ESKF's accepted update injects additive world position/velocity corrections
-delta_p [m] and delta_v [m/s]. These are revisions of an estimate, not measured
+$`\Delta\mathbf p`$ [m] and $`\Delta\mathbf v`$ [m/s]. These are revisions of an estimate, not measured
 physical impulses. Their jump in the PD correction force is
 
-    delta_c = m * (Kp * delta_p + Kv * delta_v)  [N].
+```math
+\Delta\mathbf c=m(K_p\Delta\mathbf p+K_v\Delta\mathbf v)\quad[\mathrm N].
+```
+
+The increments $`\Delta\mathbf p,\Delta\mathbf v`$ are accepted estimator corrections; $`K_p,K_v`$ are diagonal gain matrices.
 
 Accumulate these jumps between outer ticks using accepted measurement events
 only. Before the next derivative step, translate the previous input and all
-three low-pass section values by delta_c. Differences between the sections, hence
+three low-pass section values by $`\Delta\mathbf c`$. Differences between the sections, hence
 the existing first/second derivatives, are invariant under this translation.
 The current unfiltered PD force still responds fully to the posterior estimate.
 Physical force variations still use the original 30 rad/s transfer functions.
@@ -76,7 +80,7 @@ The existing scalar inner gains are overdamped: with roll inertia Jxx=.02,
 `Jxx*s²+.32*s+.64` has dominant pole -2.3431/s. Suppressing derivative kicks
 exposes this slow response to corrected attitude targets. One final bounded
 extension uses kR=1.28 N m, derived from critical
-roll damping `kR=kOmega²/(4*Jxx)`, at horizontal frequencies 1 and 1.5 rad/s.
+roll damping $`k_R=\frac{k_\Omega^2}{4J_{xx}}`$, at horizontal frequencies 1 and 1.5 rad/s.
 The corresponding roll double pole is -8/s before motor lag. Keep kOmega=.32,
 all previous limits, and all failed candidates in the comparison. The same
 three observed flights and fixed cascade comparator define the development

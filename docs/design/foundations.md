@@ -108,15 +108,14 @@ propagated motor states.
 
 ### Translational dynamics
 
-```text
-velocity_derivative_W =
-    gravity_W + (R_WB @ force_B) / mass
+```math
+\dot{\mathbf v}_W=\mathbf g_W+\frac1mR_{WB}\mathbf F_B.
 ```
 
-Here `gravity_W = [0, 0, gravity_acceleration]` in m/s², `force_B` is the net rotor force in
+Here $`\mathbf g_W=[0,0,g]^T`$ in m/s². The body force $`\mathbf F_B`$ (`force_B`) is the net rotor force in
 the zero-environment case and the combined rotor-plus-drag force otherwise, in the
 FRD body frame in newtons. `R_WB` maps body-coordinate vectors into NED world
-coordinates, and `mass` is in kilograms.
+coordinates, and $`m`$ (`mass`) is in kilograms.
 
 Gravity and the rotated rotor force determine how world-frame
 velocity changes. Position changes at the current world-frame velocity.
@@ -126,19 +125,19 @@ velocity changes. Position changes at the current world-frame velocity.
 The environmental model uses one constant wind vector in NED world coordinates and one
 nonnegative coefficient per FRD body axis:
 
-```text
-velocity_air_W = velocity_W - wind_velocity_W
-velocity_air_B = R_WB.T @ velocity_air_W
-force_drag_B = (
-    -quadratic_drag_coefficient_B
-    * abs(velocity_air_B)
-    * velocity_air_B
-)
+```math
+\begin{aligned}
+\mathbf v_{a,W}&=\mathbf v_W-\mathbf w_W,\\
+\mathbf v_{a,B}&=R_{WB}^T\mathbf v_{a,W},\\
+\mathbf F_{d,B}&=-\mathbf c_B\odot\lvert\mathbf v_{a,B}\rvert\odot\mathbf v_{a,B}.
+\end{aligned}
 ```
+
+Here $`\mathbf w_W`$ is wind velocity, $`\mathbf v_a`$ relative-air velocity, $`\mathbf c_B`$ the drag coefficients, and $`\mathbf F_{d,B}`$ drag force. Absolute value and $`\odot`$ act elementwise.
 
 Both velocity vectors use m/s, `quadratic_drag_coefficient_B` uses kg/m, and
 `force_drag_B` uses newtons. The force is dissipative relative to the air:
-`force_drag_B @ velocity_air_B <= 0`. It acts at the modelled centre of mass, so this
+$`\mathbf F_{d,B}^T\mathbf v_{a,B}\leq0`$. It acts at the modelled centre of mass, so this
 force contributes no aerodynamic moment. Euler evaluates it once at the current state;
 projected RK4 evaluates it independently at all four stage velocities and projected
 attitudes. The model contains no gust, turbulence, air-density decomposition, aerodynamic
@@ -146,13 +145,12 @@ moment, clipping, saturation, CFD, or blade-element approximation.
 
 ### Rotational dynamics
 
-```text
-inertia_B @ angular_velocity_derivative_B =
-    moment_B - cross(omega_B, inertia_B @ omega_B)
+```math
+J_B\dot{\boldsymbol\omega}_B=\boldsymbol\tau_B-\boldsymbol\omega_B\times(J_B\boldsymbol\omega_B).
 ```
 
-`inertia_B` is the symmetric positive-definite inertia tensor about the centre of mass in body
-coordinates, in kg·m². `moment_B` is the FRD body moment in N·m. The cross-product term is the
+$`J_B`$ (`inertia_B`) is the symmetric positive-definite inertia tensor about the centre of mass in body
+coordinates, in kg·m². $`\boldsymbol\tau_B`$ (`moment_B`) is the FRD body moment in N·m. The cross-product term is the
 gyroscopic coupling required by rigid-body rotational dynamics; the implementation solves the
 linear system rather than explicitly inverting the inertia matrix.
 
@@ -161,9 +159,8 @@ term accounts for the fact that a rotating body's axes and angular momentum inte
 
 ### Quaternion kinematics
 
-```text
-quaternion_derivative_WB =
-    0.5 * q_WB ⊗ [0, omega_B]
+```math
+\dot q_{WB}=\tfrac12q_{WB}\otimes[0,\boldsymbol\omega_B].
 ```
 
 The symbol `⊗` denotes the Hamilton quaternion product. `q_WB` uses scalar-first ordering
@@ -178,9 +175,8 @@ The public module `src/quadrotor_math/imu.py` provides
 `ideal_accelerometer_specific_force_body(...)`. For supplied world-frame inertial
 translational acceleration `a_W`, the function calculates
 
-```text
-g_W = [0, 0, g]
-f_B = R_WB.T @ (a_W - g_W)
+```math
+\mathbf g_W=[0,0,g]^T,\qquad \mathbf f_B=R_{WB}^T(\mathbf a_W-\mathbf g_W).
 ```
 
 The world frame is north-east-down (NED), the body frame is forward-right-down (FRD), and
@@ -214,10 +210,11 @@ accelerometer_specific_force_with_bias_body(
 
 Its deterministic measurement equation is:
 
-```text
-specific_force_with_bias_B
-    = ideal_specific_force_B + accelerometer_bias_B
+```math
+\mathbf f_{b,B}=\mathbf f_B+\mathbf b_{a,B}.
 ```
+
+Here $`\mathbf f_B`$ is ideal specific force, $`\mathbf b_{a,B}`$ accelerometer bias, and $`\mathbf f_{b,B}`$ the biased output.
 
 Both inputs and the output have exact shape `(3,)`, are expressed along the
 forward-right-down body axes, and use m/s². `accelerometer_bias_B` is a caller-supplied
@@ -240,12 +237,11 @@ saturation and quantization are outside this sensor model.
 The public IMU module provides
 `accelerometer_specific_force_measurement_body(...)`. Its measurement equation is:
 
-```text
-specific_force_measurement_B =
-    ideal_specific_force_B
-    + accelerometer_bias_B
-    + noise_standard_deviation_B * standard_normal_sample_B
+```math
+\mathbf f_{m,B}=\mathbf f_B+\mathbf b_{a,B}+\boldsymbol\sigma_{a,B}\odot\boldsymbol\epsilon_{a,B},
 ```
+
+Here $`\boldsymbol\sigma_{a,B}`$ is per-axis sample-noise standard deviation and $`\boldsymbol\epsilon_{a,B}\sim\mathcal N(0,I_3)`$. Subscript $`m`$ denotes a measured value.
 
 All three input vectors and the returned measurement have shape `(3,)`, use m/s², and are
 resolved along the body-aligned forward-right-down axes.
@@ -286,8 +282,8 @@ ideal_gyroscope_angular_velocity_body(
 
 For an ideal body-aligned gyroscope, the measurement equation is
 
-```text
-gyroscope_output_B = omega_B
+```math
+\boldsymbol\omega_{\mathrm{ideal},B}=\boldsymbol\omega_B.
 ```
 
 `omega_B` is rigid-body angular velocity with shape `(3,)`, expressed along the
@@ -320,10 +316,11 @@ gyroscope_angular_velocity_with_bias_body(
 
 Its deterministic measurement equation is:
 
-```text
-angular_velocity_with_bias_B
-    = ideal_angular_velocity_B + gyroscope_bias_B
+```math
+\boldsymbol\omega_{b,B}=\boldsymbol\omega_B+\mathbf b_{g,B}.
 ```
+
+Here $`\mathbf b_{g,B}`$ is gyroscope bias and $`\boldsymbol\omega_{b,B}`$ the biased angular-rate output.
 
 Both inputs have exact shape `(3,)`, are resolved along the body-aligned FRD axes, and use
 rad/s. `gyroscope_bias_B` is a caller-supplied constant additive three-axis vector; positive,
@@ -363,12 +360,11 @@ and hardware-specific timing are outside this model.
 The public IMU module provides
 `gyroscope_angular_velocity_measurement_body(...)`. Its measurement equation is:
 
-```text
-angular_velocity_measurement_B =
-    ideal_angular_velocity_B
-    + gyroscope_bias_B
-    + noise_standard_deviation_B * standard_normal_sample_B
+```math
+\boldsymbol\omega_{m,B}=\boldsymbol\omega_B+\mathbf b_{g,B}+\boldsymbol\sigma_{g,B}\odot\boldsymbol\epsilon_{g,B},
 ```
+
+Here $`\boldsymbol\sigma_{g,B}`$ is per-axis sample-noise standard deviation and $`\boldsymbol\epsilon_{g,B}\sim\mathcal N(0,I_3)`$.
 
 All three input vectors and the returned measurement have shape `(3,)`, use rad/s, and are
 resolved along the body-aligned FRD axes. `noise_standard_deviation_B` is configured per axis
@@ -415,9 +411,8 @@ gyroscope_bias_random_walk_step_body(
 
 Both implement the component-wise discrete update
 
-```text
-b_(k+1) = b_k + sigma_b * sqrt(dt) * z_k
-z_k ~ N(0, I_3)
+```math
+\mathbf b_{k+1}=\mathbf b_k+\boldsymbol\sigma_b\odot\sqrt{\Delta t}\,\mathbf z_k,\qquad \mathbf z_k\sim\mathcal N(0,I_3).
 ```
 
 Here `dt` is `time_step` in seconds. The `sqrt(dt)` factor is required for a
@@ -472,14 +467,11 @@ Its input and output vectors use the NED world frame, have exact shape `(3,)`, u
 and are measured in metres. The ideal boundary returns an independent copy of `position_W`.
 The noisy boundary implements
 
-```text
-standard_normal_sample_W = rng.standard_normal(3)
-
-position_measurement_W =
-    ideal_position_W
-    + position_bias_W
-    + noise_standard_deviation_W * standard_normal_sample_W
+```math
+\mathbf p_m=\mathbf p_W+\mathbf b_{p,W}+\boldsymbol\sigma_{p,W}\odot\boldsymbol\epsilon_p,\qquad\boldsymbol\epsilon_p\sim\mathcal N(0,I_3).
 ```
+
+The measured position is $`\mathbf p_m`$; $`\mathbf b_{p,W}`$ is its bias and $`\boldsymbol\sigma_{p,W}`$ its per-axis sample-noise standard deviation. One vector draw supplies $`\boldsymbol\epsilon_p`$.
 
 The configured position-noise standard deviation is per sample, not a continuous-time noise
 density. Every valid call consumes exactly one vector draw, including a zero-noise call.
@@ -490,22 +482,21 @@ independent storage.
 Public barometric altitude is positive up, while NED `position_W[2]` is positive down. The
 explicit conversion is
 
-```text
-altitude = reference_altitude - position_W[2]
+```math
+h=h_r-p_{W,3}.
 ```
+
+Here $`h_r`$ is reference altitude and $`p_{W,3}`$ the NED-down coordinate, stored at array index `2`.
 
 `reference_altitude` is the caller-selected altitude assigned to the NED origin. There is no
 hidden mean-sea-level, ellipsoid, or pressure datum: this boundary is a geometric or indicated
 altitude proxy rather than an atmospheric-pressure model. The noisy scalar boundary implements
 
-```text
-standard_normal_sample = rng.standard_normal()
-
-measured_altitude =
-    ideal_altitude
-    + barometric_altitude_bias
-    + noise_standard_deviation * standard_normal_sample
+```math
+h_m=h+b_h+\sigma_h\epsilon_h,\qquad\epsilon_h\sim\mathcal N(0,1).
 ```
+
+Here $`h_m`$ is measured altitude, $`b_h`$ barometric bias, and $`\sigma_h`$ sample-noise standard deviation. The noise uses one scalar draw.
 
 Its output is a Python float in metres, and its standard deviation is configured per sample.
 Every valid call consumes exactly one scalar draw, including a zero-noise call. Scalar
@@ -531,12 +522,15 @@ periods.
 
 For zero-based sequence index `k`, the schedule is:
 
-```text
-sample_stride = round(sample_period_s / truth_time_step_s)
-truth_index_k = (k + 1) * sample_stride
-acquisition_time_k = truth_index_k * truth_time_step_s
-delivery_time_k = acquisition_time_k + delivery_delay_s
+```math
+\begin{aligned}
+n_s&=\mathrm{round}\!\left(\frac{T_s}{\Delta t}\right),\\
+i_k&=(k+1)n_s,\\
+t_{a,k}&=i_k\Delta t,\qquad t_{d,k}=t_{a,k}+d_s.
+\end{aligned}
 ```
+
+Here $`T_s`$ is sample period, $`\Delta t`$ the truth step, $`n_s`$ `sample_stride`, $`i_k`$ `truth_index_k`, and $`d_s`$ delivery delay. Subscripts $`a,d`$ denote acquisition and delivery.
 
 The first acquisition therefore occurs after one complete sample period, never at time zero.
 Acquisition timestamps are derived from authoritative integer truth indices. An update that
@@ -559,9 +553,11 @@ record until a later delivery replaces it.
 The alignment check uses `rtol=1e-12` and `atol=0.0`. Acquisition, delivery, and monotonic-time
 comparisons use the scale-aware tolerance
 
-```text
-16 * eps_float64 * max(1, abs(a), abs(b))
+```math
+16\,\epsilon_{64}\max(1,\lvert a\rvert,\lvert b\rvert),
 ```
+
+Here $`\epsilon_{64}`$ is machine epsilon for `float64`.
 
 A scheduled event is due when its timestamp is no later than the current time plus that
 tolerance. Updates must otherwise be finite, nonnegative, and monotonically nondecreasing.
@@ -651,10 +647,11 @@ and do not drive truth generation.
 Each requested sensor period must align with the fixed truth grid. Configuration validation
 uses:
 
-```text
-sample_stride = round(sample_period_s / truth_time_step_s)
-effective_sample_period_s = sample_stride * truth_time_step_s
+```math
+n_s=\mathrm{round}\!\left(\frac{T_s}{\Delta t}\right),\qquad T_{\mathrm{eff}}=n_s\Delta t.
 ```
+
+Here $`T_{\mathrm{eff}}`$ is the effective sample period on the truth grid.
 
 Acceptance requires `sample_stride > 0` and:
 
@@ -862,16 +859,16 @@ maliciously replaced manifest.
 
 ### Explicit-Euler propagation
 
-```text
-state_next = state_current + time_step * state_derivative
+```math
+x_{k+1}=x_k+\Delta t\,\dot x_k.
 ```
 
 The same current state is used to calculate all four derivatives before position, velocity,
 quaternion, and angular velocity are updated. After the Euler update, only the quaternion is
 normalized:
 
-```text
-q_WB_next = normalize(q_WB + time_step * quaternion_derivative_WB)
+```math
+q_{WB,k+1}=\frac{q_{WB,k}+\Delta t\,\dot q_{WB,k}}{\lVert q_{WB,k}+\Delta t\,\dot q_{WB,k}\rVert}.
 ```
 
 Euler integration projects the current rates forward over a
@@ -886,29 +883,17 @@ rotor speeds, held constant over one integration step, and let
 parameters also remain constant over the step. Every `k` below is a complete state derivative,
 not a state:
 
-```text
-k1 = f(state_current, input)
-
-k2 = f(
-    state_current + 0.5 * time_step * k1,
-    input,
-)
-
-k3 = f(
-    state_current + 0.5 * time_step * k2,
-    input,
-)
-
-k4 = f(
-    state_current + time_step * k3,
-    input,
-)
-
-state_next =
-    state_current
-    + (time_step / 6)
-    * (k1 + 2*k2 + 2*k3 + k4)
+```math
+\begin{aligned}
+k_1&=f(x_k,u),\\
+k_2&=f(x_k+\tfrac12\Delta t\,k_1,u),\\
+k_3&=f(x_k+\tfrac12\Delta t\,k_2,u),\\
+k_4&=f(x_k+\Delta t\,k_3,u),\\
+x_{k+1}&=x_k+\frac{\Delta t}{6}(k_1+2k_2+2k_3+k_4).
+\end{aligned}
 ```
+
+The state is $`x_k`$, the held input $`u`$, and each $`k_i`$ a state derivative. Quaternion components are projected as described below.
 
 The `k2` derivative is evaluated at the `k1` half-step state, `k3` at the `k2` half-step
 state, and `k4` at the `k3` full-step state. Each intermediate state is constructed from the
@@ -999,11 +984,11 @@ zero world-frame velocity and zero body-frame angular velocity. In NED, gravity 
 positive world `z`; in FRD, upward rotor thrust acts along negative body `z`. Four equal rotor
 speeds are selected from
 
-```text
-hover_rotor_speed = sqrt(
-    mass * gravity_acceleration / (4 * thrust_coefficient)
-)
+```math
+\Omega_{\mathrm{hover}}=\sqrt{\frac{mg}{4k_f}}.
 ```
+
+Here $`k_f`$ is the rotor thrust coefficient and $`\Omega_{\mathrm{hover}}`$ the common rotor speed.
 
 The test geometry places the rotors at front `[+L, 0, 0]`, right `[0, +L, 0]`, rear
 `[-L, 0, 0]`, and left `[0, -L, 0]`, with spin directions `[+1, -1, +1, -1]`. This ordering is
@@ -1029,20 +1014,20 @@ controller configuration.
 
 A second test-local physical scenario uses zero rotor speeds, zero angular velocity, and
 identity attitude in the NED world frame. Zero rotor speeds produce zero body force and moment,
-so translation is driven only by `gravity_W = [0, 0, +g]`, while attitude remains identity and
+so translation is driven only by $`\mathbf g_W=[0,0,g]^T`$, while attitude remains identity and
 body angular velocity remains zero. The scenario starts at `[10, 20, 30] m` with velocity
 `[1, -2, -3] m/s`, uses mass `2.0 kg`, gravity `9.81 m/s²`, a `0.25 s` time step, and four
 steps for a total duration of `1.0 s`.
 
 Projected RK4 matches the analytical constant-gravity position and velocity histories, the
 constant identity attitude, and zero angular velocity using `rtol=0.0` and `atol=1e-12`. At
-`t = 1.0 s`, the analytical position is `[11, 18, 31.905] m` and velocity is
+$`t=1.0\;\mathrm s`$, the analytical position is `[11, 18, 31.905] m` and velocity is
 `[1, -2, 6.81] m/s`. Quaternion projection has no physical effect in this scenario because the
 attitude remains constant and unit length.
 
 Explicit Euler matches its separately derived discrete trajectory. Its velocity is analytical
 at the grid times because acceleration is constant, while its position uses the velocity at
-the beginning of each step. At `t = 1.0 s`, Euler position is `[11, 18, 30.67875] m`, giving
+the beginning of each step. At $`t=1.0\;\mathrm s`$, Euler position is `[11, 18, 30.67875] m`, giving
 Euler-minus-analytical position error `[0, 0, -1.22625] m`. This is expected first-order
 integration behavior, not a dynamics defect.
 
@@ -1057,11 +1042,11 @@ Under the explicit assumptions of zero rotor speeds, no thrust or applied body m
 constant uniform NED gravity, constant mass, and no other conservative or nonconservative
 effects, the test-local mechanical energy is
 
-```text
-kinetic_energy = 0.5 * mass * sum(velocity_history_W**2, axis=1)
-potential_energy = -mass * gravity_acceleration * position_history_W[:, 2]
-mechanical_energy = kinetic_energy + potential_energy
+```math
+E_{K,k}=\tfrac12m\lVert\mathbf v_{W,k}\rVert^2,\qquad E_{P,k}=-mg\,p_{W,3,k},\qquad E_k=E_{K,k}+E_{P,k}.
 ```
+
+Subscripts $`K,P`$ denote kinetic and potential energy; $`p_{W,3,k}`$ is NED-down position at sample $`k`$.
 
 The negative potential-energy sign follows from positive NED world `z` pointing downward.
 For the established `2.0 kg` ballistic scenario, the initial kinetic energy is `14.0 J`, the
@@ -1073,17 +1058,11 @@ it does not mean RK4 exactly conserves energy for arbitrary nonlinear systems.
 
 Explicit Euler instead follows the analytically derived drift law
 
-```text
-energy_n - energy_0 = (
-    0.5
-    * mass
-    * gravity_acceleration**2
-    * time_n
-    * time_step
-)
+```math
+E_n-E_0=\tfrac12mg^2t_n\Delta t.
 ```
 
-At `t = 1.0 s` with a `0.25 s` step, the drift is `+24.059025 J` and final energy is
+At $`t=1.0\;\mathrm s`$ with a `0.25 s` step, the drift is `+24.059025 J` and final energy is
 `-550.540975 J`. This is predictable numerical drift from Euler's position discretization,
 not physical energy entering the vehicle or a dynamics-model defect. The existing analytical
 and discrete trajectory tests already establish constant horizontal velocity, so for the
@@ -1093,8 +1072,8 @@ exposed as a public simulation metric.
 
 ### Torque-free rotation invariants
 
-A test-local asymmetric rigid-body scenario uses `inertia_B = diag(2, 3, 4) kg·m²`, initial
-`omega_B = [0.7, -0.4, 1.1] rad/s`, identity `q_WB`, and zero applied moment. A focused
+A test-local asymmetric rigid-body scenario uses $`J_B=\mathrm{diag}(2,3,4)\;\mathrm{kg\,m^2}`$, initial
+$`\boldsymbol\omega_B=[0.7,-0.4,1.1]^T\;\mathrm{rad/s}`$, identity `q_WB`, and zero applied moment. A focused
 dynamics test verifies the nonzero gyroscopically coupled angular acceleration and zero
 instantaneous rotational-energy rate within `1e-12 W`.
 

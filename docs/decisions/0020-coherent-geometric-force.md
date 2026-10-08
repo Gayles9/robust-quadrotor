@@ -10,14 +10,25 @@ different temporal response. Earlier correction rebasing reduced effort but
 worsened hover; it is not selected here.
 
 For one experiment, use the third filter section as the feedback-force value
-as well as its existing first and second derivatives. With c=m(Kp ep+Kv ev),
-H(s)=(w/(s+w))^3, and bilinear implementation, use
-L=m(g e3-a_ref)+Hc, Ldot=-m j_ref+sHc, Lddot=-m s_ref+s²Hc.
+as well as its existing first and second derivatives. With
+$`\mathbf c=m(K_p\mathbf e_p+K_v\mathbf e_v)`$,
+$`H(s)=(\omega_f/(s+\omega_f))^3`$, and bilinear implementation, use
+
+```math
+\begin{aligned}
+\mathbf L&=m(g\mathbf e_3-\mathbf a_r)+H\mathbf c,\\
+\dot{\mathbf L}&=-m\mathbf j_r+sH\mathbf c,\\
+\ddot{\mathbf L}&=-m\mathbf s_r+s^2H\mathbf c.
+\end{aligned}
+```
+
+Here $`\mathbf a_r,\mathbf j_r,\mathbf s_r`$ are reference acceleration,
+jerk and snap; $`s`$ is the Laplace variable.
 This is one command-shaping mechanism. Planned derivatives remain analytic.
 The discrete jets approximate a continuous shaped reference; holding all jets
 for 20 ms is still an approximation and is included in the local model.
 
-The fixed cutoff is w=10 rad/s, one quarter of the 40 rad/s motor pole, with all original
+The fixed cutoff is $`\omega_f=10\;\mathrm{rad/s}`$, one quarter of the 40 rad/s motor pole, with all original
 position/attitude gains, sensor distributions, estimator prior, limits and
 mission times unchanged. This trades approximately 0.3 s low-frequency delay
 for strong attenuation near the 5 Hz local-position update frequency. It is

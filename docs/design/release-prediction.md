@@ -24,7 +24,7 @@ peak exceeds the 8 cm requirement. The cascade controller remains the default.
 
 The fresh sample at release measures the supported left limit: the condition
 immediately before support disappears. The first
-post-release sample arrives h=0.0025 s later. Support disappears between them,
+post-release sample arrives $`h=0.0025\;\mathrm s`$ later. Support disappears between them,
 so averaging their accelerometer values treats a force discontinuity as a ramp.
 No additional simultaneous sample is available or invented.
 
@@ -47,13 +47,13 @@ sample is validated but supplies no open-interval force. Its input correlations
 are retained in the full joint covariance; the old gyro still contributes.
 
 For constant world acceleration, including ballistic release, the new rule is
-exact. For differentiable acceleration with ||da/dt||<=L and exact attitude,
+exact. For differentiable acceleration with $`\lVert da/dt\rVert\leq L`$ and exact attitude,
 
 ```math
 \|e_v\|\le Lh^2/2,\qquad \|e_p\|\le Lh^3/3.
 ```
 
-These follow by integrating a(h)-a(t), with weight h-t for position. Linear
+These follow by integrating $`a(h)-a(t)`$, with weight $`h-t`$ for position. Linear
 acceleration attains both bounds; halving h reduces those errors by four and
 eight. This is a first-order force rule if repeatedly applied. It is used once;
 all subsequent intervals use the existing second-order endpoint rule. Gyro
@@ -77,7 +77,7 @@ D_p&=S_p+hS_v+\tfrac12h^2D_a.
 ```
 
 Attitude, bias and fresh-noise rows retain their existing definitions. Split
-these rows into A21x21 and B21x12 and propagate
+these rows into $`A\in\mathbb R^{21\times21}`$ and $`B\in\mathbb R^{21\times12}`$ and propagate
 
 ```math
 C_1=AC_0A^T+B\mathrm{diag}(R_{IMU},hQ_b)B^T.
@@ -99,8 +99,8 @@ unique acquisition/session use; no process-local object proves hardware support.
 ## Why the first-order model cannot justify exact zero velocity
 
 In the mean-consistent ballistic case, the conditioned first-order covariance
-has rank 18. Write R for its nominal orientation, n_a for new sample error and
-b_a for terminal bias error. Its linear error relation is
+has rank 18. Write R for its nominal orientation, $`n_a`$ for new sample error and
+$`b_a`$ for terminal bias error. Its linear error relation is
 
 ```math
 r=\delta v_1+hR(\delta b_a+\delta n_a)=0.
@@ -118,7 +118,7 @@ r_y&=-hz\sin\psi.
 \end{aligned}
 ```
 
-For yaw variance s² and force variance sigma_z²,
+For yaw variance $`s^2`$ and force variance $`\sigma_z^2`$,
 
 ```math
 \mathrm{Var}(r_y)=h^2\sigma_z^2(1-e^{-2s^2})/2,
@@ -130,7 +130,7 @@ For yaw variance s² and force variance sigma_z²,
 ```
 
 Both are positive although first-order propagation reports zero. At 3 degrees
-heading sigma, 0.035 m/s² illustrative force sigma and h=0.0025 s, the omitted
+heading sigma, 0.035 m/s² illustrative force sigma and $`h=0.0025\;\mathrm s`$, the omitted
 standard deviations are 0.208 and 4.575 micrometres/s. Fixed positive quadrature
 agrees with the exact variance within 4.34e-25 (m/s)². This analytic counterexample
 is independent of the campaign samples and is not a fitted covariance adjustment.

@@ -36,7 +36,7 @@ about the final mean; the independent conditional bias residual is added only
 to the bias block.
 
 The leading mixed term is
-`Log(Exp(u*psi) Exp(t))=t+u*psi+0.5*(u*psi cross t)+...`, with
+$`\mathrm{Log}\bigl(\mathrm{Exp}([\mathbf u\psi]_\times)\mathrm{Exp}([\mathbf t]_\times)\bigr)^\vee=\mathbf t+\mathbf u\psi+\tfrac12(\mathbf u\psi)\times\mathbf t+\cdots`$, with
 `t approximately -J*eta_a`. The cross product couples heading and inclination.
 Independent finite differences and raw trial errors check this term and the
 covariance's evaluation point.

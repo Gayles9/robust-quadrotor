@@ -17,12 +17,15 @@ the difference between the physical observation and the filter prediction. The
 diagnostic independently reconstructs the full 21-state joint update, including
 the stored IMU-noise coordinates and the right-local attitude reset:
 
-```text
-nu = measurement - prediction = sensor_noise + prediction_error
-S = H C H^T + R
-K = C H^T S^-1
-correction = K sensor_noise + K prediction_error
+```math
+\begin{aligned}
+\boldsymbol\nu&=\mathbf z-\hat{\mathbf z}=\mathbf n+\mathbf e_z,\\
+S&=HCH^T+R,\qquad K=CH^TS^{-1},\\
+\delta x&=K\mathbf n+K\mathbf e_z.
+\end{aligned}
 ```
+
+Here $`\mathbf z`$ is the measurement, $`\hat{\mathbf z}`$ its prediction, $`\mathbf n`$ sensor noise, and $`\mathbf e_z`$ prediction error in measurement coordinates. The correction is $`\delta x`$.
 
 The code uses a linear solve. The original observation gate, which rejects measurements
 whose residual is too large relative to predicted uncertainty, still decides
@@ -32,10 +35,11 @@ must match the saved nominal states, covariances, events and command decisions.
 
 For each candidate/control pair, the fixed accounting order is:
 
-```text
-delta_correction = (K_candidate - K_control) nu_control
-                 + K_candidate (nu_candidate - nu_control).
+```math
+\Delta(\delta x)=(K_c-K_b)\boldsymbol\nu_b+K_c(\boldsymbol\nu_c-\boldsymbol\nu_b).
 ```
+
+Subscripts $`c,b`$ denote candidate and control, respectively.
 
 The second term includes the changed trajectory and previous corrections. These
 coupled terms cannot be removed independently to predict a new nonlinear flight.
@@ -44,13 +48,17 @@ their coordinate difference is not itself a common-world attitude intervention.
 
 ## Controller and physical response
 
-Let e_p and e_v be estimated-minus-true position and velocity. At each actual
+Let $`\mathbf e_p,\mathbf e_v`$ be estimated-minus-true position and velocity. At each actual
 outer-loop epoch, before limits, the requested NED acceleration is exactly:
 
-```text
-a_requested = a_reference + Kp p_reference + Kv v_reference
-            - Kp p_true - Kv v_true - Kp e_p - Kv e_v.
+```math
+\begin{aligned}
+\mathbf a_{\mathrm{req}}={}&\mathbf a_r+K_p\mathbf p_r+K_v\mathbf v_r\\
+ &-K_p\mathbf p-K_v\mathbf v-K_p\mathbf e_p-K_v\mathbf e_v.
+\end{aligned}
 ```
+
+Here $`\mathbf p,\mathbf v`$ are truth, subscript $`r`$ denotes the reference, and $`K_p,K_v`$ are diagonal gain matrices.
 
 The existing sampled response decomposition retains the real controller clocks,
 initial state, reference, navigation errors, limits, attitude estimation/tracking,
@@ -58,8 +66,8 @@ mass, motor lag, drag and within-step integration remainder. Its components sum
 to the recorded physical position and velocity. This is pathwise accounting
 using saved forcing histories, with simulated truth used only offline.
 
-For complete tracking error e and additive response channels e_i, the signed
-quantity `mean(e dot e_i)` sums to the full mean-squared tracking error. Negative
+For complete tracking error $`\mathbf e`$ and additive response channels $`\mathbf e_i`$, the signed
+quantity $`\mathrm{mean}(\mathbf e^T\mathbf e_i)`$ sums to the full mean-squared tracking error. Negative
 shares are expected when effects cancel. Comparisons use each flight's own full
 duration, preserving the original RMSE score. Event and command differences use
 the common time prefix and state its endpoint explicitly.

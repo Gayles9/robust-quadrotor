@@ -18,14 +18,20 @@ tests can drift in position and height when tilted.
 
 ## Law and local domain
 
-R_WB maps FRD body to NED world; all moments/rates/errors below are in current
-body coordinates. For a piecewise-constant reference q_reference_WB:
+$`R_{WB}`$ maps FRD body to NED world; all moments/rates/errors below are in current
+body coordinates. For a piecewise-constant reference $`q_{r,WB}`$:
 
-    e_B = Log(R_WB.T R_reference_WB)
-    omega_desired_B = clip(K_att * e_B, -omega_max, omega_max)
-    alpha_desired_B = K_rate * (omega_desired_B - omega_B)
-    moment_requested_B = I_nominal alpha_desired_B + omega_B × (I_nominal omega_B)
-    moment_limited_B = clip(moment_requested_B, -moment_max, moment_max)
+```math
+\begin{aligned}
+\mathbf e_B&=\mathrm{Log}(R_{WB}^{T}R_{r,WB}),\\
+\boldsymbol\omega_{d,B}&=\mathrm{clip}(K_a\odot\mathbf e_B,-\boldsymbol\omega_{\max},\boldsymbol\omega_{\max}),\\
+\boldsymbol\alpha_{d,B}&=K_r\odot(\boldsymbol\omega_{d,B}-\boldsymbol\omega_B),\\
+\boldsymbol\tau_{\mathrm{req},B}&=J_n\boldsymbol\alpha_{d,B}+\boldsymbol\omega_B\times(J_n\boldsymbol\omega_B),\\
+\boldsymbol\tau_{\mathrm{lim},B}&=\mathrm{clip}(\boldsymbol\tau_{\mathrm{req},B},-\boldsymbol\tau_{\max},\boldsymbol\tau_{\max}).
+\end{aligned}
+```
+
+Here $`R_{r,WB}`$ is reference orientation, $`J_n`$ nominal inertia, and $`K_a,K_r`$ the per-axis gains (`K_att,K_rate`). The symbol $`\odot`$ means elementwise multiplication. In this equation, $`\mathrm{Log}`$ returns the rotation vector directly.
 
 Use the shortest Hamilton relative quaternion and a stable rotation-vector map,
 invariant to either quaternion sign. Reject errors above the caller's declared
@@ -34,19 +40,26 @@ feedforward claim. Gains are positive per-axis in 1/s, rate limits rad/s,
 moment limits N m, inertia kg m². Input quaternions must already be unit length.
 
 No integral term: the local matched unsaturated zero-lag equation per principal
-axis is theta_ddot + K_rate theta_dot + K_rate K_att theta = 0.
+axis is $`\ddot\theta+K_r\dot\theta+K_rK_a\theta=0`$.
 This gives a transparent damped baseline without windup. Constant external torque
 has nonzero equilibrium attitude error; disturbance acceptance is recovery after
 a finite pulse, not asymptotic rejection of arbitrary persistent torque.
 
 ## Allocation
 
-Preserve feasible requested collective thrust T >= 0. Require a feasible zero-
-moment anchor using the existing strict allocator. In squared rotor speeds,
-s0 = A^-1[T,0,0,0] and d = A^-1[0,moment_limited_B].
-Choose the largest alpha in [0,1] for which lower <= s0+alpha*d <= upper.
+Preserve feasible requested collective thrust $`T\geq0`$. Require a feasible
+zero-moment anchor using the existing strict allocator. For allocation matrix
+$`A`$, define squared rotor speeds $`\mathbf s_0`$ and direction $`\mathbf d`$:
+
+```math
+\mathbf s_0=A^{-1}[T,0,0,0]^T,\qquad
+\mathbf d=A^{-1}[0,\boldsymbol\tau_{\mathrm{lim},B}^T]^T.
+```
+
+Choose the largest $`\alpha\in[0,1]`$ satisfying the componentwise speed bounds
+$`\mathbf s_{\min}\leq\mathbf s_0+\alpha\mathbf d\leq\mathbf s_{\max}`$.
 Only reduce moments along that ray; do not independently clip infeasible rotor
-solutions. Apply a documented roundoff backoff only when alpha < 1 and pass the
+solutions. Apply a documented roundoff backoff only when $`\alpha<1`$ and pass the
 scaled moment to the unchanged strict allocator. An infeasible collective/anchor
 is an error, not silent thrust modification. Record requested/clipped/allocated
 moments, scale, commands and limit flags. These are nominal allocation results;

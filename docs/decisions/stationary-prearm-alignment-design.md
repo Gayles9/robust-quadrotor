@@ -62,7 +62,7 @@ Three fixed upper-tail compatibility tests assess mean gyro, gravity magnitude
 and demeaned IMU variation. Each has alpha=0.001 and includes temporal correlation
 from bias walks. Their union false-rejection bound depends on the stated
 Gaussian model; it is not a guarantee for arbitrary disturbances. Thresholds use
-`c(d, alpha)=d+2*sqrt(d*ln(1/alpha))+2*ln(1/alpha)`.
+$`c(d,\alpha)=d+2\sqrt{d\ln(1/\alpha)}+2\ln(1/\alpha)`$.
 Steady acceleration and rotation/bias ambiguities can remain undetectable, so a
 gate cannot substitute for the external support assertion.
 

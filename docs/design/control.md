@@ -29,8 +29,8 @@ hardware performance.
 ## Frames, signals and interface boundaries
 
 Use the [NED/FRD frame contract](../architecture/frame-contract.md). A Hamilton scalar-first
-unit quaternion q_WB maps FRD body vectors into NED world coordinates through R_WB.
-The reference q_reference_WB describes the desired body orientation relative to the same
+unit quaternion $`q_{WB}`$ maps FRD body vectors into NED world coordinates through $`R_{WB}`$.
+The reference $`q_{r,WB}`$ describes the desired body orientation relative to the same
 world. Its physical orientation is unaffected by changing its quaternion sign.
 Both input quaternions must already be unit length within the existing rotation utility's
 tolerance; the controller does not silently normalize malformed inputs.
@@ -60,8 +60,8 @@ caller-supplied gains, plant mismatches or sampling rates.
 
 ## Relative rotation and cascaded law
 
-Let R = R_WB and R_d = R_reference_WB. The relative rotation RᵀR_d is expressed in
-the **current body** coordinates. Its principal rotation vector e_B has direction
+Let $`R=R_{WB}`$ and $`R_d=R_{r,WB}`$. The relative rotation $`R^TR_d`$ is expressed in
+the **current body** coordinates. Its principal rotation vector $`\mathbf e_B`$ has direction
 along the required rotation axis and norm equal to the shortest angular error:
 
 ```math
@@ -70,19 +70,19 @@ along the required rotation axis and norm equal to the shortest angular error:
 
 Here Log maps a rotation to a skew-symmetric matrix; vee extracts its three-vector.
 The implementation computes the equivalent relative quaternion
-q_e = q_WB* ⊗ q_reference_WB, where * is quaternion conjugation and ⊗ Hamilton
-multiplication. Write q_e = (w_e, v_e) and choose the representation with nonnegative
+$`q_e=q_{WB}^*\otimes q_{r,WB}`$, where $`*`$ is quaternion conjugation and $`\otimes`$ Hamilton
+multiplication. Write $`q_e=(w_e,\mathbf v_e)`$ and choose the representation with nonnegative
 scalar part. At an exact half-turn, use the first nonzero positive vector component.
-For s = ||v_e|| > 0:
+For $`s=\lVert\mathbf v_e\rVert>0`$:
 
 ```math
 \theta=2\mathrm{atan2}(s,w_e),\qquad
 \mathbf e_B=\frac{\theta}{s}\mathbf v_e,\qquad 0\leq\theta\leq\pi.
 ```
 
-At s < 10⁻⁸, the code uses the continuous small-angle limit
-2 v_e / ||q_e|| to avoid division by a very small s. The local controller rejects
-||e_B|| above maximum_attitude_error_rad, which must itself be strictly below π.
+At $`s<10^{-8}`$, the code uses the continuous small-angle limit
+$`2\mathbf v_e/\lVert q_e\rVert`$ to avoid division by a very small $`s`$. The local controller rejects
+$`\lVert\mathbf e_B\rVert`$ above `maximum_attitude_error_rad`, which must itself be strictly below π.
 The utility defines a half-turn tie, but the controller does not operate at that
 singularity. Tests compare the error with an independent relative-matrix/Rodrigues
 expression at nonidentity attitudes, signed principal axes and either input sign.
@@ -106,12 +106,13 @@ angular acceleration. With componentwise clipping and multiplication (⊙),
 =\mathrm{clip}(\boldsymbol\tau_{\rm req},-\boldsymbol\tau_{\max},\boldsymbol\tau_{\max}).
 ```
 
-All vectors above are (3,) current-body vectors. K_a and K_r are positive diagonal
-gain vectors in s⁻¹; omega is rigid-body rate in rad/s, alpha angular acceleration in
-rad/s², I_n the full nominal inertia in kg m², and tau moment in N m. Rotor angular
+All vectors above are (3,) current-body vectors. $`K_a,K_r`$ contain the positive
+per-axis gains in s⁻¹; $`\boldsymbol\omega`$ is rigid-body rate in rad/s,
+$`\boldsymbol\alpha`$ angular acceleration in rad/s², $`I_n`$ the full nominal
+inertia in kg m², and $`\boldsymbol\tau`$ moment in N m. Rotor angular
 speeds are separate (4,) variables. The cross product compensates the gyroscopic term
-in I omega_dot = tau − omega × (I omega). For a matched plant, feasible unsaturated
-allocation and instantaneous actuation, the resulting angular acceleration is alpha_d.
+in $`I\dot{\boldsymbol\omega}=\boldsymbol\tau-\boldsymbol\omega\times(I\boldsymbol\omega)`$. For a matched plant, feasible unsaturated
+allocation and instantaneous actuation, the resulting angular acceleration is $`\boldsymbol\alpha_d`$.
 An independent off-diagonal-inertia test verifies that cancellation with the existing
 physical acceleration function.
 
@@ -129,7 +130,7 @@ defined above; it does not implement PX4's complete flight-control law.
 ## Gain rationale and persistent disturbances
 
 Near a constant reference, on a matched principal inertia axis, with no limits or motor
-lag, a small signed orientation deviation theta obeys
+lag, a small signed orientation deviation $`\theta`$ obeys
 
 ```math
 \ddot\theta+K_r\dot\theta+K_rK_a\theta=0,\qquad
@@ -138,8 +139,8 @@ lag, a small signed orientation deviation theta obeys
 ```
 
 Finite differences of the composed controller and physical acceleration verify this local
-linearization. The declared example uses K_a = [3,3,2] and K_r = [12,12,8] s⁻¹:
-K_r = 4 K_a gives ζ = 1 and natural frequencies [6,6,4] rad/s in the zero-lag local
+linearization. The declared example uses $`K_a=[3,3,2]^T`$ and $`K_r=[12,12,8]^T`$ s⁻¹:
+$`K_r=4K_a`$ gives $`\zeta=1`$ and natural frequencies [6,6,4] rad/s in the zero-lag local
 model. These are model-based starting gains, not fitted held-out results. Actual motor
 lag, sampling, coupling and limits remain in all execution experiments. The fixed
 example uses rate-demand bounds [2,2,1.5] rad/s, moment bounds [.8,.8,.3] N m and a
@@ -161,7 +162,7 @@ region.
 ## Collective-preserving allocation
 
 The existing rotor model has FRD thrust along negative z and reaction-moment sign
-−spin. For squared speed s_i = Omega_i², its allocation matrix is
+−spin. For squared speed $`s_i=\Omega_i^2`$, its allocation matrix is
 
 ```math
 A=
@@ -174,9 +175,9 @@ x_1k_f&x_2k_f&x_3k_f&x_4k_f\\
 A\mathbf s=\begin{bmatrix}T\\\boldsymbol\tau_B\end{bmatrix}.
 ```
 
-x_i,y_i are rotor positions in body metres, sigma_i ∈ {−1,+1} the documented rotor
-spin directions, k_f thrust coefficient and k_m reaction-moment coefficient. T ≥ 0 is
-collective thrust **magnitude**, not body-z force; F_rotor,B = [0,0,−T] N.
+$`x_i,y_i`$ are rotor positions in body metres, $`\sigma_i\in\{-1,+1\}`$ the documented rotor
+spin directions, $`k_f`$ thrust coefficient and $`k_m`$ reaction-moment coefficient.
+$`T\geq0`$ is collective thrust **magnitude**, not body-z force; $`\mathbf F_{r,B}=[0,0,-T]^T`$ N.
 
 For a feasible zero-moment collective anchor, define
 
@@ -185,18 +186,18 @@ For a feasible zero-moment collective anchor, define
 \mathbf d=A^{-1}[0,\boldsymbol\tau_{\rm lim}^\mathsf{T}]^\mathsf{T}.
 ```
 
-Find the largest a ∈ [0,1] satisfying
-Omega_min² ≤ s_0,i + a d_i ≤ Omega_max² for every rotor.
-For each d_i > 0 its candidate upper bound is (Omega_max²−s_0,i)/d_i;
-for d_i < 0 it is (s_0,i−Omega_min²)/(−d_i). Zero directions add no restriction.
+Find the largest $`a\in[0,1]`$ satisfying
+$`\Omega_{\min}^2\leq s_{0,i}+ad_i\leq\Omega_{\max}^2`$ for every rotor.
+For each $`d_i>0`$ its candidate upper bound is $`(\Omega_{\max}^2-s_{0,i})/d_i`$;
+for $`d_i<0`$ it is $`(s_{0,i}-\Omega_{\min}^2)/(-d_i)`$. Zero directions add no restriction.
 The minimum of these bounds and 1 preserves T and the direction of the already clipped
 moment while reducing its magnitude. Componentwise moment clipping may itself change
 the original requested direction; only this subsequent allocation ray preserves direction.
 
 The implementation obtains the anchor from the unchanged strict allocator and squares
 its returned speeds. Thus anchor values include that boundary's roundoff repair.
-When a < 1, it backs a off by the relative factor 1−64 epsilon_float64 before invoking
-the same strict allocator on (T, a tau_lim). Its achieved moment is recomputed with the
+When $`a<1`$, it backs $`a`$ off by the relative factor $`1-64\epsilon`$ (float64 machine precision) before invoking
+the same strict allocator on $`(T,a\boldsymbol\tau_{\mathrm{lim}})`$. Its achieved moment is recomputed with the
 forward rotor model. LimitedMomentAllocation records commanded_rotor_omega,
 allocated_moment_B and moment_scale. These are nominal steady command quantities.
 Independent tests check physical forward force/moment, boundary anchors, feasible identity
@@ -208,9 +209,9 @@ is an error, even if another nonzero-moment allocation could support the same T.
 
 AttitudeControlSchedule owns a positive time_step_s, integer controller_stride L ≥ 1,
 reference_q_WB (m,4), collective_thrust (m,) and disturbance_moment_B (N,3),
-where N ≥ 1 and m = ceil(N/L). Plant timestamps are t_k = k h, k=0,...,N.
-Reference/collective row j applies from t_jL through its control interval. Body disturbance
-row k is constant in current-body components through [t_k,t_k+1). Partial final control
+where $`N\geq1`$ and $`m=\lceil N/L\rceil`$. Plant timestamps are $`t_k=kh`$, $`k=0,\ldots,N`$.
+Reference/collective row j applies from $`t_{jL}`$ through its control interval. Body disturbance
+row k is constant in current-body components through $`[t_k,t_{k+1})`$. Partial final control
 intervals are allowed. No terminal command is computed at t_N.
 
 At each controller epoch the harness reads the current truth attitude/rate, computes
@@ -222,23 +223,23 @@ Unit tests show that changing only truth inertia preserves the first command and
 the subsequent trajectory; changing nominal inertia changes the first command.
 The declared acceptance campaign itself uses matched parameters.
 
-With held target Omega_c and actual speed Omega_0 at the interval start, each motor is
+With held target $`\Omega_c`$ and actual speed $`\Omega_0`$ at the interval start, each motor is
 evaluated exactly at an RK4 stage's elapsed time u:
 
 ```math
 \Omega(u)=\Omega_c+(\Omega_0-\Omega_c)\exp(-u/\tau_m).
 ```
 
-Stages at u = 0, h/2, h/2, h compose the existing rotor wrench, stage-specific
+Stages at $`u=0,h/2,h/2,h`$ compose the existing rotor wrench, stage-specific
 wind-relative quadratic drag, supplied body disturbance and body-wrench rigid-body
 derivative. Intermediate and final quaternions are normalized. The final actual motor
-speed uses the exact same held-target solution at u=h. This evaluates changing thrust
+speed uses the exact same held-target solution at $`u=h`$. This evaluates changing thrust
 within a step. The constant-command sensor-run generator uses a separate
 integration schedule; see [foundations](foundations.md).
 
 The constant-speed/zero-disturbance limit agrees with the existing RK4 integrator.
 Equal-motor spin-up from rest has an independent analytical vertical position/velocity
-solution obtained by integrating [Omega_c(1−exp(−t/tau_m))]²; step halving demonstrates
+solution obtained by integrating $`[\Omega_c(1-\exp(-t/\tau_m))]^2`$; step halving demonstrates
 fourth-order convergence in that test. Future-reference changes cannot alter earlier
 states or commands. Additional tests cover initial/final alignment, exact held motor
 response, a partial last control interval, finite failures and nonzero drag.

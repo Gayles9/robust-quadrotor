@@ -55,37 +55,47 @@ separately identify a bad bias update, an outlier or a covariance defect.
 
 ## Exact response accounting
 
-Let `n_p = p_hat - p`, `n_v = v_hat - v`, and let `j` be the last outer-control
-epoch at or before plant interval `k`. The requested acceleration is
+Let $`\mathbf n_p=\hat{\mathbf p}-\mathbf p`$, $`\mathbf n_v=\hat{\mathbf v}-\mathbf v`$, and let $`j`$ be the last outer-control
+epoch at or before plant interval $`k`$. The requested acceleration is
 
-```text
-a_req = a_ref[j] + Kp*(p_ref[j] - p[j]) + Kv*(v_ref[j] - v[j])
-        - Kp*n_p[j] - Kv*n_v[j].
+```math
+\begin{aligned}
+\mathbf a_{\mathrm{req}}={}&\mathbf a_r[j]+K_p(\mathbf p_r[j]-\mathbf p[j])+K_v(\mathbf v_r[j]-\mathbf v[j])\\
+ &-K_p\mathbf n_p[j]-K_v\mathbf n_v[j].
+\end{aligned}
 ```
 
-The gains are unchanged: horizontal `Kp=1 s^-2`, `Kv=1.8 s^-1`; vertical
-`Kp=2.25 s^-2`, `Kv=3 s^-1`. Outer updates are every 20 ms, inner updates every
+Subscript $`r`$ denotes the reference. The matrices $`K_p,K_v`$ are diagonal gains, and $`\mathbf n_p,\mathbf n_v`$ the estimation errors defined above.
+
+The gains are unchanged: horizontal $`K_p=1\;\mathrm{s}^{-2}`$, $`K_v=1.8\;\mathrm{s}^{-1}`$; vertical
+$`K_p=2.25\;\mathrm{s}^{-2}`$, $`K_v=3\;\mathrm{s}^{-1}`$. Outer updates are every 20 ms, inner updates every
 10 ms and plant steps every 2.5 ms. The ordered physical identity uses actual
-thrust `T`, commanded thrust `Tc`, mass `m`, nominal mass `m0`, and true,
-estimated and commanded body-down axes `b`, `b_hat`, `b_cmd`:
+thrust $`T`$, commanded thrust $`T_c`$, mass $`m`$, nominal mass $`m_0`$, and true,
+estimated and commanded body-down axes $`\mathbf b`$, $`\hat{\mathbf b}`$, $`\mathbf b_c`$:
 
-```text
-a_true = a_feasible
-       + (1-m0/m)*(g*e_D-a_feasible)
-       - (Tc/m)*(b-b_hat)
-       - (Tc/m)*(b_hat-b_cmd)
-       - ((T-Tc)/m)*b + drag_W/m.
+```math
+\begin{aligned}
+\mathbf a={}&\mathbf a_f+\left(1-\frac{m_0}{m}\right)(g\mathbf e_D-\mathbf a_f)\\
+ &-\frac{T_c}{m}(\mathbf b-\hat{\mathbf b})-\frac{T_c}{m}(\hat{\mathbf b}-\mathbf b_c)\\
+ &-\frac{T-T_c}{m}\mathbf b+\frac{\mathbf F_{d,W}}{m}.
+\end{aligned}
 ```
+
+Here $`\mathbf a_f`$ is feasible commanded acceleration, $`\mathbf b_c`$ commanded thrust-axis direction, and $`\mathbf F_{d,W}`$ world-frame drag force. The result $`\mathbf a`$ is true acceleration.
 
 The gravity assumptions match in these six cases. Command limiting contributes
-`a_feasible-a_req`; it is roundoff only here. Each channel receives its own
+$`\mathbf a_f-\mathbf a_{\mathrm{req}}`$; it is roundoff only here. Each channel receives its own
 sample-held PD feedback and its own forcing:
 
-```text
-a_i[k] = -Kp*p_i[j] - Kv*v_i[j] + forcing_i[k]
-p_i[k+1] = p_i[k] + h*v_i[k] + h^2*a_i[k]/2 + delta_p_i[k]
-v_i[k+1] = v_i[k] + h*a_i[k] + delta_v_i[k].
+```math
+\begin{aligned}
+a_i[k]&=-K_pp_i[j]-K_vv_i[j]+f_i[k],\\
+p_i[k+1]&=p_i[k]+hv_i[k]+\tfrac12h^2a_i[k]+\delta p_i[k],\\
+v_i[k+1]&=v_i[k]+ha_i[k]+\delta v_i[k].
+\end{aligned}
 ```
+
+The forcing contribution for channel $`i`$ is $`f_i[k]`$ (`forcing_i[k]` in the reconstruction). Gains here are the scalar values for the axis being analysed.
 
 Only the initial-state channel starts nonzero. Reference forcing is retained
 over the entire flight; subtracting the current reference from that channel
@@ -102,19 +112,26 @@ vectors add; component norms and alleged percentages of causation do not.
 
 ## Unfitted local model
 
-For each horizontal axis, use states `p, v, u, w, alpha`, where
-`u=-g*b_horizontal` is the near-level acceleration due to inclination,
-`w=du/dt` and `alpha=dw/dt`. The flow is
+For each horizontal axis, use states $`p,v,u,w,\alpha`$, where
+$`u=-g b_h`$ is the near-level acceleration due to the horizontal thrust-axis component $`b_h`$,
+$`w=\dot u`$ and $`\alpha=\dot w`$. The flow is
 
-```text
-p_dot=v; v_dot=u; u_dot=w; w_dot=alpha
-tau*alpha_dot = alpha_command-alpha
-alpha_command = kr*(ka*(held_acceleration-u-inclination_error)
-                    -w-inclination_rate_error).
+```math
+\begin{aligned}
+\dot p&=v,\quad\dot v=u,\quad\dot u=w,\quad\dot w=\alpha,\\
+\tau\dot\alpha&=\alpha_c-\alpha,\\
+\alpha_c&=k_r\bigl(k_a(a_h-u-e_u)-w-e_w\bigr).
+\end{aligned}
 ```
 
-The existing gains are `ka=3 s^-1`, `kr=12 s^-1`, and the motor lag is
-`tau=0.025 s`. The actual nested update clocks are retained. Initial horizontal
+Here $`a_h`$ is held acceleration and $`\alpha_c`$ the commanded fourth
+derivative of position. The error channels $`e_u=\hat u-u`$ and
+$`e_w=\hat w-w`$ are acceleration and acceleration-rate errors from the
+estimated thrust axis, in m/s² and m/s³. They already include the factor
+of gravity; they are not angles or angular rates.
+
+The existing gains are $`k_a=3\;\mathrm{s}^{-1}`$, $`k_r=12\;\mathrm{s}^{-1}`$, and the motor lag is
+$`\tau=0.025\;\mathrm{s}`$. The actual nested update clocks are retained. Initial horizontal
 position, inclination and rates and the saved navigation/inclination/rate error
 histories drive the model. There are no fitted coefficients. It assumes
 near-level motion, hover thrust, matched inertia and no limits/drag; it omits

@@ -9,7 +9,7 @@ The original completion campaign reported full-state NEES coverage 88.8367% and
 mean 18.358807 (15 degrees of freedom). Development-only noiseless and step-halving
 probes exposed a deterministic integration contribution; they did not uniquely
 attribute the entire discrepancy. The existing prediction freezes world acceleration
-and uses a left-held body angular rate, with `Phi=I+F*dt`. Improving covariance alone
+and uses a left-held body angular rate, with $`\Phi=I+F\Delta t`$. Improving covariance alone
 cannot remove the resulting deterministic integration error on changing motion.
 
 Endpoint propagation uses both IMU samples at the ends of a completed interval,
@@ -23,24 +23,26 @@ freedom. Six temporary noise variables retain the shared endpoint's information.
 
 ## Nominal discrete map
 
-Let `h=t[k+1]-t[k]>0`, `R=R_WB[k]`, and `n_hat[k]` be the conditional mean of the
+Let $`h=t_{k+1}-t_k>0`$, $`R=R_{WB}[k]`$, and $`\hat{\mathbf n}[k]`$ be the conditional mean of the
 six IMU sample noises at the current epoch. Accelerometer units are m/s²; gyro units
 are rad/s. Subtract the current estimated biases and that mean from the old sample;
 subtract the estimated biases from the new sample, whose prior noise mean is zero:
 
-```
-f0 = f_m[k]   - b_a - n_hat_a[k]
-w0 = w_m[k]   - b_g - n_hat_g[k]
-f1 = f_m[k+1] - b_a
-w1 = w_m[k+1] - b_g
-phi = h/2 * (w0+w1)
-E = Exp(skew(phi))
-R1 = R E
-a0 = g_W + R f0
-a1 = g_W + R1 f1
-p1 = p + h*v + h²/6 * (2*a0+a1)
-v1 = v + h/2 * (a0+a1)
-b_a1 = b_a; b_g1 = b_g
+```math
+\begin{aligned}
+\mathbf f_0&=\mathbf f_m[k]-\mathbf b_a-\hat{\mathbf n}_a[k],
+&\boldsymbol\omega_0&=\boldsymbol\omega_m[k]-\mathbf b_g-\hat{\mathbf n}_g[k],\\
+\mathbf f_1&=\mathbf f_m[k+1]-\mathbf b_a,
+&\boldsymbol\omega_1&=\boldsymbol\omega_m[k+1]-\mathbf b_g,\\
+\boldsymbol\phi&=\tfrac h2(\boldsymbol\omega_0+\boldsymbol\omega_1),
+&E&=\mathrm{Exp}([\boldsymbol\phi]_\times),\quad R_1=RE,\\
+\mathbf a_0&=\mathbf g_W+R\mathbf f_0,
+&\mathbf a_1&=\mathbf g_W+R_1\mathbf f_1,\\
+\mathbf p_1&=\mathbf p+h\mathbf v+\tfrac{h^2}{6}(2\mathbf a_0+\mathbf a_1),
+&\mathbf v_1&=\mathbf v+\tfrac h2(\mathbf a_0+\mathbf a_1),\\
+\mathbf b_{a,1}&=\mathbf b_a,
+&\mathbf b_{g,1}&=\mathbf b_g.
+\end{aligned}
 ```
 
 Quaternion evaluation uses the existing Hamilton exponential and normalization.
@@ -48,57 +50,59 @@ The translation integrates linearly interpolated world acceleration. It is exact
 for constant or linearly changing world acceleration when attitudes are exact.
 The exponential of the averaged rate is second order on smooth rotating trajectories;
 noncommuting angular rates leave higher-order coning error. This is not exact
-continuous inertial integration. Both endpoints are available at `t[k+1]`; no future
+continuous inertial integration. Both endpoints are available at $`t_{k+1}`$; no future
 row beyond the output epoch is read. At the first epoch, no prediction is performed.
 
 ## Matched discrete Jacobians and shared noise
 
-Independent samples have covariance `Sigma` (6 by 6, accelerometer then gyro).
-Bias endpoint increments `u=[u_a,u_g]` are independent of samples and have covariance
-`W*h`, with `W` a 6 by 6 bias-increment spectral density. Full within-sample and
+Independent samples have covariance $`\Sigma`$ (6 by 6, accelerometer then gyro).
+Bias endpoint increments $`\mathbf u=[\mathbf u_a^T,\mathbf u_g^T]^T`$ are independent of samples and have covariance
+$`hW`$, with $`W`$ a 6 by 6 bias-increment spectral density. Full within-sample and
 within-walk correlations are supported; sample/walk and inter-sample independence
-are explicit assumptions. The bias at the second endpoint is `b+u`.
+are explicit assumptions. The bias at the second endpoint is $`\mathbf b+\mathbf u`$.
 
-The joint local error is `z=[e_x, n[k]-n_hat[k]]`, dimension 21. Its covariance is
-`C`, initially `diag(P0,Sigma)` because the known prior is independent of IMU noise.
-New drivers are `r=[n[k+1],u]` (12 components) with `D=diag(Sigma,W*h)`.
-Define derivative matrices `A=dz1/dz` and `B=dz1/dr`. They are the derivatives of
+The joint local error is $`\mathbf z=[\mathbf e_x^T,(\mathbf n[k]-\hat{\mathbf n}[k])^T]^T`$, dimension 21. Its covariance is
+$`C`$, initially $`\mathrm{diag}(P_0,\Sigma)`$ because the known prior is independent of IMU noise.
+New drivers are $`\mathbf r=[\mathbf n[k+1]^T,\mathbf u^T]^T`$ (12 components) with $`D=\mathrm{diag}(\Sigma,hW)`$.
+Define derivative matrices $`A=\frac{\partial\mathbf z_1}{\partial\mathbf z}`$ and $`B=\frac{\partial\mathbf z_1}{\partial\mathbf r}`$. They are the derivatives of
 the actual discrete nominal map, not an unrelated continuous approximation.
 The following differential equations specify every block (all vectors are length 3):
 
-```
-df0 = -db_a - dn_a0
-df1 = -db_a - dn_a1 - du_a
-dphi = -h*db_g - h/2*(dn_g0+dn_g1+du_g)
-dtheta1 = E.T*dtheta0 + Jr(phi)*dphi
-da0 = -R*skew(f0)*dtheta0 + R*df0
-da1 = -R1*skew(f1)*dtheta1 + R1*df1
-dp1 = dp0 + h*dv0 + h²/6*(2*da0+da1)
-dv1 = dv0 + h/2*(da0+da1)
-db1 = db0 + du
-dn1 = dn_new
-C1 = A*C*A.T + B*D*B.T
+```math
+\begin{aligned}
+\delta\mathbf f_0&=-\delta\mathbf b_a-\delta\mathbf n_{a,0},\\
+\delta\mathbf f_1&=-\delta\mathbf b_a-\delta\mathbf n_{a,1}-\delta\mathbf u_a,\\
+\delta\boldsymbol\phi&=-h\delta\mathbf b_g-\tfrac h2(\delta\mathbf n_{g,0}+\delta\mathbf n_{g,1}+\delta\mathbf u_g),\\
+\delta\boldsymbol\theta_1&=E^T\delta\boldsymbol\theta_0+J_r(\boldsymbol\phi)\delta\boldsymbol\phi,\\
+\delta\mathbf a_0&=-R[\mathbf f_0]_\times\delta\boldsymbol\theta_0+R\delta\mathbf f_0,\\
+\delta\mathbf a_1&=-R_1[\mathbf f_1]_\times\delta\boldsymbol\theta_1+R_1\delta\mathbf f_1,\\
+\delta\mathbf p_1&=\delta\mathbf p_0+h\delta\mathbf v_0+\tfrac{h^2}{6}(2\delta\mathbf a_0+\delta\mathbf a_1),\\
+\delta\mathbf v_1&=\delta\mathbf v_0+\tfrac h2(\delta\mathbf a_0+\delta\mathbf a_1),\\
+\delta\mathbf b_1&=\delta\mathbf b_0+\delta\mathbf u,\qquad
+\delta\mathbf n_1=\delta\mathbf n_{\mathrm{new}},\\
+C_1&=ACA^T+BDB^T.
+\end{aligned}
 ```
 
-`Jr` is the SO(3) right Jacobian, already implemented by the attitude block of
+$`J_r`$ is the SO(3) right Jacobian, already implemented by the attitude block of
 `eskf_reset_jacobian`. These rotation derivatives follow Solà, *Quaternion kinematics
 for the error-state Kalman filter* (2017), sections 4.3.3–4.3.5,
 <https://arxiv.org/abs/1711.02508>. The sample-memory derivation here follows directly
 from differentiating the stated discrete map. Bias increments affect the endpoint
 measurement subtraction as well as final bias covariance; their signs are tested.
 
-Adjacent intervals share `n[k]`. Dropping its state cross-covariance or treating
+Adjacent intervals share $`\mathbf n[k]`$. Dropping its state cross-covariance or treating
 averaged sample errors as independent understates accumulated variance. For example,
-with one-dimensional acceleration noise of variance `sigma²`, zero prior, fixed
+with one-dimensional acceleration noise of variance $`\sigma^2`$, zero prior, fixed
 attitude and zero bias noise, N trapezoidal velocity increments have variance
-`h²*sigma²*(N-1/2)` for N>=1, not `N*h²*sigma²/2`.
+$`h^2\sigma^2(N-\tfrac12)`$ for N>=1, not $`Nh^2\sigma^2/2`$.
 
 ## Correction and reset
 
-Each ordinary observation has joint Jacobian `Hj=[H,0]`. Compute the full 21-row
+Each ordinary observation has joint Jacobian $`H_j=[H,\ 0]`$. Compute the full 21-row
 gain using the existing scaled Cholesky solve, condition the six noise means, inject
 the physical 15-vector correction and form the full Joseph covariance. Reset it with
-`diag(J_reset,I6)`, including all physical/noise cross terms. Return the physical
+$`\mathrm{diag}(J_{\mathrm{reset}},I_6)`$, including all physical/noise cross terms. Return the physical
 15-by-15 marginal in the established replay result and measurement diagnostics.
 The temporary noise memory is retained internally until the next prediction.
 Stale, pending, disabled and rejected observations do not condition any joint state.
@@ -117,7 +121,7 @@ legacy continuous covariance field to reject ambiguous noise declarations.
    and smooth-motion step refinement: demonstrate second-order global convergence.
 3. Central differences for all 21 prior and 12 driver columns, at nontrivial attitude,
    biases, endpoint force/rate and conditional sample mean. Compare actual nonlinear
-   perturbations and right-local output errors against `A` and `B`.
+   perturbations and right-local output errors against $`A`$ and $`B`$.
 4. Exact one-dimensional multi-interval sample-noise variance, full joint conditioning
    against an independent linear-Gaussian calculation, nonzero noise posterior mean,
    attitude cross-covariance reset, correlated PSD inputs and deterministic Monte Carlo.

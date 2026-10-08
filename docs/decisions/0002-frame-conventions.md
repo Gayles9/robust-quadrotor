@@ -13,7 +13,7 @@ Use a North-East-Down (NED) world frame and a Forward-Right-Down (FRD) body
 frame. Positive rotations follow the right-hand rule.
 
 Represent orientation as the active body-to-world rotation `R_WB`, so
-`v_W = R_WB v_B` and `v_B = R_WB^T v_W`. Use `q_WB` for the equivalent Hamilton,
+$`\mathbf v_W=R_{WB}\mathbf v_B`$ and $`\mathbf v_B=R_{WB}^T\mathbf v_W`$. Use `q_WB` for the equivalent Hamilton,
 scalar-first, unit quaternion.
 
 Keep future ROS ENU/FLU conversions at adapter boundaries and out of the

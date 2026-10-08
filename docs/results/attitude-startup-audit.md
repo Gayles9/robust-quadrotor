@@ -53,7 +53,7 @@ controller sees truth. That distinction supports the [attitude-feedback diagnosi
 ## What the existing measurements can identify
 
 For the calm rotor-only plant, an accelerometer measures specific force,
-approximately `f_B = [0, 0, -T/m]`, not a stationary gravity vector. Changing
+approximately $`\mathbf f_B=[0,0,-T/m]^T`$, not a stationary gravity vector. Changing
 attitude changes world acceleration; it does not independently rotate gravity
 into the free-flight accelerometer measurement. Applying a stationary-gravity
 pseudo-measurement here would add an unsupported constraint and reuse IMU data.
@@ -61,10 +61,12 @@ pseudo-measurement here would add an unsupported constraint and reuse IMU data.
 Position over time does carry tilt information through acceleration. Around
 constant level hover the right-local error equations include
 
-```text
-delta_v_N_dot = -g * delta_theta_y - delta_b_a_x
-delta_v_E_dot = +g * delta_theta_x - delta_b_a_y
-delta_theta_dot = -delta_b_g
+```math
+\begin{aligned}
+\delta\dot v_N&=-g\,\delta\theta_y-\delta b_{a,x},\\
+\delta\dot v_E&=g\,\delta\theta_x-\delta b_{a,y},\\
+\delta\dot{\boldsymbol\theta}&=-\delta\mathbf b_g.
+\end{aligned}
 ```
 
 The 15-state constant-coefficient model with position output has rank 11.
@@ -75,7 +77,7 @@ information: this local calculation does **not** prove global unobservability.
 
 Even a naive second difference of three independent 2 cm position measurements
 spaced 0.2 s apart has acceleration-noise standard deviation
-`sqrt(6)*0.02/0.2^2 = 1.224745 m/s^2`, equivalent to 7.153182 degrees at small
+$`\sqrt6\,\frac{0.02}{0.2^2}=1.224745\;\mathrm{m/s^2}`$, equivalent to 7.153182 degrees at small
 angles. This is illustrative, not a lower bound on the ESKF or a proposed
 estimator. The actual filter uses its prior and all correlated information.
 

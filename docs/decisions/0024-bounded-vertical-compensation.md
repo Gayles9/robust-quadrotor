@@ -19,7 +19,7 @@ The 1.1 kg truth / 1.0 kg nominal case has mean vertical error 0.436975 m over
 17..25 s; the last two seconds' mean estimated-minus-true vertical position is
 only 0.001055 m. There are zero outer or inner limit flags. Commanded thrust
 ranges 9.81..11.317405 N. The nominal PD equilibrium predicts
-`(1.1/1.0 - 1)*9.81/2.25 = 0.436 m`, matching the persistent offset.
+$`(1.1/1.0-1)\,9.81/2.25=0.436\;\mathrm m`$, matching the persistent offset.
 
 The earlier bounded-integral prototype targeted horizontal startup response
 and reached its 0.5 m/s² bound while failing the hover requirement. The vertical
@@ -29,13 +29,13 @@ scalar state. Estimator, references, PD gains and geometric control stay fixed.
 ## Candidate and state contract
 
 The explicit opt-in vertical integral acceleration `I` uses NED m/s²:
-`a_command = a_PD + [0, 0, I]`, with `I_dot = 0.5*(z_reference-z_estimate)`.
+$`\mathbf a_c=\mathbf a_{\mathrm{PD}}+[0,0,I]^T`$, with $`\dot I=0.5(z_r-\hat z)`$.
 The existing position-control feasibility projection and all bounds also apply
 to the compensated command.
 The integral gain is **0.5 s^-3**, update period **0.02 s**, and state bound
 **±1.5 m/s²**. Initialization and reset set the integral state to zero. No mass or fault label is an input.
 
-The gain follows `(s+0.5)^2*(s+2) = s^3+3s^2+2.25s+0.5` for the nominal
+The gain follows $`(s+0.5)^2(s+2)=s^3+3s^2+2.25s+0.5`$ for the nominal
 unsaturated vertical model with the existing PD gains. The 1.1 kg case with
 0.025 s linear motor lag has continuous poles approximately -37.1202, -1.8277,
 -0.6195 and -0.4326 s^-1. This is a design rationale, not a nonlinear proof.

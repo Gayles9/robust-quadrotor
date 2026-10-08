@@ -21,30 +21,58 @@ to the implemented alternatives and completed comparisons.
 
 ## Equations
 
-NED/FRD, active R_WB, e3=[0,0,1], nominal mass m and gravity g:
+Use NED/FRD frames, active $`R_{WB}`$, $`\mathbf e_3=[0,0,1]^T`$, nominal mass $`m`$ and gravity $`g`$:
 
-    c = m (Kp (p-pd) + Kv (v-vd))
-    u = m (g e3-ad) + c
-    u_dot = -m jd + D1(c); u_ddot = -m sd + D2(c)
+```math
+\begin{aligned}
+\mathbf c&=m\bigl(K_p(\mathbf p-\mathbf p_d)+K_v(\mathbf v-\mathbf v_d)\bigr),\\
+\mathbf u&=m(g\mathbf e_3-\mathbf a_d)+\mathbf c,\\
+\dot{\mathbf u}&=-m\mathbf j_d+D_1(\mathbf c),\\
+\ddot{\mathbf u}&=-m\mathbf s_d+D_2(\mathbf c).
+\end{aligned}
+```
 
-Use L(s)=w/(s+w), D1=s L^3, D2=s² L^3, w=30 rad/s.
-Three trapezoidal low-pass sections give D1=w(y2-y3),
-D2=w²(y1-2y2+y3). Initialize all sections to c[0]; this yields zero
-feedback derivatives at startup. Own state, require consecutive sample indices,
-update filter state only after successful finite arithmetic. Require 0<w*h<=1.
+Here $`K_p,K_v`$ are diagonal gains; $`\mathbf a_d,\mathbf j_d,\mathbf s_d`$ are reference acceleration, jerk, and snap. The operators $`D_1,D_2`$ supply filtered derivative estimates.
 
-b3d=normalize(u); b1d=normalize(heading_y cross b3d);
-b2d=b3d cross b1d. Differentiate normalization/cross products twice.
-Omega_d=vee(Rd.T Rd_dot), alpha_d=vee(Rd.T Rd_ddot-Omega_d_hat²).
-Rates are in the desired body frame. With A=R.T Rd:
+Use $`L(s)=\omega_f/(s+\omega_f)`$, $`D_1(s)=sL(s)^3`$ and
+$`D_2(s)=s^2L(s)^3`$, with $`\omega_f=30\;\mathrm{rad/s}`$.
+Three trapezoidal low-pass sections give derivative estimates
+$`\omega_f(\mathbf y_2-\mathbf y_3)`$ and
+$`\omega_f^2(\mathbf y_1-2\mathbf y_2+\mathbf y_3)`$.
+Initialize all sections to $`\mathbf c[0]`$; this yields zero feedback
+derivatives at startup. Own state, require consecutive sample indices, and
+update filter state only after successful finite arithmetic. Require
+$`0<\omega_f h\leq1`$ for sample period $`h`$.
 
-    eR = vee(Rd.T R - R.T Rd)/2
-    eOmega = Omega - A Omega_d
-    M = -kR eR - kOmega eOmega + Omega cross J Omega
-        - J (Omega cross (A Omega_d) - A alpha_d)
-    f = u dot (R e3)
+For heading $`\psi`$, construct and twice differentiate the desired axes:
 
-Default kR=0.64 N m and kOmega=0.32 N m s preserve the recorded
+```math
+\begin{aligned}
+\mathbf y_\psi&=[-\sin\psi,\cos\psi,0]^T,\\
+\mathbf b_{3d}&=\frac{\mathbf u}{\lVert\mathbf u\rVert},\qquad
+\mathbf b_{1d}=\frac{\mathbf y_\psi\times\mathbf b_{3d}}{\lVert\mathbf y_\psi\times\mathbf b_{3d}\rVert},\\
+\mathbf b_{2d}&=\mathbf b_{3d}\times\mathbf b_{1d},\qquad
+R_d=[\mathbf b_{1d}\ \mathbf b_{2d}\ \mathbf b_{3d}],\\
+\boldsymbol\Omega_d&=(R_d^T\dot R_d)^\vee,\qquad
+\boldsymbol\alpha_d=(R_d^T\ddot R_d-[\boldsymbol\Omega_d]_\times^2)^\vee.
+\end{aligned}
+```
+
+Rates are in the desired body frame. With $`R=R_{WB}`$ and $`A=R^TR_d`$:
+
+```math
+\begin{aligned}
+\mathbf e_R&=\tfrac12(R_d^TR-R^TR_d)^\vee,\\
+\mathbf e_\Omega&=\boldsymbol\Omega-A\boldsymbol\Omega_d,\\
+\mathbf M&=-k_R\mathbf e_R-k_\Omega\mathbf e_\Omega+\boldsymbol\Omega\times(J\boldsymbol\Omega)\\
+ &\quad-J\bigl(\boldsymbol\Omega\times(A\boldsymbol\Omega_d)-A\boldsymbol\alpha_d\bigr),\\
+f&=\mathbf u^T(R\mathbf e_3).
+\end{aligned}
+```
+
+The vee map $`(\cdot)^\vee`$ converts a skew-symmetric matrix to its three-vector.
+
+Default $`k_R=0.64\;\mathrm{N\,m}`$ and $`k_\Omega=0.32\;\mathrm{N\,m\,s}`$ preserve the recorded
 design. Reject nonsmooth outer limiting/domain violations; retain visible moment
 clipping and bounded nominal allocation. Projection is recomputed at inner ticks.
 Held reference jets and filtered derivatives are approximations; the ideal

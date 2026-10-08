@@ -48,8 +48,8 @@ its timestamps and accepted age when interpreting an old record.
 
 Each stream supplies its sample period T, delivery delay D, monitor clock
 interval h, warning period count w and loss count l. The thresholds are
-`warning_age = w*T + D + h` and `lost_age = l*T + D + h`, with `l > w`.
-The final clock interval allows delivery quantization. A mission verifies these
+$`a_w=wT+D+h`$ and $`a_l=lT+D+h`$, with `l > w`.
+The symbols $`a_w,a_l`$ denote the warning and loss ages. The final clock interval allows delivery quantization. A mission verifies these
 schedule and clock values against its own configuration before running.
 
 The age is the current clock minus the last accepted acquisition time. Before

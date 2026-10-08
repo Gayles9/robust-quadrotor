@@ -16,8 +16,8 @@ using inertial measurement unit (IMU) samples. The repository uses a north-east-
 Hamilton scalar-first quaternions. The quaternion `q_WB` maps body-coordinate vectors
 into world coordinates and obeys
 
-```text
-q_dot_WB = 0.5 q_WB ⊗ [0, omega_B].
+```math
+\dot q_{WB}=\tfrac12 q_{WB}\otimes[0,\boldsymbol\omega_B].
 ```
 
 Mixing left- and right-local attitude errors would change Jacobian frames and signs.
@@ -29,15 +29,14 @@ The same convention therefore applies to prediction and measurement correction.
 
 The nominal state is
 
-```text
-x_nominal = (
-    position_W,             # (3,), NED, m
-    velocity_W,             # (3,), NED, m/s
-    q_WB,                   # (4,), unit Hamilton scalar-first, body to world
-    accelerometer_bias_B,   # (3,), FRD, m/s²
-    gyroscope_bias_B,       # (3,), FRD, rad/s
-).
+```math
+x=(\mathbf p_W,\mathbf v_W,q_{WB},\mathbf b_{a,B},\mathbf b_{g,B}).
 ```
+
+The entries are position (3 scalars, m), velocity (3, m/s), orientation
+(4, unit quaternion), accelerometer bias (3, m/s²), and gyroscope bias
+(3, rad/s). Their code fields are `position_W`, `velocity_W`, `q_WB`,
+`accelerometer_bias_B`, and `gyroscope_bias_B`, respectively.
 
 The quaternion sign is not canonicalized. State arrays are finite, independently
 owned, C-contiguous `float64` values and are exposed read-only. Quaternion norm evaluation
@@ -49,83 +48,84 @@ use the rotation utility's squared-norm check with `rtol=1e-12, atol=1e-12`.
 
 The 15-state error ordering is
 
-```text
-delta_x = [
-    delta_position_W,           # 0:3
-    delta_velocity_W,           # 3:6
-    delta_theta_B,              # 6:9
-    delta_accelerometer_bias_B, # 9:12
-    delta_gyroscope_bias_B,     # 12:15
-].
+```math
+\delta x=[\delta\mathbf p_W^T,\delta\mathbf v_W^T,\delta\boldsymbol\theta_B^T,\delta\mathbf b_{a,B}^T,\delta\mathbf b_{g,B}^T]^T.
 ```
+
+Each block has three coordinates. In the stored array, the blocks occupy
+slices `0:3`, `3:6`, `6:9`, `9:12`, and `12:15`, in that order.
 
 Position, velocity, and bias errors are additive, with bias errors defined as true
 minus nominal. Attitude uses a right-multiplicative body-local error:
 
-```text
-R_true_WB = R_nominal_WB Exp(skew(delta_theta_B))
-q_true_WB = q_nominal_WB ⊗ delta_q(delta_theta_B)
-
-delta_q(phi) = [
-    cos(norm(phi) / 2),
-    sin(norm(phi) / 2) / norm(phi) phi,
-].
+```math
+\begin{aligned}
+R_{\mathrm{true},WB}&=R_{\mathrm{nom},WB}\,\mathrm{Exp}([\delta\boldsymbol\theta_B]_\times),\\
+q_{\mathrm{true},WB}&=q_{\mathrm{nom},WB}\otimes\delta q(\delta\boldsymbol\theta_B),\\
+\delta q(\boldsymbol\phi)&=\begin{bmatrix}
+\cos(\lVert\boldsymbol\phi\rVert/2)\\
+\dfrac{\sin(\lVert\boldsymbol\phi\rVert/2)}{\lVert\boldsymbol\phi\rVert}\boldsymbol\phi
+\end{bmatrix}.
+\end{aligned}
 ```
 
 The implementation uses a Taylor expansion near zero and normalizes at the existing
 quaternion normalization boundary. Right multiplication matches the repository's
 body-rate kinematics because both the angular rate and the local perturbation are
-expressed in `B` for `q_dot_WB = 0.5 q_WB ⊗ [0, omega_B]`.
+expressed in `B` for $`\dot q_{WB}=\tfrac12 q_{WB}\otimes[0,\boldsymbol\omega_B]`$.
 
 ### IMU and gravity conventions
 
 The measurement and bias signs are
 
-```text
-specific_force_measurement_B
-    = specific_force_true_B + accelerometer_bias_true_B + n_a_B
-
-angular_velocity_measurement_B
-    = angular_velocity_true_B + gyroscope_bias_true_B + n_g_B.
+```math
+\begin{aligned}
+\mathbf f_{m,B}&=\mathbf f_{\mathrm{true},B}+\mathbf b_{a,B}+\mathbf n_{a,B},\\
+\boldsymbol\omega_{m,B}&=\boldsymbol\omega_{\mathrm{true},B}+\mathbf b_{g,B}+\mathbf n_{g,B}.
+\end{aligned}
 ```
 
+The subscript $`m`$ denotes a measured value. Here the bias terms are the true sensor biases, and $`\mathbf n_a,\mathbf n_g`$ are measurement noise.
+
 Nominal propagation therefore subtracts both nominal biases. In NED coordinates,
-gravity is `gravity_W = [0, 0, gravity_acceleration]`; positive world `z` is down. IMU
+gravity is $`\mathbf g_W=[0,0,g]^T`$; positive world `z` is down. IMU
 measurements and corrected acceleration and angular rate are constant over one
 prediction interval. Nominal biases remain constant during that interval.
 
 ### Continuous error dynamics
 
-Let `R = R_WB`,
-`f = specific_force_measurement_B - accelerometer_bias_B`, and
-`omega = angular_velocity_measurement_B - gyroscope_bias_B`. With 3-by-3 blocks and
-`[.]x` denoting `skew(.)`, the continuous state matrix is
+Let $`R=R_{WB}`$,
+$`\mathbf f=\mathbf f_m-\mathbf b_a`$, and
+$`\boldsymbol\omega=\boldsymbol\omega_m-\mathbf b_g`$. With 3-by-3 blocks and
+$`[\cdot]_\times`$ denoting the skew-symmetric cross-product matrix, the continuous state matrix is
 
-```text
-        delta_p  delta_v  delta_theta  delta_b_a  delta_b_g
-F = [      0        I          0           0          0     ]
-    [      0        0       -R [f]x       -R          0     ]
-    [      0        0       -[omega]x      0         -I     ]
-    [      0        0          0           0          0     ]
-    [      0        0          0           0          0     ].
+```math
+F=\begin{bmatrix}
+0&I&0&0&0\\
+0&0&-R[\mathbf f]_\times&-R&0\\
+0&0&-[\boldsymbol\omega]_\times&0&-I\\
+0&0&0&0&0\\
+0&0&0&0&0
+\end{bmatrix}.
 ```
 
 The continuous process-noise ordering is
 
-```text
-w = [n_a_B, n_g_B, n_wa_B, n_wg_B],
+```math
+\mathbf w=[\mathbf n_{a,B}^{T},\mathbf n_{g,B}^{T},\mathbf n_{wa,B}^{T},\mathbf n_{wg,B}^{T}]^{T},
 ```
 
 where the final two terms drive accelerometer- and gyroscope-bias random walks. The
 noise-input matrix is
 
-```text
-          n_a_B  n_g_B  n_wa_B  n_wg_B
-G = [       0      0       0       0   ]
-    [      -R      0       0       0   ]
-    [       0     -I       0       0   ]
-    [       0      0       I       0   ]
-    [       0      0       0       I   ].
+```math
+G=\begin{bmatrix}
+0&0&0&0\\
+-R&0&0&0\\
+0&-I&0&0\\
+0&0&I&0\\
+0&0&0&I
+\end{bmatrix}.
 ```
 
 All unlisted blocks in `F` and `G` are exactly zero.
@@ -135,10 +135,12 @@ All unlisted blocks in `F` and `G` are exactly zero.
 For the continuous process-noise spectral-density matrix `Q_c` in the fixed noise
 ordering, the high-rate baseline discretization is
 
-```text
-Phi = I + F dt
-Q_d_raw = G Q_c G.T dt
-Q_d = 0.5 (Q_d_raw + Q_d_raw.T).
+```math
+\begin{aligned}
+\Phi&=I+F\Delta t,\\
+Q_d^{\mathrm{raw}}&=GQ_cG^T\Delta t,\\
+Q_d&=\tfrac12\bigl(Q_d^{\mathrm{raw}}+(Q_d^{\mathrm{raw}})^T\bigr).
+\end{aligned}
 ```
 
 The explicit final symmetrization changes only floating-point roundoff because the
@@ -156,9 +158,11 @@ positive diagonal scales before its eigendecomposition, so a large eigenvalue ca
 small indefinite principal block. A scale-aware eigenvalue tolerance admits only
 floating-point eigensolver roundoff. The covariance prediction is
 
-```text
-P_next = Phi P Phi.T + Q_d
-P_next = 0.5 (P_next + P_next.T).
+```math
+\begin{aligned}
+P_{k+1}^{\mathrm{raw}}&=\Phi P_k\Phi^T+Q_d,\\
+P_{k+1}&=\tfrac12\bigl(P_{k+1}^{\mathrm{raw}}+(P_{k+1}^{\mathrm{raw}})^T\bigr).
+\end{aligned}
 ```
 
 For positive duration, the composed prediction builds `F` and `G` at the pre-propagation

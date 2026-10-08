@@ -22,13 +22,16 @@ not turn planning smoothness into a general flight-feasibility guarantee.
 
 For segment i with duration T_i and normalized coordinate s in [0,1],
 
-`p_i(t) = origin + sum(k=0..7, c_ik s^k)`, `s=(t-t_i)/T_i`.
+$`\mathbf p_i(t)=\mathbf o+\sum_{k=0}^7\mathbf c_{ik}s^k`$, $`s=(t-t_i)/T_i`$.
 
-Its r-th physical derivative divides the r-th normalized derivative by T_i^r.
-For r=4, the integrated squared-snap cost is
+Here $`\mathbf o`$ is the origin. The $`r`$-th physical derivative divides the
+$`r`$-th normalized derivative by $`T_i^r`$. For $`r=4`$, the integrated squared-snap cost is
 
-`J = sum_i T_i^-7 sum_(k,l=4..7)
-     (c_ik dot c_il) [k!/(k-4)!] [l!/(l-4)!] / (k+l-7)`.
+```math
+J=\sum_i T_i^{-7}\sum_{k,l=4}^7
+\frac{\mathbf c_{ik}^T\mathbf c_{il}}{k+l-7}
+\frac{k!}{(k-4)!}\frac{l!}{(l-4)!}.
+```
 
 The units of J are m²/s⁷. Each segment interpolates both endpoint positions.
 Velocity, acceleration and jerk are shared between adjacent segments, enforcing

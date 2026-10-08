@@ -32,14 +32,12 @@ would have to establish its own velocity bound and uncertainty independently.
 
 ## One-time Gaussian conditioning
 
-The endpoint covariance `C` contains 15 physical errors and six retained IMU
-sample-noise errors. Let `H` select its three velocity errors. With zero prior
+The endpoint covariance $`C`$ contains 15 physical errors and six retained IMU
+sample-noise errors. Let $`H`$ select its three velocity errors. With zero prior
 velocity mean and an exact independent support constraint, conditioning gives
 
-```text
-S = H*C*H^T
-K = C*H^T*S^-1
-C_conditioned = (I-K*H)*C*(I-K*H)^T.
+```math
+S=HCH^T,\qquad K=CH^TS^{-1},\qquad C^+=(I-KH)C(I-KH)^T.
 ```
 
 The implementation solves the three-dimensional system. It does not invert
@@ -64,23 +62,27 @@ disappears. Position and velocity stay continuous, but acceleration jumps.
 The existing endpoint map integrates a linear interpolation between the two
 endpoint accelerations:
 
-```text
-v_hat(h) = v(0) + h*(a(0-)+a(h))/2
-p_hat(h) = p(0) + h*v(0) + h^2*(a(0-)/3+a(h)/6).
+```math
+\begin{aligned}
+\hat{\mathbf v}(h)&=\mathbf v(0)+\tfrac h2(\mathbf a(0^-)+\mathbf a(h)),\\
+\hat{\mathbf p}(h)&=\mathbf p(0)+h\mathbf v(0)+h^2\left(\frac{\mathbf a(0^-)}3+\frac{\mathbf a(h)}6\right).
+\end{aligned}
 ```
 
 An exact counterexample is a stationary, motor-off, no-drag release into free
-fall. Acceleration is zero under support and `g_W` throughout the open flight
-interval. Thus `a(0-)=0`, `a(h)=g_W`, while the analytic flight solution is
+fall. Acceleration is zero under support and $`\mathbf g_W`$ throughout the open flight
+interval. Thus $`\mathbf a(0^-)=\mathbf0`$, $`\mathbf a(h)=\mathbf g_W`$, while the analytic flight solution is
 
-```text
-v(h) = v(0) + h*g_W
-p(h) = p(0) + h*v(0) + h^2*g_W/2
-v_hat(h)-v(h) = -h*g_W/2
-p_hat(h)-p(h) = -h^2*g_W/3.
+```math
+\begin{aligned}
+\mathbf v(h)&=\mathbf v(0)+h\mathbf g_W,\\
+\mathbf p(h)&=\mathbf p(0)+h\mathbf v(0)+\tfrac12h^2\mathbf g_W,\\
+\hat{\mathbf v}(h)-\mathbf v(h)&=-\tfrac h2\mathbf g_W,\\
+\hat{\mathbf p}(h)-\mathbf p(h)&=-\tfrac{h^2}{3}\mathbf g_W.
+\end{aligned}
 ```
 
-At `h=0.0025 s` and `g=9.81 m/s^2`, the NED-down velocity error is
+At $`h=0.0025\;\mathrm s`$ and $`g=9.81\;\mathrm{m/s^2}`$, the NED-down velocity error is
 **-0.0122625 m/s**, and the down position error is **-0.0000204375 m**.
 This is an analytic boundary test, not a measured mission score or the exact
 motor-ramp error in the archived flights. It isolates the discontinuity using
@@ -88,19 +90,20 @@ mean-consistent IMU values and the actual reported release uncertainty.
 
 ## Independent uncertainty calculation
 
-Let `r` be the down row of `R_WB`, `P_ba` the initial accelerometer-bias covariance,
-`C_a0` the retained fresh accelerometer-noise block, `R_a1` the next sample's
-noise covariance, and `Q_ba` the bias-walk spectral density. For the accepted
+Let $`r`$ be the down row of $`R_{WB}`$, $`P_{b_a}`$ the initial accelerometer-bias covariance,
+$`C_{a0}`$ the retained fresh accelerometer-noise block, $`R_{a1}`$ the next sample's
+noise covariance, and $`Q_{b_a}`$ the bias-walk spectral density. For the accepted
 independent velocity profile, the down variance of this boundary map is
 
-```text
-sigma_vD^2 = C_vD,vD + h^2*r*P_ba*r^T
-           + h^2/4*r*(C_a0+R_a1)*r^T
-           + h^3/4*r*Q_ba*r^T.
+```math
+\begin{aligned}
+\sigma_{v_D}^2={}&C_{v_D,v_D}+h^2rP_{b_a}r^T\\
+ &+\tfrac{h^2}{4}r(C_{a0}+R_{a1})r^T+\tfrac{h^3}{4}rQ_{b_a}r^T.
+\end{aligned}
 ```
 
 The first-order down projection of the tilt term vanishes because
-`e_D^T*R_WB*[R_WB^T*g_W]_cross = 0`. The full alignment/bias and sample-noise
+$`\mathbf e_D^T R_{WB}[R_{WB}^T\mathbf g_W]_\times=\mathbf0^T`$. The full alignment/bias and sample-noise
 covariances are still retained and propagated; the evidence verifier separately
 reconstructs all 21x21 entries with specialized analytic derivatives.
 

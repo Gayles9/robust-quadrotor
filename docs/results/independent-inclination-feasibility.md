@@ -48,8 +48,8 @@ gravity from arbitrary translational acceleration.
 
 ## Two-coordinate geometry
 
-Let the nominal body-down direction be `d_hat=R_hat_WB e3`. Choose a fixed local
-basis `E_W` with two orthonormal columns perpendicular to `d_hat`. For a unit
+Let the nominal body-down direction be $`\hat{\mathbf d}=\hat R_{WB}\mathbf e_3`$. Choose a fixed local
+basis `E_W` with two orthonormal columns perpendicular to $`\hat{\mathbf d}`$. For a unit
 observed direction `z_W`, define a tangent **chord** residual
 
 ```math
@@ -57,7 +57,7 @@ r=E_W^T(z_W-\hat d_W).
 ```
 
 The chart is fixed for this linearization. Under the existing right-local
-attitude convention `R_true=R_hat Exp([delta_theta_B]x)`,
+attitude convention $`R_{\mathrm{true}}=\hat R\mathrm{Exp}([\delta\boldsymbol\theta_B]_\times)`$,
 
 ```math
 H_\theta=-E_W^T\hat R_{WB}[e_3]_\times,\qquad
@@ -75,8 +75,8 @@ rotation about **world** vertical generally changes `R_WB e3`. Body-axis twist a
 yaw coincide only in the relevant level configuration. The local hover rank
 calculation applies at that configuration.
 
-A unit antipodal observation `z=-d_hat` has zero tangent projection. A local
-contract must therefore reject `d_hat.T z <= 0` before evaluating NIS. Passing
+A unit antipodal observation $`\mathbf z=-\hat{\mathbf d}`$ has zero tangent projection. A local
+contract must therefore reject $`\hat{\mathbf d}^T\mathbf z\leq0`$ before evaluating NIS. Passing
 the hemisphere check does not prove that a large residual has a valid linear
 Gaussian likelihood. Nonunit/nonfinite directions, invalid rotations, unknown
 frame registration and invalid uncertainty are also ineligible. Normalizing a
@@ -100,11 +100,11 @@ This is first-order uncertainty propagation. Mounting/reference calibration
 errors, persistent bias, nonlinear curvature and temporal correlation require
 their own justified treatment. They are not removed by projecting to two
 coordinates. If the source also supplies body-origin position, its joint noise
-covariance contains `R_pt=Cov(n_p,epsilon_W) J.T`. This block is part of the
+covariance contains $`R_{pt}=\mathrm{Cov}(\mathbf n_p,\boldsymbol\epsilon_W)J^T`$. This block is part of the
 measurement model and must be retained.
 
 For state error `delta_x`, observation noise `n`, and
-`U=Cov(delta_x,n)`, the linear Gaussian innovation and cross covariance are
+$`U=\mathrm{Cov}(\delta\mathbf x,\mathbf n)`$, the linear Gaussian innovation and cross covariance are
 
 ```math
 S=HPH^T+HU+U^TH^T+R,\quad C=PH^T+U,
@@ -123,7 +123,7 @@ different interface is invalid. These equations concern original linear error
 coordinates; a future implementation would still need correct quaternion
 injection/reset and every corresponding covariance transformation.
 
-When noise is independent of state (`U=0`) but position and direction noise are
+When noise is independent of state ($`U=0`$) but position and direction noise are
 correlated, a correct sequential factorization uses
 
 ```math
@@ -168,8 +168,8 @@ measurement. The current API accepts only same-epoch corrections; delayed-state
 handling is not implemented.
 
 For a conditional two-dimensional zero-mean Gaussian innovation, the radial
-tail is `Pr(NIS>c)=exp(-c/2)`, so a 99% threshold would be
-`c=-2 log(0.01)=9.21034037`. This is not added to configuration. Original position
+tail is $`\Pr(\mathrm{NIS}>c)=\exp(-c/2)`$, so a 99% threshold would be
+$`c=-2\log(0.01)=9.21034037`$. This is not added to configuration. Original position
 and altitude thresholds stay 11.345 and 6.635. Nonlinear/biased residuals do not
 inherit that coverage automatically, and eligibility/hemisphere rejections
 remain separate events.
@@ -182,8 +182,8 @@ s=\sigma_{max}\sqrt{2\log(N/\alpha)}
 ```
 
 with failure probability at most `alpha`. Temporal independence is unnecessary
-for this upper bound. The dimensionless example `N=1000`, `alpha=0.01` gives
-`s=4.798526 sigma_max`. This does not cover calibration, bias, nonlinear model
+for this upper bound. The dimensionless example $`N=1000`$, $`\alpha=0.01`$ gives
+$`s=4.798526\,\sigma_{\max}`$. This does not cover calibration, bias, nonlinear model
 error or posterior estimator error. None of those missing quantities is zeroed
 to manufacture an 8 cm allocation.
 

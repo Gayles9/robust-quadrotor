@@ -12,30 +12,34 @@ experimental first-interval correction.
 
 ## Conditional nonlinear moments
 
-The 33 zero-mean Gaussian latent variables `X` have covariance
-`diag(C0,R_imu,h Q_bias)`. Six rotation variables are
-`eta=[delta_theta0,delta_phi]`, where
+The 33 zero-mean Gaussian latent variables $`X`$ have covariance
+$`\mathrm{diag}(C_0,R_{\mathrm{imu}},hQ_b)`$. Six rotation variables are
+$`\boldsymbol\eta=[\delta\boldsymbol\theta_0^T,\delta\boldsymbol\phi^T]^T`$, where
 
-```text
-delta_phi = -h*delta_bg - h/2*(old_gyro_noise + new_gyro_noise + gyro_bias_increment).
+```math
+\delta\boldsymbol\phi=-h\,\delta\mathbf b_g-\frac h2(\mathbf n_{g0}+\mathbf n_{g1}+\Delta\mathbf b_g).
 ```
 
-The 18-entry vector `Z` contains
-`[delta_p0,delta_v0,terminal_bias_error6,new_sample_noise6]`. Force error `zeta`
+The terms $`\mathbf n_{g0},\mathbf n_{g1}`$ are the old and new gyro sample noise; $`\Delta\mathbf b_g`$ is the gyro-bias increment.
+
+The 18-entry vector $`Z`$ contains
+`[delta_p0,delta_v0,terminal_bias_error6,new_sample_noise6]`. Force error $`\zeta`$
 is terminal accelerometer bias plus new accelerometer noise, a linear selector
-`E Z`. Selectors retain all correlations from the original latent ordering.
+$`EZ`$. Selectors retain all correlations from the original latent ordering.
 Gaussian conditioning gives
 
-```text
-Z | eta = K eta + epsilon
-K = Cov(Z,eta) Cov(eta)^-1
-D = Cov(Z) - K Cov(eta,Z), epsilon independent of eta.
+```math
+\begin{aligned}
+Z\mid\eta&=K\eta+\epsilon,\\
+K&=\mathrm{Cov}(Z,\eta)\,\mathrm{Cov}(\eta)^{-1},\\
+D&=\mathrm{Cov}(Z)-K\,\mathrm{Cov}(\eta,Z),\qquad\epsilon\perp\eta.
+\end{aligned}
 ```
 
 A scaled linear solve evaluates conditioning without forming an explicit
 inverse. At a rotation node,
-`Ri=R0 Exp(delta_theta0) Exp(phi+delta_phi)`. The non-attitude output is affine
-in `Z`: `Y=bi+Mi Z`. The matrix `Mi` preserves position/velocity/bias/noise and
+$`R_i=R_0\mathrm{Exp}([\delta\boldsymbol\theta_0]_\times)\mathrm{Exp}([\boldsymbol\phi+\delta\boldsymbol\phi]_\times)`$. The non-attitude output is affine
+in $`Z`$: $`Y=b_i+M_iZ`$. The matrix $`M_i`$ preserves position/velocity/bias/noise and
 subtracts the rotated force-error contribution.
 
 The law of total covariance combines conditional covariance and variability

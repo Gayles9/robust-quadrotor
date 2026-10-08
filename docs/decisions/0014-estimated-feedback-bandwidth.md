@@ -32,43 +32,57 @@ demonstrate an estimator, frame or sign defect.
 ## Local mathematical design
 
 Linearize about matched, level hover with zero yaw and inactive limits. For
-one horizontal axis define tilt eta so p_ddot = g*eta: eta=-pitch for north,
-eta=roll for east. Let r=eta_dot, a=eta_ddot and tau be motor lag. Nominal
+one horizontal axis define tilt $`\eta`$ so $`\ddot p=g\eta`$: $`\eta=-\theta`$ for north
+(pitch $`\theta`$), $`\eta=\varphi`$ for east (roll $`\varphi`$). Let $`r=\dot\eta`$,
+$`a=\ddot\eta`$ and $`\tau`$ be motor lag. Nominal
 inertia compensation gives:
 
-    p_dot=v, v_dot=g*eta, eta_dot=r, r_dot=a
-    tau*a_dot+a = kr*(ka*(eta_d-eta)-r)
-    eta_d = (-kp*p-kv*v)/g.
+```math
+\begin{aligned}
+\dot p&=v,\quad\dot v=g\eta,\quad\dot\eta=r,\quad\dot r=a,\\
+\tau\dot a+a&=k_r(k_a(\eta_d-\eta)-r),\\
+\eta_d&=\frac{-k_pp-k_vv}{g}.
+\end{aligned}
+```
 
 The homogeneous characteristic polynomial is
 
-    tau*s^5+s^4+kr*s^3+kr*ka*s^2+kr*ka*kv*s+kr*ka*kp.
+```math
+D(s)=\tau s^5+s^4+k_rs^3+k_rk_as^2+k_rk_ak_vs+k_rk_ak_p.
+```
 
-kp is s^-2; kv, ka and kr are s^-1. For the retained kp=1, kv=1.8,
-tau=.025, baseline ka=3, kr=12 produces a slow oscillatory pair
+$`k_p`$ is in s⁻²; $`k_v,k_a,k_r`$ are in s⁻¹. For the retained $`k_p=1`$, $`k_v=1.8`$,
+$`\tau=.025`$, baseline $`k_a=3`$, $`k_r=12`$ produces a slow oscillatory pair
 -1.26270 +/- 1.80018j (damping ratio .57425), despite ideal outer-loop
 damping .9. Thus the ideal double-integrator calculation alone omits
 important inner-loop phase lag.
 
 Use coefficient matching with the complete motor/inner/outer model:
 
-    D(s) = .025*(s+3)^2*(s+6)*(s²+28s+392)
-    kp=3528/1003, kv=3192/1003, ka=6018/773, kr=773/40.
+```math
+\begin{aligned}
+D(s)&=0.025(s+3)^2(s+6)(s^2+28s+392),\\
+k_p&=\frac{3528}{1003},\quad k_v=\frac{3192}{1003},\quad
+k_a=\frac{6018}{773},\quad k_r=\frac{773}{40}.
+\end{aligned}
+```
 
-The s^4 coefficient is .025*(3+3+6+28)=1, so all four gains can be
+The $`s^4`$ coefficient is $`.025(3+3+6+28)=1`$, so all four gains can be
 matched without pretending to change the physical motor lag. The continuous
 poles are -3 (double), -6, -14 +/- 14j. Equivalent sampled-data poles,
 log(z)/.02, are approximately -2.4599, -4.3654 +/- 1.1289j,
 -12.2840 +/- 16.3269j. All have negative real parts; the minimum sampled
-damping ratio is .6012. Leave yaw at ka=2, kr=8 and vertical kp=2.25,
-kv=3, and leave all limits unchanged. This is a local linear result only.
+damping ratio is .6012. Leave yaw at $`k_a=2`$, $`k_r=8`$ and vertical $`k_p=2.25`$,
+$`k_v=3`$, and leave all limits unchanged. This is a local linear result only.
 
 With errors defined as estimate minus truth, the horizontal forcing law is
 
-    D(d/dt)*p = -kr*ka*(kp*e_p+kv*e_v+g*e_eta) - g*kr*e_r.
+```math
+D\!\left(\frac{d}{dt}\right)p=-k_rk_a(k_pe_p+k_ve_v+ge_\eta)-gk_re_r.
+```
 
-For constant tilt error the resulting local position offset is -g*e_eta/kp;
-for constant velocity-estimation error it is -kv*e_v/kp. Thus faster inner
+For constant tilt error the resulting local position offset is $`-ge_\eta/k_p`$;
+for constant velocity-estimation error it is $`-k_ve_v/k_p`$. Thus faster inner
 feedback alone cannot improve these static sensitivities. The joint design
 reduces their magnitudes from 9.81 to 2.789 and from 1.8 to .9048,
 respectively, without any integral state. Position-estimation error still
@@ -93,8 +107,13 @@ sensitive to those assumptions. Do not infer initial state from a sampled
 truth realization. Instead specify the prior covariance once from the
 declared independent zero-mean uniform distributions:
 
-    Var(U[-a,a]) = integral(-a..a, x²/(2a) dx) = a²/3
-    P0 = diag([.02 (x6), 2*pi/180 (x3), .02 (x3), .003 (x3)]² / 3).
+```math
+\begin{aligned}
+x&\sim\mathcal U[-a,a],\qquad\mathrm{Var}(x)=\int_{-a}^{a}\frac{x^2}{2a}\,dx=\frac{a^2}{3},\\
+P_0&=\frac13\,\mathrm{diag}\!\left(
+0.02^2I_6,\left(\frac{2\pi}{180}\right)^2I_3,0.02^2I_3,0.003^2I_3\right).
+\end{aligned}
+```
 
 At the identity prior, the supplied bounded rotation vector is exactly
 the right-local attitude error, so its three-component covariance has
@@ -105,7 +124,7 @@ claim or new evidence of full closed-loop NIS/NEES calibration.
 
 ## Evidence for the joint profile
 
-The initial inner-only candidate ka=6,kr=24 kept the old outer gains; it
+The initial inner-only candidate $`k_a=6`$,$`k_r=24`$ kept the old outer gains; it
 missed the .08 m target on development hover 8200 (.087947 m). Joint
 pole placement with slow poles -2 reduced that peak to .064014 m, but
 development hover 8202 exceeded the 15-degree attitude-estimation target
@@ -168,19 +187,27 @@ but narrowly misses the stricter .07 m development margin. Its failed test log
 is retained; the .07 m check is not relaxed. No version-2 held-out seed was opened.
 
 Use the real-pole stiffness bound to select the final version-2 target. Write
-positive real decay rates as a1..a5 with sum 1/tau=40. Coefficient matching gives
-kp = 1 / sum(i<j, 1/(ai*aj)). Cauchy-Schwarz gives
+positive real decay rates as $`a_1,\ldots,a_5`$ with sum $`1/\tau=40`$. Coefficient matching gives
+$`k_p=\left(\sum_{i<j}(a_i a_j)^{-1}\right)^{-1}`$. Cauchy-Schwarz gives
 
-    sum(i<j, ai*aj) * sum(i<j, 1/(ai*aj)) >= 100,
-    sum(i<j, ai*aj) <= ((sum ai)^2 - (sum ai)^2/5)/2 = 640.
+```math
+\begin{aligned}
+\left(\sum_{i<j}a_ia_j\right)\left(\sum_{i<j}\frac1{a_ia_j}\right)&\ge100,\\
+\sum_{i<j}a_ia_j&\le\frac{(\sum_i a_i)^2-(\sum_i a_i)^2/5}{2}=640.
+\end{aligned}
+```
 
 Consequently kp<=6.4 s^-2, with equality for five equal rates of 8 s^-1.
 This maximizes static position stiffness within the stated all-real continuous
 pole family, not over arbitrary nonlinear controllers or complex-pole designs:
 
-    D2(s) = .025*(s+8)^5
-          = .025*s^5+s^4+16*s^3+128*s^2+512*s+819.2.
-    kp=6.4, kv=4, ka=8, kr=16.
+```math
+\begin{aligned}
+D_2(s)&=0.025(s+8)^5\\
+ &=0.025s^5+s^4+16s^3+128s^2+512s+819.2,\\
+k_p&=6.4,\quad k_v=4,\quad k_a=8,\quad k_r=16.
+\end{aligned}
+```
 
 The decay rates still sum to 40 s^-1, preserving the physical motor time constant.
 The same held-clock local model has slowest equivalent decay rate about
@@ -224,21 +251,29 @@ hold-entry samples; changing the scoring window is not a remedy. All attitude
 and numerical conditions pass. The all-real family has exhausted its stiffness
 bound. The equal-decay complex-pole alternative uses the same physical model:
 
-    D_b(s) = .025*(s+8)*((s+8)^2+b^2)^2.
+```math
+D_b(s)=0.025(s+8)((s+8)^2+b^2)^2.
+```
 
 All real parts remain -8 s^-1, so their sum preserves the fixed motor lag.
-Require continuous complex-mode damping at least 1/sqrt(2), giving 0<=b<=8.
-Writing x=b^2, coefficient matching gives
+Require continuous complex-mode damping at least $`1/\sqrt2`$, giving $`0\leq b\leq8`$.
+Writing $`x=b^2`$, coefficient matching gives
 
-    kp(x)=(64+x)^2/(640+6*x),
-    d(kp)/dx=(64+x)*(896+6*x)/(640+6*x)^2 > 0.
+```math
+k_p(x)=\frac{(64+x)^2}{640+6x},\qquad\frac{dk_p}{dx}=\frac{(64+x)(896+6x)}{(640+6x)^2}>0.
+```
 
-Consequently b=8 maximizes position stiffness in this explicitly constrained
+Consequently $`b=8`$ maximizes position stiffness in this explicitly constrained
 family. It is not an optimum over arbitrary controllers. The selected candidate is
 
-    D3(s)=.025*(s+8)*(s^2+16*s+128)^2
-         =.025*s^5+s^4+19.2*s^3+204.8*s^2+1228.8*s+3276.8,
-    kp=16 s^-2, kv=6 s^-1, ka=32/3 s^-1, kr=96/5 s^-1.
+```math
+\begin{aligned}
+D_3(s)&=0.025(s+8)(s^2+16s+128)^2\\
+ &=0.025s^5+s^4+19.2s^3+204.8s^2+1228.8s+3276.8,\\
+k_p&=16\ \mathrm{s}^{-2},\quad k_v=6\ \mathrm{s}^{-1},\quad
+k_a=\frac{32}{3}\ \mathrm{s}^{-1},\quad k_r=\frac{96}{5}\ \mathrm{s}^{-1}.
+\end{aligned}
+```
 
 The unchanged held-clock map predicts minimum damping .59084 and slowest
 equivalent decay 5.38638 s^-1. The tilt and velocity-error static sensitivities
@@ -269,13 +304,13 @@ separate use in the completed controller study.
 
 ### Rejected prototype and diagnostic boundary
 
-The preceding b=8 proposal did not pass its pre-implementation probe. Seed 93012
+The preceding $`b=8`$ proposal did not pass its pre-implementation probe. Seed 93012
 reached .0844626 m and activated a limit; seed 93003 reached .0759334 m, above the
 declared .065 m development margin. No version-3 production profile was added.
 The failed probe and its exact script are retained as development evidence.
 
 A separate causal bounded-integral prototype also failed. Its continuous target
-was .025*(s+20/3)^6, with kp=40/3, kv=5, ka=80/9, kr=50/3 and integral gain
+was $`.025(s+20/3)^6`$, with $`k_p=40/3`$, $`k_v=5`$, $`k_a=80/9`$, $`k_r=50/3`$ and integral gain
 400/27 s^-3. The horizontal integral acceleration used the previous outer-tick
 position error and was bounded at +/-.5 m/s². Seed 93012 reached .111452 m;
 93003 reached .069758 m, and the integral bound became active. These observations
@@ -301,9 +336,9 @@ unchanged. They do not retroactively qualify either frozen batch or the failed
 strict-margin prototype. Qualification requires a candidate that passes its
 prerequisites and a separately fixed validation protocol.
 
-The b=10,12,14 saturation diagnostics all failed even the inherited .08 m startup
+The $`b=10,12,14`$ saturation diagnostics all failed even the inherited .08 m startup
 target: seed 93012 reached .0822047, .0826201 and .0913843 m, respectively.
-The b=14 profile additionally failed seeds 91016 and 8200. Across these probes,
+The $`b=14`$ profile additionally failed seeds 91016 and 8200. Across these probes,
 the longest actuator-limiting intervals were .05, .10 and .15 s; brief limiting
 was therefore not the disqualifying inherited condition. Higher bandwidth did
 not resolve the performance issue and increased measured moment effort. None

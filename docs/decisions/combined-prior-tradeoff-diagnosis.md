@@ -36,7 +36,7 @@ updates retain their order.
 
 Each innovation is split into saved sensor noise and physical prediction error.
 For paired effective gains and innovations, the ordered identity is
-`delta_c = (K_candidate - K_control) nu_control + K_candidate delta_nu`.
+$`\Delta\mathbf c=(K_1-K_0)\boldsymbol\nu_0+K_1\Delta\boldsymbol\nu`$ (subscripts 0 and 1 denote control and candidate; $`\Delta\boldsymbol\nu=\boldsymbol\nu_1-\boldsymbol\nu_0`$).
 This separates a change in gain from a change in the innovation it acts on.
 It is an accounting identity in each update's coordinates, not a prediction of
 a filter with a noise source removed. Matched events use the common time prefix,

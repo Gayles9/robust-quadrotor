@@ -12,7 +12,7 @@ both matched controls. It is not adopted as the default mission behavior.
 ## Candidate and ownership
 
 `SupportedVelocityConditioner` acts once at the externally supported release,
-before initial observations. Its Gaussian constraint is `H=[0 I 0]` on the
+before initial observations. Its Gaussian constraint is $`H=[0\ I\ 0]`$ on the
 21-dimensional joint state. For the independent zero-mean velocity profile,
 conditioning removes only three velocity covariance rows and columns. Nominal
 state, IMU sample, attitude/bias correlation, position uncertainty, noise and

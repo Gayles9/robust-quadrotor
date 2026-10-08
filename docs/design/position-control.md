@@ -52,29 +52,34 @@ overflow rather than silently sanitizing them. Unit quaternion inputs are requir
 ## Position/velocity law and local dynamics
 
 Use the existing NED world and FRD body frame contract: positive world z is down,
-gravity is `g e3`, and rotor force is `-T e3` in body coordinates. Let p,v be world
-position and velocity, and p_r,v_r,a_r their references. An asterisk denotes
-elementwise multiplication in the following executable-form equations:
+gravity is $`g\mathbf e_3`$, and rotor force is $`-T\mathbf e_3`$ in body coordinates. Let $`\mathbf p,\mathbf v`$ be world
+position and velocity, and $`\mathbf p_r,\mathbf v_r,\mathbf a_r`$ their
+references. The gain matrices below are diagonal:
 
-    a_requested_W = a_r + K_p * (p_r - p) + K_v * (v_r - v)
+```math
+\mathbf a_{\mathrm{req},W}=\mathbf a_r+K_p(\mathbf p_r-\mathbf p)+K_v(\mathbf v_r-\mathbf v).
+```
 
-Here K_p is a positive `(3,)` diagonal gain vector in s^-2, K_v in s^-1, and every
+Here $`K_p`$ represents the positive `(3,)` gain vector as a diagonal matrix
+in s⁻², and $`K_v`$ does the same for velocity gains in s⁻¹. Every
 acceleration is in m/s². Acceleration feedforward supplies known reference curvature;
 feedback removes measured tracking error. With a perfectly realized acceleration and
 a dynamically consistent reference, each axis obeys
 
-    e_ddot + K_v * e_dot + K_p * e = 0,   e = p - p_r.
+```math
+\ddot{\mathbf e}+K_v\dot{\mathbf e}+K_p\mathbf e=0,\qquad\mathbf e=\mathbf p-\mathbf p_r.
+```
 
-Thus natural frequency is sqrt(K_p) and damping ratio K_v/(2 sqrt(K_p)). The example
-uses K_p=[1,1,2.25], K_v=[1.8,1.8,3]: frequencies [1,1,1.5] rad/s and damping
+Thus each axis has natural frequency $`\sqrt{K_p}`$ and damping ratio $`K_v/(2\sqrt{K_p})`$.
+The example uses diagonal entries $`[1,1,2.25]`$ for $`K_p`$ and $`[1.8,1.8,3]`$ for $`K_v`$: frequencies [1,1,1.5] rad/s and damping
 [.9,.9,1]. These are slower than the existing inner-loop local frequencies [6,6,4]
 rad/s. Faster update rates alone do not establish time-scale separation; both the
 loop dynamics and sampling are relevant. This local equation assumes no actuator
 lag, attitude-tracking error or active limits and is not a stability proof for the
 complete nonlinear sampled system. The experiments retain those effects.
 
-There is no integrator. A persistent external force d_W approximately produces
-e_W=d_W/(m*K_p) at a matched, unsaturated equilibrium, rather than zero position
+There is no integrator. A persistent external force $`\mathbf d_W`$ approximately produces
+$`\mathbf e_W=K_p^{-1}\mathbf d_W/m`$ at a matched, unsaturated equilibrium, rather than zero position
 error. Constant mass/gravity mismatch likewise produces a vertical offset. Mild-wind
 testing characterizes this baseline limitation; it does not justify a universal
 disturbance-rejection claim. With no integral state, anti-windup/reset logic is not
@@ -84,14 +89,14 @@ needed for this controller.
 
 The mapping is deliberately explicit and sequential, not an optimal projection:
 
-1. Clip a_requested componentwise to ±`maximum_acceleration_W`, obtaining a_c.
+1. Clip $`\mathbf a_{\mathrm{req}}`$ componentwise to ±`maximum_acceleration_W`, obtaining $`\mathbf a_c`$.
    The vertical bound must be strictly less than nominal gravity.
-2. Form the desired body-down force vector l_W=m_n(g_n e3-a_c). It has positive
-   down component l_z, even when upward/downward acceleration is limited.
-3. If ||l_xy|| > l_z tan(theta_max), scale only l_xy to that radius. This bounds
+2. Form the desired body-down force vector $`\boldsymbol\ell_W=m_n(g_n\mathbf e_3-\mathbf a_c)`$. It has positive
+   down component $`\ell_z`$, even when upward/downward acceleration is limited.
+3. If $`\lVert\boldsymbol\ell_{xy}\rVert>\ell_z\tan\theta_{\max}`$, scale only $`\boldsymbol\ell_{xy}`$ to that radius. This bounds
    the desired tilt without reversing horizontal direction.
-4. Let b3=l/||l|| and T=clip(||l||,T_min,T_max), where 0<T_min<T_max. The implied
-   feasible nominal acceleration is g_n e3-(T/m_n)b3.
+4. Let $`\mathbf b_3=\boldsymbol\ell/\lVert\boldsymbol\ell\rVert`$ and $`T=\mathrm{clip}(\lVert\boldsymbol\ell\rVert,T_{\min},T_{\max})`$, where $`0<T_{\min}<T_{\max}`$. The implied
+   feasible nominal acceleration is $`g_n\mathbf e_3-(T/m_n)\mathbf b_3`$.
 
 `PositionControlCommand` records `requested_acceleration_W`,
 `feasible_acceleration_W`, `q_reference_WB`, `collective_thrust`, and separate
@@ -118,11 +123,13 @@ clipping, so clipping cannot conceal invalid intermediate arithmetic.
 
 ## Desired orientation and yaw
 
-For requested yaw psi, define horizontal y_h=[-sin(psi),cos(psi),0]. Then
+For requested yaw $`\psi`$, define horizontal $`\mathbf y_h=[-\sin\psi,\cos\psi,0]^T`$. Then
 
-    b1 = normalize(y_h cross b3)
-    b2 = b3 cross b1
-    R_reference_WB = [b1 b2 b3]
+```math
+\mathbf b_1=\frac{\mathbf y_h\times\mathbf b_3}{\lVert\mathbf y_h\times\mathbf b_3\rVert},
+\qquad\mathbf b_2=\mathbf b_3\times\mathbf b_1,\qquad
+R_{r,WB}=[\mathbf b_1\ \mathbf b_2\ \mathbf b_3].
+```
 
 The columns are the desired FRD axes expressed in NED. Since b3_z>0, the cross
 product is nonzero and the horizontal projection of b1 points along the requested
@@ -143,14 +150,19 @@ feedforward or global attitude-domain guarantee is implied.
 
 `MissionSegment` declares a phase, positive duration, connected start/end NED positions
 and `ReferenceKind`. A hold requires equal endpoints. For a smooth segment of length D,
-let s=t/D in [0,1], delta_p=p_end-p_start. Its quintic blend is
+let $`s=t/D\in[0,1]`$ and $`\Delta\mathbf p=\mathbf p_1-\mathbf p_0`$ (end minus start). Its quintic blend is
 
-    h(s)   = 10 s^3 - 15 s^4 + 6 s^5
-    h'(s)  = 30 s^2 (1-s)^2
-    h''(s) = 60 s (1-s) (1-2s)
-    p = p_start + h(s) delta_p
-    v = h'(s) delta_p / D
-    a = h''(s) delta_p / D^2.
+```math
+\begin{aligned}
+h(s)&=10s^3-15s^4+6s^5,\\
+h'(s)&=30s^2(1-s)^2,\qquad h''(s)=60s(1-s)(1-2s),\\
+\mathbf p&=\mathbf p_0+h(s)\Delta\mathbf p,\\
+\mathbf v&=\frac{h'(s)}D\Delta\mathbf p,\qquad
+\mathbf a=\frac{h''(s)}{D^2}\Delta\mathbf p.
+\end{aligned}
+```
+
+Here $`\mathbf p_0`$ is segment-start position, $`\Delta\mathbf p`$ the endpoint displacement, and $`D`$ segment duration.
 
 Position, velocity and acceleration connect continuously to endpoint holds; endpoint
 values are returned exactly. This is a simple rest-to-rest primitive, not a minimum-snap
@@ -187,7 +199,7 @@ the positive plant step and integer strides, with the position stride a multiple
 the attitude stride. The full reference-plus-timeout horizon must fit `maximum_steps`;
 budget failure is configuration rejection, never successful mission completion.
 
-At each t_k=k*dt: record truth and the analytic reference; check actual-state guards and
+At each $`t_k=k\Delta t`$: record truth and the analytic reference; check actual-state guards and
 advance the supervisor; stop if terminal; compute the outer demand if due; check the
 local attitude domain; compute the inner command if due; advance the plant. The existing
 `attitude_simulation._plant_step` supplies stage-resolved exact motor response, rotor
@@ -237,12 +249,12 @@ subsequently decoded. Missing/reordered/duplicate trials, failed executions and 
 criteria cannot become an aggregate pass. Metrics use all samples; plots read stored
 validated evidence rather than rerunning or selecting favorable seeds.
 
-RMSE is sqrt(integral ||p-p_r||² dt / duration), using trapezoidal quadrature over the
+RMSE is $`\sqrt{T^{-1}\int_0^T\lVert\mathbf p-\mathbf p_r\rVert^2\,dt}`$ for mission duration $`T`$, using trapezoidal quadrature over the
 complete mission, including takeoff and landing. Command-limit durations use actual
 hold widths, including partial final intervals. Actuator limiting is moment clipping,
 allocation scaling, or a commanded rotor at a speed bound; longest consecutive duration
 and final-second overlap are reported separately. Rate/outer limits have their own
-diagnostics. Control effort is integral T_command² dt and integral ||tau_actual||² dt;
+diagnostics. Control effort is $`\int T_c^2\,dt`$ and $`\int\lVert\boldsymbol\tau_a\rVert^2\,dt`$, using commanded thrust $`T_c`$ and actual moment $`\boldsymbol\tau_a`$;
 these are signal-effort measures, not electrical energy. Settling uses the first epoch
 after the last simultaneous position/speed-band violation within the constant vertical
 step interval. Refinement halves only plant dt and compares the full common truth grid.

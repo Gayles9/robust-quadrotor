@@ -66,8 +66,8 @@ f_k=-R^T g_W+b_{a,k}+n_{a,k},\qquad
 
 In particular a level supported accelerometer reads approximately **-g on body
 z**. This equation relies on the support reaction; arbitrary accelerated flight
-does not supply this observation. Let s=mean(f)-the prior accelerometer-bias
-mean, and retain the prior heading psi. Then
+does not supply this observation. Let $`s=\bar f-\hat b_{a,0}`$ be mean specific force minus the prior accelerometer-bias
+mean, and retain the prior heading $`\psi`$. Then
 
 ```math
 \begin{aligned}
@@ -98,19 +98,19 @@ is a prerequisite for hardware use.
 
 ## Duration allocation and irreducible uncertainty
 
-For N samples separated by dt=0.0025 s, T=(N-1)dt. If bias increments have
-covariance W dt, define
+For $`N`$ samples separated by $`\Delta t=0.0025\;\mathrm s`$, $`T=(N-1)\Delta t`$.
+If bias increments have covariance $`W\Delta t`$, define
 
 ```math
-A_N=\frac{dt(N-1)(2N-1)}{6N},\qquad B_N=\frac{T}{2}.
+A_N=\frac{\Delta t(N-1)(2N-1)}{6N},\qquad B_N=\frac{T}{2}.
 ```
 
-The average walk has covariance W A_N, its covariance with the terminal walk
-is W B_N, and the terminal walk has covariance W T. These follow by giving
-increment j the mean weight (N-j)/N and terminal weight 1.
+The average walk has covariance $`WA_N`$, its covariance with the terminal walk
+is $`WB_N`$, and the terminal walk has covariance $`WT`$. These follow by giving
+increment $`j`$ the mean weight $`(N-j)/N`$ and terminal weight 1.
 
-The white accelerometer contribution must satisfy sigma_a/(g sqrt(N)) <=0.02
-degree. Terminal gyro-bias variance is sigma_g²/N+w_g² A_N, constrained to
+The white accelerometer contribution must satisfy $`\sigma_a/(g\sqrt N)\leq0.02`$
+degree. Terminal gyro-bias variance is $`\sigma_g^2/N+w_g^2 A_N`$, constrained to
 three sigma <=0.03 degree/s. Solving these inequalities gives 137 and 132
 samples respectively, hence minimum span 0.34 s. Rounding upward to the specified
 0.5 s block gives **201 samples**. This is an analytic allocation, not a
@@ -129,10 +129,10 @@ Covariance describes both the size of each error and how errors vary together.
 The correlations matter here: the same accelerometer error can affect both
 the inferred tilt and its relationship to the accelerometer bias.
 
-Errors use R_true=R_hat Exp([delta-theta]x), true bias minus estimated bias.
-Let J be the right-local derivative of the inclination estimate with respect
-to s, u=R_hat^T e_D the retained-heading direction, and Sigma_a/g the
-per-sample white-noise covariance. With the stated independent priors,
+Errors use $`R_{\mathrm{true}}=\hat R\mathrm{Exp}([\delta\theta]_\times)`$ and true bias minus estimated bias.
+Let $`J`$ be the right-local derivative of the inclination estimate with respect
+to $`s`$, $`u=\hat R^T e_D`$ the retained-heading direction, and $`\Sigma_a,\Sigma_g`$
+the per-sample accelerometer and gyro white-noise covariances. With the stated independent priors,
 
 ```math
 V_a=P_{a,0}+W_a A_N+\Sigma_a/N,\qquad
@@ -149,12 +149,12 @@ P_{gg}&=\Sigma_g/N+W_g A_N.
 ```
 
 All other blocks are zero under the stated independence assumptions, and
-P_a-theta is the transpose. The attitude/bias cross block is essential. At
-level, J has J_roll,fy=-1/g and J_pitch,fx=+1/g, so P_roll,ba_y is positive
-and P_pitch,ba_x negative. The implementation checks these signs, matrix finite
+$`P_{a\theta}=P_{\theta a}^T`$. The attitude/bias cross block is essential. At
+level, $`J_{\phi,f_y}=-1/g`$ and $`J_{\theta,f_x}=1/g`$ for roll $`\phi`$ and pitch $`\theta`$,
+so $`P_{\phi,b_{a,y}}`$ is positive and $`P_{\theta,b_{a,x}}`$ negative. The implementation checks these signs, matrix finite
 differences and an independently assembled latent-increment covariance.
 
-For completeness, with r=sqrt(s_y²+s_z²), the inclination derivative is
+For completeness, with $`r=\sqrt{s_y^2+s_z^2}`$, the inclination derivative is
 
 ```math
 D=\begin{bmatrix}0&s_z/r^2&-s_y/r^2\\
@@ -170,10 +170,10 @@ E=\begin{bmatrix}1&0&-\sin\theta\\
  0&-\sin\phi&\cos\phi\cos\theta\end{bmatrix},\qquad u=E_{:,3}.
 ```
 
-The world body-z/thrust-axis direction is d=R e_3. Its first-order error is
--R[e_3]x delta-theta. The two nonzero covariance eigenvalues are those of
-P_theta-theta[0:2,0:2]. The largest-radius local 99% ellipse therefore has
-radius sqrt(-2 ln(0.01) lambda_max), required <=0.75 degree. This retains the
+The world body-z/thrust-axis direction is $`d=Re_3`$. Its first-order error is
+$`-R[e_3]_\times\delta\theta`$. The two nonzero covariance eigenvalues are those of
+the first two rows and columns of $`P_{\theta\theta}`$ (the transverse attitude block). The largest-radius local 99% ellipse therefore has
+radius $`\sqrt{-2\ln(0.01)\lambda_{\max}}`$, required to be at most 0.75 degree. This retains the
 heading contribution when tilted; using a fixed level-only radius would hide it.
 The 99% label is a **local Gaussian approximation**, not a deterministic bound.
 
@@ -198,29 +198,30 @@ That clock tolerance is a numerical design constraint, not hardware timing
 qualification. The candidate must also have a finite normalized quaternion and
 symmetric positive definite covariance; invalid uncertainty never becomes ready.
 
-Reject a gravity vector with norm below 1 m/s² or s_y²+s_z² below 0.25||s||²,
+Reject a gravity vector with norm below 1 m/s² or $`s_y^2+s_z^2`$ below $`0.25\lVert s\rVert^2`$,
 an inferred inclination above 15 degrees, a failed noise allocation, or an axis
 radius above 0.75 degree. The uncertainty limit is usually tighter than the
 15-degree numerical domain limit.
 
-Three additional compatibility tests use alpha=0.001 each and
-c(d,alpha)=d+2 sqrt(d ln(1/alpha))+2 ln(1/alpha):
+Three additional compatibility tests use $`\alpha=0.001`$ each and
+$`c(d,\alpha)=d+2\sqrt{d\ln(1/\alpha)}+2\ln(1/\alpha)`$:
 
 | Test | Statistic | Threshold |
 | --- | --- | --- |
-| Mean gyro | (mean(omega)-prior_bg)^T V_g^-1 (mean(omega)-prior_bg), V_g=P_g0+W_g A_N+Sigma_g/N | c(3,alpha) |
-| Gravity magnitude | (norm(s)-g)²/lambda_max(V_a) | c(3,alpha) |
-| IMU variation | Sum of squared whitened accelerometer/gyro Helmert contrasts | c(6(N-1),alpha) |
+| Mean gyro | $`(\bar\omega-\hat b_{g,0})^T V_g^{-1}(\bar\omega-\hat b_{g,0})`$, $`V_g=P_{g,0}+W_gA_N+\Sigma_g/N`$ | $`c(3,\alpha)`$ |
+| Gravity magnitude | $`(\lVert s\rVert-g)^2/\lambda_{\max}(V_a)`$ | $`c(3,\alpha)`$ |
+| IMU variation | Sum of squared whitened accelerometer/gyro Helmert contrasts | $`c(6(N-1),\alpha)`$ |
 
-Helmert columns Q are orthonormal and perpendicular to the constant vector.
-For each sensor axis their covariance is
-Q^T(Sigma_white I+W min(t_i,t_j))Q; whitening retains walk-induced temporal
+Here $`\bar\omega`$ is mean measured rate and $`\hat b_{g,0}`$ the prior gyro-bias mean.
+Helmert columns $`Q`$ are orthonormal and perpendicular to the constant vector.
+For each sensor axis, with per-sample white-noise variance $`\Sigma_w`$, their covariance is
+$`Q^T(\Sigma_w I+W[\min(t_i,t_j)]_{ij})Q`$; whitening retains walk-induced temporal
 correlation. Bias and constant gravity vanish under the contrast. The magnitude
-gate uses |norm(h+eta)-norm(h)|<=norm(eta), rather than pretending the norm
+gate uses $`\bigl|\lVert h+\eta\rVert-\lVert h\rVert\bigr|\leq\lVert\eta\rVert`$, rather than pretending the norm
 residual is exactly Gaussian.
 
 For a standard Gaussian vector, the squared norm has moment-generating function
-(1-2t)^(-d/2); a Chernoff upper bound gives the stated c. Thus the three-test
+$`(1-2t)^{-d/2}`$; a Chernoff upper bound gives the stated c. Thus the three-test
 union false-rejection probability is <=0.003 **only under the matching Gaussian
 white-noise, walk and bias-prior model and genuinely stationary support**.
 It does not cover malformed data, physical-support errors, or the separate

@@ -71,13 +71,17 @@ default controller.
 
 ## Why separate the axes
 
-For the feedback force `c=m(Kp ep+Kv ev)`, each axis has three states:
+For the feedback force $`\mathbf c=m(K_p\mathbf e_p+K_v\mathbf e_v)`$, each axis has three states:
 
-```text
-x1_dot = w (c - x1)
-x2_dot = w (x1 - x2)
-x3_dot = w (x2 - x3)
+```math
+\begin{aligned}
+\dot{\mathbf x}_1&=\omega_f(\mathbf c-\mathbf x_1),\\
+\dot{\mathbf x}_2&=\omega_f(\mathbf x_1-\mathbf x_2),\\
+\dot{\mathbf x}_3&=\omega_f(\mathbf x_2-\mathbf x_3).
+\end{aligned}
 ```
+
+Here $`\omega_f`$ is the filter pole for the axis being filtered and $`\mathbf x_1,\mathbf x_2,\mathbf x_3`$ are the three filter states.
 
 Use `x3`, `w(x2-x3)` and `w²(x1-2x2+x3)` as the feedback force and its first
 two derivative jets. The planned acceleration, jerk and snap remain analytic.
@@ -95,7 +99,7 @@ experiment tests only three declared horizontal poles: 10, 15 and 20 rad/s.
 
 The equal horizontal poles also give a coordinate interpretation. If `n` is
 the unit gravity direction, the transfer operator is
-`H = Hh (I - n n^T) + Hv n n^T`. It filters the horizontal plane identically and
+$`H=H_h(I-\mathbf n\mathbf n^T)+H_v\mathbf n\mathbf n^T`$. It filters the horizontal plane identically and
 the gravity direction separately. It therefore commutes with rotations about
 gravity. Under a general static coordinate change, rotating `n` and the force
 together transforms this operator consistently. The implementation specializes
@@ -103,8 +107,8 @@ that expression to the repository's fixed NED frame; it does not alter the
 rotation-based attitude error or establish a new global stability theorem.
 
 There is also a quantitative noise cost. For one continuous section cascade,
-`|s² H(j omega)| = w² r²/(1+r²)^(3/2)`, where `r=omega/w`. Its maximum is
-`2 w²/(3 sqrt(3))`, attained at `omega=sqrt(2) w`. Doubling a horizontal pole
+$`\lvert(j\omega)^2 H(j\omega)\rvert=\frac{\omega_f^2 r^2}{(1+r^2)^{3/2}}`$, where $`r=\omega/\omega_f`$. Its maximum is
+`2 w²/(3 sqrt(3))`, attained at $`\omega=\sqrt2\,\omega_f`$. Doubling a horizontal pole
 therefore quadruples the largest correction-to-second-derivative gain. The
 bilinear frequency map retains that maximum while changing its digital
 frequency. Actual nonlinear moment effort also depends on correction spectra,
@@ -119,8 +123,8 @@ Both raw and shaped commands retain the original smooth-domain checks. No
 true state enters an estimated controller, and an invalid update cannot commit
 new filter memory. This is an experimental implementation, not a new default.
 
-The other declared choice is horizontal frequency `f=1` or `1.25 rad/s`, with
-`Kp=f²` and `Kv=1.8f`. Vertical and attitude gains remain unchanged. In an ideal
+The other declared choice is horizontal frequency $`f=1`$ or `1.25 rad/s`, with
+$`K_p=f^2`$ and $`K_v=1.8f`$. Vertical and attitude gains remain unchanged. In an ideal
 PD equilibrium, a constant disturbance's position offset scales inversely with
 Kp; the higher setting predicts a 36% reduction in that component. Estimation
 error and transient coupling prevent that simple calculation from predicting

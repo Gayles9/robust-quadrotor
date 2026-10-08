@@ -23,13 +23,13 @@ property to check the complete reference path, including between waypoints.
 
 For a degree-n polynomial in normalized segment time,
 
-`p(s) = sum(k=0..n, a_k s^k) = sum(i=0..n, b_i B_i,n(s))`,
+$`p(s)=\sum_{k=0}^n a_k s^k=\sum_{i=0}^n b_i B_{i,n}(s)`$,
 
 the Bernstein control points are
 
-`b_i = sum(k=0..i, binomial(i,k)/binomial(n,k) a_k)`.
+$`b_i=\sum_{k=0}^i\frac{\binom ik}{\binom nk}a_k`$.
 
-The Bernstein basis is nonnegative and sums to one on [0,1]. Every polynomial
+The basis is $`B_{i,n}(s)=\binom ni s^i(1-s)^{n-i}`$. It is nonnegative and sums to one on [0,1]. Every polynomial
 value therefore lies in the convex hull of its control points. Apply the same
 conversion to physical velocity, acceleration and jerk, then split each segment
 at midpoints with de Casteljau's algorithm. The default six levels give 64
@@ -44,20 +44,20 @@ floating-point pad of `512 eps (1 + sum(abs(power coefficients)))`, with origin
 and gravity contributions included where needed. This is a conservative numerical
 engineering check at supported float64 scales, not formal interval arithmetic.
 
-In the nominal drag-free NED model, define `u = g e3 - a`. Reference thrust is
-`T = m ||u||`, and desired body-down is `b3 = u/||u||`. On each subinterval let
-`z` be a positive lower bound on u_z, H an upper bound on `||u_xy||`, U an upper
-bound on `||u||`, and J an upper bound on jerk norm. Sufficient bounds are
+In the nominal drag-free NED model, define $`\mathbf u=g\mathbf e_3-\mathbf a`$. Reference thrust is
+$`T=m\lVert\mathbf u\rVert`$, and desired body-down is $`\mathbf b_3=\mathbf u/\lVert\mathbf u\rVert`$. On each subinterval let
+$`z`$ be a positive lower bound on $`u_z`$, $`H`$ an upper bound on $`\lVert\mathbf u_{xy}\rVert`$, $`U`$ an upper
+bound on $`\lVert\mathbf u\rVert`$, and $`J`$ an upper bound on jerk norm. Writing tilt as $`\vartheta`$ and reference angular velocity as $`\boldsymbol\omega_r`$, sufficient bounds are
 
-- `m z <= T <= m U`;
-- `tilt <= atan(H/z)`;
-- `||omega_reference|| <= J/z`.
+- $`mz\leq T\leq mU`$;
+- $`\vartheta\leq\arctan(H/z)`$;
+- $`\lVert\boldsymbol\omega_r\rVert\leq J/z`$.
 
-The last inequality matches the existing controller's fixed-heading construction:
-`c2 = [-sin(yaw), cos(yaw), 0]`, `b1 = (c2 x b3)/h`, `h = ||c2 x b3||`,
-`b2 = b3 x b1`. Differentiating `c2 dot b1 = 0` gives
-`omega3 = omega2 (c2 dot b3)/h`. Consequently
-`||omega|| <= ||b3_dot||/h <= ||j||/(||u|| h) <= ||j||/u_z`.
+The heading angle is $`\psi`$. The last inequality matches the existing controller's fixed-heading construction:
+$`\mathbf c_2=[-\sin\psi,\cos\psi,0]^T`$, $`\mathbf b_1=(\mathbf c_2\times\mathbf b_3)/h`$, $`h=\lVert\mathbf c_2\times\mathbf b_3\rVert`$,
+$`\mathbf b_2=\mathbf b_3\times\mathbf b_1`$. Differentiating $`\mathbf c_2^T\mathbf b_1=0`$ gives
+$`\omega_3=\omega_2(\mathbf c_2^T\mathbf b_3)/h`$. Consequently
+$`\lVert\boldsymbol\omega\rVert\leq\frac{\lVert\dot{\mathbf b}_3\rVert}{h}\leq\frac{\lVert\mathbf j\rVert}{\lVert\mathbf u\rVert h}\leq\frac{\lVert\mathbf j\rVert}{u_z}`$.
 Fixed yaw heading does not imply zero angular velocity about body-down.
 
 `check_trajectory_feasibility(trajectory, limits)` returns all bounds and an
@@ -82,8 +82,10 @@ velocity, acceleration and jerk to the same numerical tolerance. It retains the
 normalized coefficients, origin and relative segment durations. Scaling durations
 by alpha preserves the spatial path and gives
 
-`p_alpha(t) = p(t/alpha)`, `p_alpha^(r)(t) = alpha^-r p^(r)(t/alpha)`,
-`snap_cost_alpha = alpha^-7 snap_cost`.
+$`\mathbf p_\alpha(t)=\mathbf p(t/\alpha)`$, $`\mathbf p_\alpha^{(r)}(t)=\alpha^{-r}\mathbf p^{(r)}(t/\alpha)`$,
+$`J_\alpha=\alpha^{-7}J`$.
+
+Here $`J`$ and $`J_\alpha`$ denote the original and retimed integrated squared snap costs.
 
 For a minimum-snap input this remains the minimum-snap solution at the scaled
 times. The function cannot infer optimality for manually constructed inputs.

@@ -23,20 +23,23 @@ epoch; it is not a hardware emergency-control policy.
 NED world, FRD body, scalar-first Hamilton q_WB, R_WB body to world. All position,
 velocity and acceleration references are NED SI vectors. A pure stateless PD law:
 
-    a_requested_W = a_reference_W + K_p*(p_reference_W-p_W)
-                    + K_v*(v_reference_W-v_W)
+```math
+\mathbf a_{\mathrm{req},W}=\mathbf a_{r,W}+K_p(\mathbf p_{r,W}-\mathbf p_W)+K_v(\mathbf v_{r,W}-\mathbf v_W).
+```
 
-K_p has units 1/s², K_v 1/s. No integral: no windup state and no claim of zero
+Here $`K_p,K_v`$ are diagonal gain matrices and subscript $`r`$ denotes reference values.
+
+$`K_p`$ has units 1/s², $`K_v`$ 1/s. No integral: no windup state and no claim of zero
 steady error under persistent force or mass mismatch. Limit acceleration per
 axis, with positive vertical bound strictly below nominal gravity. Set the
-desired down-axis force vector l_W = m_nominal*(g_nominal*e3-a_limited_W).
+desired down-axis force vector $`\boldsymbol\ell_W=m_n(g_n\mathbf e_3-\mathbf a_{\mathrm{lim},W})`$.
 Its vertical component is strictly positive. Reduce its horizontal norm to
-l_z*tan(theta_max) if necessary; then clip its magnitude to the positive
+$`\ell_z\tan\theta_{\max}`$ if necessary; then clip its magnitude to the positive
 configured thrust interval, preserving direction. Record every limit flag and
-the resulting feasible nominal acceleration g*e3-T*b3/m.
+the resulting feasible nominal acceleration $`g_n\mathbf e_3-(T/m_n)\mathbf b_3`$.
 
-Let b3=l/||l|| and y_heading=[-sin(yaw),cos(yaw),0]. Construct b1 as normalized
-y_heading cross b3, b2=b3 cross b1, and R_reference_WB=[b1,b2,b3]. Positive b3_z
+Let $`\mathbf b_3=\boldsymbol\ell/\lVert\boldsymbol\ell\rVert`$ and $`\mathbf y_\psi=[-\sin\psi,\cos\psi,0]^T`$ for yaw $`\psi`$.
+Construct $`\mathbf b_1`$ by normalizing $`\mathbf y_\psi\times\mathbf b_3`$; then $`\mathbf b_2=\mathbf b_3\times\mathbf b_1`$ and $`R_{r,WB}=[\mathbf b_1\ \mathbf b_2\ \mathbf b_3]`$. Positive $`b_{3,z}`$
 prevents the heading singularity and makes the horizontal body-x heading equal
 to the requested yaw. Convert this orthonormal matrix to a unit quaternion with
 a largest-component branch, including yaw near a half-turn. Collective T is a
@@ -77,7 +80,7 @@ limit flags on their own clocks. A failure ledger retains unsuccessful trials.
 ## Model-based gains and frozen acceptance
 
 Use the preceding illustrative 1 kg model and inner gains unchanged. Position
-K_p=[1,1,2.25] s^-2, K_v=[1.8,1.8,3] s^-1 give ideal local natural frequencies
+Diagonal entries $`K_p=[1,1,2.25]`$ s⁻², $`K_v=[1.8,1.8,3]`$ s⁻¹ give ideal local natural frequencies
 [1,1,1.5] rad/s, slower than the inner [6,6,4] rad/s. Acceleration bounds [2,2,2]
 m/s², reference tilt 20 degrees, collective 2..18 N; actual-tilt guard 35 degrees.
 Geofence [-3,-3,-3]..[3,3,.5] m. These are illustrative simulation settings,

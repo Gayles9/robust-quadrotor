@@ -14,20 +14,28 @@ acceptance criteria and filter frequency are unchanged.
 
 ## Equations and measurement boundary
 
-Let f_m [m/s²] be current measured body specific force, b_a its posterior bias,
-n_a the endpoint ESKF's conditional current accelerometer-noise mean, R_hat the
-posterior active R_WB and g nominal gravity. All are available causally:
+Let $`\mathbf f_m`$ [m/s²] be current measured body specific force, $`\mathbf b_a`$ its posterior bias,
+$`\bar{\mathbf n}_a`$ the endpoint ESKF's conditional current accelerometer-noise mean, $`\hat R`$ the
+posterior active $`R_{WB}`$ and $`g`$ nominal gravity. All are available causally:
 
-    a_hat_W = R_hat * (f_m - b_a - n_a) + g*e3.
+```math
+\hat{\mathbf a}_W=\hat R(\mathbf f_m-\mathbf b_a-\bar{\mathbf n}_a)+g\mathbf e_3.
+```
 
-At each outer tick feed F_hat=m*a_hat_W [N] into the unchanged 30 rad/s
-three-section filter. Its first derivative estimates m*j_hat_W [N/s]; the
-second output is unused. For e_v=v_hat-v_d, planned a_d, j_d, s_d, and the
-unchanged raw PD correction c=m*(Kp*e_p+Kv*e_v):
+Here $`\bar{\mathbf n}_a`$ is the posterior conditional mean of accelerometer sample noise.
 
-    u       = m*(g*e3-a_d)+c
-    u_dot   = -m*j_d + m*Kp*e_v + Kv*(F_hat-m*a_d)
-    u_ddot  = -m*s_d + Kp*(F_hat-m*a_d) + Kv*(D1(F_hat)-m*j_d).
+At each outer tick feed $`\hat{\mathbf F}=m\hat{\mathbf a}_W`$ [N] into the unchanged 30 rad/s
+three-section filter. Its first derivative estimates $`m\hat{\mathbf j}_W`$ [N/s]; the
+second output is unused. For $`\mathbf e_v=\hat{\mathbf v}-\mathbf v_d`$, planned $`\mathbf a_d,\mathbf j_d,\mathbf s_d`$, and the
+unchanged raw PD correction $`\mathbf c=m(K_p\mathbf e_p+K_v\mathbf e_v)`$:
+
+```math
+\begin{aligned}
+\mathbf u&=m(g\mathbf e_3-\mathbf a_d)+\mathbf c,\\
+\dot{\mathbf u}&=-m\mathbf j_d+mK_p\mathbf e_v+K_v(\hat{\mathbf F}-m\mathbf a_d),\\
+\ddot{\mathbf u}&=-m\mathbf s_d+K_p(\hat{\mathbf F}-m\mathbf a_d)+K_v(D_1(\hat{\mathbf F})-m\mathbf j_d).
+\end{aligned}
+```
 
 These are physical kinematics with a filtered measured jerk. They ignore
 instantaneous posterior-state revisions as physical derivatives; raw feedback

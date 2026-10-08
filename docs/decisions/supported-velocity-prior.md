@@ -19,12 +19,10 @@ that was not reached.
 ## Gaussian conditioning
 
 For the 21-state endpoint covariance `C`, velocity selector `H`, exact supported
-velocity zero, prior nominal velocity zero and `R_s=0`, the calculation is
+velocity zero, prior nominal velocity zero and $`R_s=0`$, the calculation is
 
-```text
-S = H*C*H^T
-K = C*H^T*S^-1
-C_plus = (I-K*H)*C*(I-K*H)^T.
+```math
+S=HCH^T,\qquad K=CH^TS^{-1},\qquad C^+=(I-KH)C(I-KH)^T.
 ```
 
 Implementation uses a linear solve rather than forming a full inverse. The
@@ -50,9 +48,9 @@ is an estimator prior, not an arm command.
 ## Release uncertainty screen
 
 The first IMU sample is taken just before support disappears. During the first
-interval `h=0.0025 s`, the original endpoint map assumes linearly interpolated
+interval $`h=0.0025\;\mathrm s`$, the original endpoint map assumes linearly interpolated
 acceleration. A stationary, motor-off, no-drag release gives a deterministic
-counterexample: `a(0-)=0` while `a(t>0)=g_W`. The estimator's position and velocity
+counterexample: $`\mathbf a(0^-)=\mathbf0`$ while $`\mathbf a(t>0)=\mathbf g_W`$. The estimator's position and velocity
 are compared with the analytic ballistic solution.
 
 The input campaign report has SHA-256

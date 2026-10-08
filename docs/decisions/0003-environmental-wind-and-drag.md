@@ -16,12 +16,12 @@ model that exposes frame and sign errors without implying flight-validated aerod
 
 - Represent wind as one constant `wind_velocity_W` vector in the NED world frame, in m/s.
 - Compute vehicle-relative air velocity as
-  `velocity_air_W = velocity_W - wind_velocity_W`.
-- Transform it into FRD with `velocity_air_B = R_WB.T @ velocity_air_W`.
+  $`\mathbf v_{a,W}=\mathbf v_W-\mathbf w_W`$.
+- Transform it into FRD with $`\mathbf v_{a,B}=R_{WB}^T\mathbf v_{a,W}`$.
 - Represent drag through one nonnegative lumped coefficient per FRD body axis,
   `quadratic_drag_coefficient_B`, in kg/m.
 - Compute the body force elementwise as
-  `force_drag_B = -quadratic_drag_coefficient_B * abs(velocity_air_B) * velocity_air_B`.
+  $`\mathbf F_{d,B}=-\mathbf c_B\odot\lvert\mathbf v_{a,B}\rvert\odot\mathbf v_{a,B}`$.
 - Apply this force at the modelled centre of mass without an aerodynamic moment.
 - Recompute drag at every derivative evaluation. Projected RK4 therefore evaluates drag at
   the separate velocity and projected attitude of k1, k2, k3, and k4.
@@ -32,6 +32,11 @@ model that exposes frame and sign errors without implying flight-validated aerod
   actuation.
 - Keep `RunArtifactData` at exactly 35 arrays. Environmental state is reproducible from the
   manifest and does not require another artifact history.
+
+The notation follows the [frame contract](../architecture/frame-contract.md):
+$`\mathbf w_W`$ is wind, $`\mathbf v_a`$ is relative-air velocity,
+$`\mathbf c_B`$ contains the drag coefficients, and $`\mathbf F_{d,B}`$
+is drag force. The symbol $`\odot`$ means componentwise multiplication.
 
 ## Reason
 

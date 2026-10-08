@@ -23,19 +23,23 @@ it is not the default controller and does not meet the full flight requirements.
 With NED position, the new state is an acceleration correction:
 
 ```math
-a_{command}=a_{PD}+[0,0,I]^T, \qquad
-\dot I=K_i(z_{reference}-\hat z), \qquad |I|\le I_{max}.
+\mathbf a_c=\mathbf a_{\mathrm{PD}}+[0,0,I]^T,\qquad
+\dot I=K_i(z_r-\hat z),\qquad |I|\leq I_{\max}.
 ```
+
+Here $`\mathbf a_c`$ is commanded acceleration, $`\mathbf a_{\mathrm{PD}}`$
+the existing proportional–derivative command, $`z_r`$ reference down-position,
+and $`\hat z`$ its estimate. The scalar $`I`$ is the bounded integral correction.
 
 An aircraft below its reference has a negative reference-minus-estimate error,
 so the correction becomes negative: more upward thrust. The existing feasible
 acceleration, tilt, thrust and motor constraints still apply. The correction
 uses only estimated position and nominal controller parameters, not true mass.
 
-This single candidate fixes `Ki=0.5 s^-3`, `Imax=1.5 m/s²` and an outer update
-period of 0.02 s. With the existing vertical gains `Kp=2.25 s^-2` and
-`Kv=3 s^-1`, the nominal ideal characteristic polynomial factors as
-`(s+0.5)^2*(s+2)`. The correction needed to balance the tested extra mass is
+This single candidate fixes $`K_i=0.5\;\mathrm{s}^{-3}`$, $`I_{\max}=1.5\;\mathrm{m/s^2}`$ and an outer update
+period of 0.02 s. With the existing vertical gains $`K_p=2.25\;\mathrm{s}^{-2}`$ and
+$`K_v=3\;\mathrm{s}^{-1}`$, the nominal ideal characteristic polynomial factors as
+$`(s+0.5)^2(s+2)`$. The correction needed to balance the tested extra mass is
 -0.981 m/s², within the state bound. A separate exact held-input linear motor
 model checks sampled stability and constant-load rejection. Neither local
 model replaces the noisy nonlinear flight campaign.

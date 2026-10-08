@@ -22,9 +22,9 @@ normalized variance 1.11216 against a 1.10 limit. Reconstructing the original
 5,000 errors, covariance matrices, whitened errors and gate statistics gives
 exact equality. The failure is not caused by discarding rejected trials.
 
-Let R_0 be the inclination estimate at retained zero heading, u=R_0^T e_D,
-eta the accelerometer-mean error, and psi the independent heading error. Define
-t=Log(R_0^T R(s-eta,0)). The exact relative rotation is
+Let $`R_0`$ be the inclination estimate at retained zero heading, $`u=R_0^Te_D`$,
+$`\eta`$ the accelerometer-mean error, and $`\psi`$ the independent heading error.
+Define $`t=\mathrm{Log}(R_0^TR(s-\eta,0))`$. Here $`\mathrm{Log}`$ returns a rotation vector and $`\mathrm{Exp}`$ maps a rotation vector to a rotation matrix. The exact relative rotation is
 
 ```math
 R_0^T R(s-\eta,\psi)=\mathrm{Exp}(u\psi)\mathrm{Exp}(t).
@@ -38,7 +38,7 @@ The leading terms of its logarithm are
 ```
 
 The mixed heading/inclination term therefore has derivative
--0.5 u cross J[:,j] with respect to psi and eta_j. Independent matrix finite
+$`-\tfrac12u\times J_{:,j}`$ with respect to $`\psi`$ and $`\eta_j`$. Independent matrix finite
 differences confirm its sign and magnitude. Independent latent variables do
 not imply that this nonlinear product has zero variance.
 
@@ -49,7 +49,7 @@ Near level, the leading extra transverse variance is
 ```
 
 The first-order transverse variance conditional on terminal accelerometer bias
-is (V_a-C_a²/P_aT)/g². At the specified profile, their ratio is **0.07811**.
+is $`(V_a-C_a^2/P_{aT})/g^2`$. At the specified profile, their ratio is **0.07811**.
 The omitted term is small compared with marginal inclination uncertainty but
 about 7.8% of the much smaller conditional variance. That explains why a
 marginal axis-error check can look good while the complete joint check misses.
@@ -92,9 +92,9 @@ b=K\eta+\epsilon,\quad K=C_a V_a^{-1},\quad
 
 This is a Gaussian conditional decomposition, not a new accelerometer-bias
 measurement. The bias prior mean stays zero. The total terminal bias covariance
-is still K V_a K^T+D=P_aT. Independent explicit random-walk increments reproduce
+is still $`KV_aK^T+D=P_{aT}`$. Independent explicit random-walk increments reproduce
 the same decomposition. The independent terminal gyro-bias covariance remains
-Sigma_g/N+W_g A_N exactly as before.
+$`\Sigma_g/N+W_gA_N`$ exactly as before.
 
 ## Nonlinear mean and covariance calculation
 
@@ -113,22 +113,22 @@ Use four independent standard-normal latent coordinates z. Set
 The inverse gravity-direction map R is the same ZYX inclination construction
 as the first-order model, evaluated at every latent point. Five-point
 Gauss-Hermite quadrature in each dimension gives **625 fixed nodes**. For
-physicists' Hermite nodes x_j and weights w_j, the standard-normal rule uses
-sqrt(2)x_j and w_j/sqrt(pi). Tensor-product weights are positive and sum to one.
+physicists' Hermite nodes $`x_j`$ and weights $`w_j`$, the standard-normal rule uses
+$`\sqrt2\,x_j`$ and $`w_j/\sqrt\pi`$. Tensor-product weights are positive and sum to one.
 The one-dimensional rule integrates polynomials through degree nine exactly;
 independent standard-normal moment tests verify the implementation.
 
-Starting at R_0, compute the rotation mean by
+Starting at $`R_0`$, compute the rotation mean by
 
 ```math
 \mu=\sum_i w_i\mathrm{Log}(\bar R^T R_i),\qquad
  \bar R\leftarrow\bar R\mathrm{Exp}(\mu).
 ```
 
-Require ||mu||<=1e-13 rad with at most eight corrections. Failure rejects the
+Require $`\lVert\mu\rVert\leq10^{-13}`$ rad with at most eight corrections. Failure rejects the
 candidate. The solver recomputes all moments at the final rotation mean, so it
 does not reuse a covariance expressed around the old mean without transport.
-Let e_i=Log(R_bar^T R_i)-mu. The joint covariance is
+Let $`e_i=\mathrm{Log}(\bar R^TR_i)-\mu`$. The joint covariance is
 
 ```math
 P=\sum_i w_i

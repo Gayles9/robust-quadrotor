@@ -61,8 +61,12 @@ Rotor force is negative body z. Let actual rotor force plus aerodynamic drag be
 `f_B`, true mass `m_t`, and true gravity magnitude `g_t`. A centre-of-mass,
 body-aligned ideal accelerometer measures
 
-    a_W = R_WB f_B / m_t + [0, 0, g_t]
-    f_specific_B = R_WB.T (a_W - [0, 0, g_t]) = f_B / m_t.
+```math
+\mathbf a_W=\frac1{m_t}R_{WB}\mathbf F_B+g_t\mathbf e_3,\qquad
+\mathbf f_B=R_{WB}^T(\mathbf a_W-g_t\mathbf e_3)=\frac{\mathbf F_B}{m_t}.
+```
+
+Uppercase $`\mathbf F_B`$ denotes physical force; lowercase $`\mathbf f_B`$ denotes specific force. Subscript $`t`$ marks truth parameters and $`\mathbf e_3=[0,0,1]^T`$.
 
 The producer uses the existing acceleration and specific-force functions to
 compute this quantity from **actual**, lagged rotor speeds and current drag,
@@ -70,9 +74,15 @@ before the next command is issued. It never uses desired thrust as measured
 acceleration. Specific force is FRD m/s², not world acceleration. The gyroscope
 measures FRD body angular velocity in rad/s. The unchanged measurement models give
 
-    f_measured_B[k] = f_specific_B[k] + b_a_true[k] + sigma_a * epsilon_a[k]
-    w_measured_B[k] = omega_true_B[k] + b_g_true[k] + sigma_g * epsilon_g[k]
-    b_true[k] = b_true[k-1] + density * sqrt(dt) * xi[k].
+```math
+\begin{aligned}
+\mathbf f_{m,B}[k]&=\mathbf f_B[k]+\mathbf b_{a,\mathrm{true}}[k]+\boldsymbol\sigma_a\odot\boldsymbol\epsilon_a[k],\\
+\boldsymbol\omega_{m,B}[k]&=\boldsymbol\omega_{\mathrm{true},B}[k]+\mathbf b_{g,\mathrm{true}}[k]+\boldsymbol\sigma_g\odot\boldsymbol\epsilon_g[k],\\
+\mathbf b_{\mathrm{true}}[k]&=\mathbf b_{\mathrm{true}}[k-1]+\boldsymbol\sigma_b\odot\sqrt{\Delta t}\,\boldsymbol\xi[k].
+\end{aligned}
+```
+
+The vectors $`\boldsymbol\sigma_a,\boldsymbol\sigma_g`$ are sample-noise standard deviations; $`\boldsymbol\sigma_b`$ is the bias random-walk density. Multiplication by noise vectors is elementwise.
 
 The standard-normal measurement vectors and walk increments come from independent,
 named PCG64 streams. `sigma` is per-sample standard deviation. Walk density is bias
@@ -122,7 +132,11 @@ an error, not a gate rejection.
 `EskfOnlineEstimate` returns an owned nominal state, the physical `(15,15)` covariance,
 current `(6,)` conditional IMU noise mean, observation events, and rate feedback:
 
-    omega_feedback_B[k] = w_measured_B[k] - b_g_estimated[k] - n_g_mean[k].
+```math
+\boldsymbol\omega_{\mathrm{fb},B}[k]=\boldsymbol\omega_{m,B}[k]-\hat{\mathbf b}_g[k]-\bar{\mathbf n}_g[k].
+```
+
+Here $`\hat{\mathbf b}_g`$ is estimated gyro bias and $`\bar{\mathbf n}_g`$ the conditional sample-noise mean. Subscript $`\mathrm{fb}`$ denotes the rate supplied to feedback.
 
 All terms are at the **posterior current epoch**, in FRD rad/s. The last term is
 zero in first-order mode and is the conditional gyro sample-noise mean in endpoint

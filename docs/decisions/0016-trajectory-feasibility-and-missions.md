@@ -17,17 +17,17 @@ outside this model.
 
 ## Reference feasibility contract
 
-For NED reference acceleration a and jerk j, define u = g e3 - a. In the nominal
-drag-free model, thrust is m ||u|| and body-down is u/||u||. Require u_z > 0.
+For NED reference acceleration $`\mathbf a`$ and jerk $`\mathbf j`$, define $`\mathbf u=g\mathbf e_3-\mathbf a`$.
+In the nominal drag-free model, thrust is $`m\lVert\mathbf u\rVert`$ and body-down is $`\mathbf u/\lVert\mathbf u\rVert`$. Require $`u_z>0`$.
 Bound position inside the declared box, speed, component acceleration, collective
 thrust, tilt, and the norm of the fixed-yaw reference's angular velocity.
 
 Convert each derivative polynomial to Bernstein form and apply a fixed number
 of midpoint subdivisions. Every subinterval lies in the convex hull of its
 control points. Use those hulls, with explicit floating-point padding, to bound
-the entire curve, not just sampled times. With z_min > 0, valid conservative
-bounds are thrust >= m z_min, tilt <= atan(horizontal_u_max/z_min), and
-||omega_reference|| <= ||j||_max/z_min. The last inequality follows from the
+the entire curve, not just sampled times. With a lower bound $`z_{\min}>0`$ on $`u_z`$ and upper bound $`U_h`$ on $`\lVert\mathbf u_{xy}\rVert`$,
+valid conservative bounds are $`T\geq mz_{\min}`$, tilt $`\vartheta\leq\arctan(U_h/z_{\min})`$,
+and $`\lVert\boldsymbol\omega_r\rVert\leq\lVert\mathbf j\rVert_{\max}/z_{\min}`$. The last inequality follows from the
 existing fixed-heading attitude construction; it includes the changing rotation
 about body-down even though the supplied yaw heading is constant.
 

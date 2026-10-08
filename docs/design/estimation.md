@@ -100,10 +100,10 @@ coordinates to NED world coordinates. There are 16 stored scalars but only 15 lo
 degrees of freedom. The error order is position, velocity, body-local rotation vector,
 accelerometer bias and gyro bias, each with three components. Units are m, m/s, rad,
 m/s² and rad/s. Position, velocity and biases use true-minus-nominal additive errors;
-attitude uses `R_true_WB = R_nominal_WB Exp(skew(delta_theta_B))`.
+attitude uses $`R_{WB}^{\mathrm{true}}=R_{WB}\mathrm{Exp}([\delta\boldsymbol\theta_B]_\times)`$.
 
-For measured specific force `f_m` and angular rate `omega_m`, default prediction subtracts the
-estimated biases, forms `a_W = [0,0,g] + R_WB @ (f_m-b_a)`, and integrates position,
+For measured specific force $`\mathbf f_m`$ and angular rate $`\boldsymbol\omega_m`$, default prediction subtracts the
+estimated biases, forms $`\mathbf a_W=g\mathbf e_3+R_{WB}(\mathbf f_m-\mathbf b_a)`$, and integrates position,
 velocity and the quaternion over a left-held IMU interval. Specific force excludes
 gravity: a stationary level accelerometer observes `[0,0,-g]`, not zero or `[0,0,g]`.
 Quaternion normalization maintains its constraint. The continuous error Jacobians,
@@ -115,9 +115,9 @@ The predicted position measurement is `p_W + assumed_position_bias_W`;
 the altitude prediction is
 `reference_altitude - p_W[2] + assumed_altitude_bias`. Thus a positive altitude innovation
 corrects the NED-down coordinate negatively. Sensor biases here are explicit assumptions,
-not additional estimated states. For observation `z`, prediction `h`, Jacobian `H`, prior
-covariance `P` and independent per-observation covariance `R`, the innovation is `r=z-h`
-and its covariance is `S=H P H.T+R`. A diagonally scaled Cholesky solve computes the gain
+not additional estimated states. For observation $`\mathbf z`$, prediction $`\mathbf h`$, Jacobian $`H`$, prior
+covariance $`P`$ and independent per-observation covariance $`R`$, the innovation is $`\mathbf r=\mathbf z-\mathbf h`$
+and its covariance is $`S=HPH^T+R`$. A diagonally scaled Cholesky solve computes the gain
 without forming an inverse. The correction is injected once, Joseph form updates the
 covariance, and the SO(3) right Jacobian resets its attitude coordinates and every
 attitude cross-covariance. See [ADR 0005](../decisions/0005-eskf-measurement-updates.md).
@@ -139,9 +139,9 @@ Samples at different epochs, bias increments and the initial prior are independe
 Within each six-vector, correlations are allowed. The unused legacy
 `continuous_noise_covariance` must be zero; mixed declarations are rejected.
 
-At `t[k+1]` both endpoint samples are available. After subtracting estimated bias and
-the old sample's conditional noise mean, let the two specific forces be `f0,f1` and
-body rates `w0,w1`. For `h=t[k+1]-t[k]>0`, `R=R_WB[k]` and NED gravity `g_W`,
+At $`t_{k+1}`$ both endpoint samples are available. After subtracting estimated bias and
+the old sample's conditional noise mean, let the two specific forces be $`f_0,f_1`$ and
+body rates $`\omega_0,\omega_1`$. For $`h=t_{k+1}-t_k>0`$, $`R=R_{WB}[k]`$ and NED gravity $`g_W`$,
 
 ```math
 \phi=\tfrac h2(\omega_0+\omega_1),\qquad
@@ -157,7 +157,7 @@ v_1=v+h(a_0+a_1)/2,\qquad
 p_1=p+hv+h^2(2a_0+a_1)/6.
 ```
 
-Here `phi` is a body-local rotation vector in radians, `R` and `R1` map body to world,
+Here $`\phi`$ is a body-local rotation vector in radians, $`R`$ and $`R_1`$ map body to world,
 accelerations are NED m/s², velocity is NED m/s and position is NED metres. Translation
 integrates a linear world-acceleration interpolant; attitude uses an exponential of
 the averaged rate. Nominal biases stay constant during prediction. These equations
@@ -239,7 +239,7 @@ invalid inputs, ownership, causal timing and recorded-run compatibility.
 | `inject_eskf_observation_faults` | Copy measured observations with explicit faults and retain a separate source-label ledger |
 | `make_eskf_synthetic_case` | Independent analytic kinematics, randomized measurement generation and known-prior verification fixture |
 
-At `t[k+1]`, default replay predicts with IMU row `k`; endpoint replay uses rows `k,k+1`.
+At $`t_{k+1}`$, default replay predicts with IMU row `k`; endpoint replay uses rows `k,k+1`.
 Both then correct with fresh position followed by fresh altitude. No prediction precedes
 `t[0]`. The final row is unused by default prediction and closes the endpoint method's last interval.
 Each observation has an acquisition index and actual delivery index. Delivery `-1` means
@@ -274,10 +274,10 @@ v_i(t)=A_i w_i\cos(w_i t+\alpha_i)+u_i,\qquad
 a_i(t)=-A_i w_i^2\sin(w_i t+\alpha_i).
 ```
 
-Here `A` is in metres, `w` in radians/second, `alpha` in radians and `u` in m/s. The
+Here `A` is in metres, `w` in radians/second, $`\alpha`$ in radians and `u` in m/s. The
 roll/pitch/yaw angles have an analogous sinusoidal form plus optional constant Euler
-rates. For roll `phi`, pitch `theta` and yaw `psi`, the body-to-world rotation is
-`Rz(psi) Ry(theta) Rx(phi)`. Its differentiated body angular velocity is
+rates. For roll $`\phi`$, pitch $`\theta`$ and yaw $`\psi`$, the body-to-world rotation is
+$`R_z(\psi)R_y(\theta)R_x(\phi)`$. Its differentiated body angular velocity is
 
 ```math
 \omega_B=\begin{bmatrix}
@@ -287,8 +287,8 @@ rates. For roll `phi`, pitch `theta` and yaw `psi`, the body-to-world rotation i
 \end{bmatrix},\qquad f_B=R_{WB}^{T}(a_W-[0,0,g]^T).
 ```
 
-Central differences independently verify `p_dot=v`, `v_dot=a` and
-`R_dot=R skew(omega_B)`. Noise-free strapdown integration is checked under step refinement;
+Central differences independently verify $`\dot{\mathbf p}=\mathbf v`$, $`\dot{\mathbf v}=\mathbf a`$ and
+$`\dot R=R[\boldsymbol\omega_B]_\times`$. Noise-free strapdown integration is checked under step refinement;
 the existing left-held nominal integration has first-order error for changing inputs.
 The stationary control uses zero motion. The translating/yaw control uses NED velocity
 `[.5,-.25,.1]` m/s and yaw rate `.2` rad/s. Excited motion uses the predeclared independent
@@ -304,8 +304,8 @@ order. The measured input and nominal configuration are the only arguments passe
 replay; reference states and fault labels are consumed afterward by evaluation.
 
 Default prediction expects continuous process-noise spectral density. For held independent
-IMU samples with standard deviation `sigma`, its leading increment variance is matched
-by `Q_c = diag(sigma_a² dt, sigma_g² dt, eta_a², eta_g²)`. Observation `R` instead uses
+IMU samples with standard deviation $`\sigma`$, its leading increment variance is matched
+by $`Q_c=\mathrm{diag}(\sigma_a^2\Delta t,\sigma_g^2\Delta t,\eta_a^2,\eta_g^2)`$. Observation $`R`$ instead uses
 the squared per-observation standard deviation without `dt`. This conversion does not
 supply the higher-order position/cross terms omitted by the baseline discretization.
 

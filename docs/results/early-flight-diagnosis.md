@@ -11,7 +11,7 @@ measured results and their limits.
 ## Mass transient
 
 With 1.1 kg truth, 1.0 kg nominal mass and nominal hover thrust, the initial
-downward acceleration deficit is `9.81*(1-1/1.1) = 0.891818 m/s²`.
+downward acceleration deficit is $`9.81(1-1/1.1)=0.891818\;\mathrm{m/s^2}`$.
 The vertical integral eventually supplies the required negative nominal
 acceleration, approximately -0.981 m/s². Starting from zero, it first needs
 position error to accumulate. Its healthy learning begins at 0.2 s, but 90%
@@ -65,7 +65,7 @@ second executes exactly one new diagnostic flight; the third replays its saved
 evidence without flying again. Temporary oracle adapters restore on all exits
 and must not share a process with concurrent mission threads.
 
-The force budget uses `a = g*e3 - T*b3/m` and an explicitly ordered exact split
+The force budget uses $`\mathbf a=g\mathbf e_3-\frac Tm\mathbf b_3`$ and an explicitly ordered exact split
 into the feasible request, mass mismatch, estimated-to-true direction error,
 estimated-to-target direction error and motor thrust mismatch. The term named
 `attitude_tracking` in the archive always means estimated-to-target direction;

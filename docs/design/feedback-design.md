@@ -28,30 +28,33 @@ loop while ignoring those dynamics can therefore overestimate damping. A small
 attitude error during initialization can first push the vehicle laterally, then
 excite an oscillatory position recovery even after the estimate improves.
 
-Near level matched hover with zero yaw, define one horizontal position `p` [m],
-velocity `v` [m/s], signed tilt `eta` [rad], signed tilt rate `r` [rad/s] and
-actual angular acceleration `a` [rad/s²]. For north `eta=-pitch`; for east
-`eta=roll`. Both definitions give `v_dot=g*eta`, consistent with NED/FRD and
-negative-body-z thrust. `g` is gravity magnitude [m/s²], not specific force.
+Near level matched hover with zero yaw, define one horizontal position $`p`$ [m],
+velocity $`v`$ [m/s], signed tilt $`\eta`$ [rad], signed tilt rate $`r`$ [rad/s] and
+actual angular acceleration $`a`$ [rad/s²]. With pitch $`\theta`$ and roll $`\varphi`$, for north $`\eta=-\theta`$; for east
+$`\eta=\varphi`$. Both definitions give $`\dot v=g\eta`$, consistent with NED/FRD and
+negative-body-z thrust. $`g`$ is gravity magnitude [m/s²], not specific force.
 
 Linearizing differential rotor thrust about nonzero hover speed preserves the
-rotor time constant `tau`: thrust is quadratic in speed, but its first-order
+rotor time constant $`\tau`$: thrust is quadratic in speed, but its first-order
 perturbation is proportional to speed perturbation. With matched inertia and
-inactive limits, the inner controller produces commanded angular acceleration `u`:
+inactive limits, the inner controller produces commanded angular acceleration $`u`$:
 
-```text
-p_dot = v             v_dot = g*eta
-eta_dot = r           r_dot = a
-tau*a_dot = u-a
-u = kr*(ka*(eta_d-eta)-r)
-eta_d = (-kp*p-kv*v)/g          (zero horizontal reference)
+```math
+\begin{aligned}
+\dot p&=v,&\dot v&=g\eta,\\
+\dot\eta&=r,&\dot r&=a,\\
+\tau\dot a&=u-a,&u&=k_r(k_a(\eta_d-\eta)-r),\\
+\eta_d&=\frac{-k_pp-k_vv}{g}.
+\end{aligned}
 ```
 
-`kp` has units s^-2; `kv`, `ka` and `kr` have units s^-1. Eliminating the
+The last relation uses a zero horizontal reference.
+
+$`k_p`$ has units s^-2; $`k_v`$, $`k_a`$ and $`k_r`$ have units s^-1. Eliminating the
 intermediate variables gives the fifth-order characteristic polynomial
 
-```text
-D(s) = tau*s^5 + s^4 + kr*s^3 + kr*ka*s^2 + kr*ka*kv*s + kr*ka*kp.
+```math
+D(s)=\tau s^5+s^4+k_rs^3+k_rk_as^2+k_rk_ak_vs+k_rk_ak_p.
 ```
 
 For the original horizontal gains, the slow oscillatory pair has damping ratio
@@ -65,36 +68,38 @@ Version 2 places all five continuous-model poles at a decay rate of 8 s^-1.
 A pole describes a mode of the local response: a negative real pole decays
 without oscillation. The target polynomial is
 
-```text
-D2(s) = .025*(s+8)^5
-      = .025*s^5+s^4+16*s^3+128*s^2+512*s+819.2.
-kp = 6.4 s^-2, kv = 4 s^-1, ka = 8 s^-1, kr = 16 s^-1.
+```math
+\begin{aligned}
+D_2(s)&=0.025(s+8)^5\\
+ &=0.025s^5+s^4+16s^3+128s^2+512s+819.2,\\
+k_p&=6.4\ \mathrm{s}^{-2},\quad k_v=4\ \mathrm{s}^{-1},\quad k_a=8\ \mathrm{s}^{-1},\quad k_r=16\ \mathrm{s}^{-1}.
+\end{aligned}
 ```
 
-The sum of the desired pole decay rates is 40 s^-1, exactly `1/tau`, making
+The sum of the desired pole decay rates is 40 s^-1, exactly $`1/\tau`$, making
 the s^4 coefficient compatible with the fixed physical motor lag. All remaining
 coefficients map directly to the four gains. Only the horizontal position gains
 and roll/pitch attitude/rate gains change. Vertical and yaw settings and all
 actuator, acceleration, tilt and geofence limits remain unchanged.
 
-For five positive real decay rates `ai` summing to `1/tau=40`, coefficient
-matching gives `kp=1/sum(i<j,1/(ai*aj))`. Cauchy-Schwarz bounds the denominator
-below by `100/sum(i<j,ai*aj)`, while the fixed sum bounds the pair-product sum
-above by 640. Hence `kp<=6.4`, attained by five equal rates of 8 s^-1. This is
+For five positive real decay rates $`a_i`$ summing to $`1/\tau=40`$, coefficient
+matching gives $`k_p=\left(\sum_{i<j}\frac1{a_i a_j}\right)^{-1}`$. Cauchy-Schwarz bounds the denominator
+below by $`100/\sum_{i<j}a_i a_j`$, while the fixed sum bounds the pair-product sum
+above by 640. Hence $`k_p\leq6.4`$, attained by five equal rates of 8 s^-1. This is
 maximum position stiffness within the stated all-real continuous pole family,
 not a global optimum over arbitrary controllers. The sampled implementation
 and nonlinear stochastic performance must still be checked independently.
 
 Version 1 remains available with target
-`.025*(s+3)^2*(s+6)*(s^2+28*s+392)` and gains `3528/1003`, `3192/1003`,
+$`.025(s+3)^2(s+6)(s^2+28s+392)`$ and gains `3528/1003`, `3192/1003`,
 `6018/773`, `773/40`. Its held-out result is 29/30 passing cases: the failing
 case has not settled sufficiently by the 5-s hold entry. Version 2 differs only
 in these four gains; its moment-matched prior is identical. Each profile has
 a separate validation batch.
 
 `cascade_analysis.HorizontalCascade` constructs both the continuous generator
-and a sampled-data transition. Its state is `[p,v,eta,r,a]`. The latter is sampled
-immediately before an outer update. A temporary sixth coordinate holds `eta_d`:
+and a sampled-data transition. Its state is $`[p,v,\eta,r,a]^T`$. The latter is sampled
+immediately before an outer update. A temporary sixth coordinate holds $`\eta_d`$:
 reset it at the outer tick, perform two 10-ms inner-loop updates with held commands,
 then retain the five physical coordinates at the next 20-ms outer tick. This
 models the actual 50/100-Hz control-clock relationship, not a fictitious continuous
@@ -102,7 +107,7 @@ controller. `hover_axis_zero_order_hold` computes the exact local held-input map
 to floating-point precision using a bounded augmented-matrix exponential.
 
 All five discrete poles lie inside the unit circle for this profile. Their
-equivalent continuous values `log(z)/.02` differ from the design poles because
+equivalent continuous values $`\log(z)/.02`$ differ from the design poles because
 of sampling: approximately -3.927, -4.685 +/- 3.781j and -11.590 +/- 9.660j.
 The minimum damping ratio is .7682 and slowest decay rate 3.9267 s^-1, compared
 with .6012 and 2.4599 s^-1 for version 1.
@@ -110,14 +115,14 @@ These establish local stability of the specified linear controller/plant model.
 They do **not** establish nonlinear closed-loop stability with an ESKF, saturation,
 large attitudes or arbitrary mismatch.
 
-Let each `e_*` denote estimate minus truth. In the continuous local model,
+Let each $`e_*`$ denote estimate minus truth. In the continuous local model,
 
-```text
-D(d/dt)*p = -kr*ka*(kp*e_p + kv*e_v + g*e_eta) - g*kr*e_r.
+```math
+D\!\left(\frac{d}{dt}\right)p=-k_rk_a(k_pe_p+k_ve_v+ge_\eta)-gk_re_r.
 ```
 
-Thus the static sensitivity to tilt error is `-g/kp`; the sensitivity to velocity
-error is `-kv/kp`. The joint design reduces these magnitudes from 9.81 to about
+Thus the static sensitivity to tilt error is $`-g/k_p`$; the sensitivity to velocity
+error is $`-k_v/k_p`$. The joint design reduces these magnitudes from 9.81 to about
 1.533, and from 1.8 to .625, respectively. Position-estimation error still
 has unit static sensitivity. Faster feedback also passes more measurement noise
 to commands, which is why the evidence records moment effort and limiting along
@@ -130,8 +135,8 @@ error population. The population-matched prior uses the same mean: zero position
 velocity and biases, identity body-to-world attitude. For each independent
 zero-mean uniform error on `[-a,a]`,
 
-```text
-E[x] = 0,       Var[x] = integral(-a..a, x^2/(2*a) dx) = a^2/3.
+```math
+\mathbb E[x]=0,\qquad \mathrm{Var}(x)=\int_{-a}^{a}\frac{x^2}{2a}\,dx=\frac{a^2}{3}.
 ```
 
 The 15 component half-widths are .02 m (position), .02 m/s (velocity),

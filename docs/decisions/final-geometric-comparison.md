@@ -16,14 +16,18 @@ frequency. Vertical collective control does not pass through horizontal
 attitude dynamics, so it need not share their filter bandwidth. Faster
 horizontal shaping trades reduced delay against greater correction noise.
 
-Diagonal filters `H_i(s)=(w_i/(s+w_i))^3` act on feedback correction
-`c=m(Kp ep+Kv ev)`. They form one coherent force jet:
+Diagonal filters $`H_i(s)=\left(\frac{\omega_i}{s+\omega_i}\right)^3`$ act on feedback correction
+$`\mathbf c=m(K_p\mathbf e_p+K_v\mathbf e_v)`$. They form one coherent force jet:
 
-```text
-L = m(g e3-a_ref) + Hc
-Ldot = -m j_ref + sHc
-Lddot = -m s_ref + s^2 Hc.
+```math
+\begin{aligned}
+\mathbf L&=m(g\mathbf e_3-\mathbf a_r)+H\mathbf c,\\
+\dot{\mathbf L}&=-m\mathbf j_r+sH\mathbf c,\\
+\ddot{\mathbf L}&=-m\mathbf s_r+s^2H\mathbf c.
+\end{aligned}
 ```
+
+Here $`\mathbf a_r,\mathbf j_r,\mathbf s_r`$ are reference acceleration, jerk, and snap. The scalar $`s`$ is the Laplace variable; $`\mathbf s_r`$ is a trajectory derivative.
 
 Each section uses the existing bilinear rule and initializes to the first
 correction. Planned jerk and snap remain analytic, with raw and shaped
@@ -41,11 +45,11 @@ arms, for 36 flights:
 
 | Profiles | Parameters |
 | --- | --- |
-| Historical coherent geometric reference | `w=(10,10,10)`, horizontal frequency `f=1` |
-| Six new geometric profiles | `w=(h,h,30)`, `h in {10,15,20}` rad/s, `f in {1,1.25}` rad/s |
+| Historical coherent geometric reference | $`\boldsymbol\omega_f=(10,10,10)`$, horizontal frequency $`f=1`$ |
+| Six new geometric profiles | $`\boldsymbol\omega_f=(h,h,30)`$, `h in {10,15,20}` rad/s, `f in {1,1.25}` rad/s |
 | Two cascade profiles | The same two `f` values |
 
-Horizontal gains are `Kp=f^2` and `Kv=1.8 f`; original vertical and inner gains
+Horizontal gains are $`K_p=f^2`$ and $`K_v=1.8f`$; original vertical and inner gains
 remain unchanged. Every arm uses the same 0.5 s supported alignment, exact
 one-time velocity condition, nonlinear first-release prediction and ordinary
 later estimator. Physical support, stopped initial motors, sensor distributions,

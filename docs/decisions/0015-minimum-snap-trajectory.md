@@ -28,8 +28,8 @@ feasibility, retiming and mission-execution layer.
 
 ## Mathematical contract
 
-For segment i of duration T_i, use s=(t-t_i)/T_i and
-`p_i(s)=sum(k=0..7, c_ik s^k)`. Derivative r in physical time is the
+For segment $`i`$ of duration $`T_i`$, use $`s=(t-t_i)/T_i`$ and
+$`\mathbf p_i(s)=\sum_{k=0}^7\mathbf c_{ik}s^k`$. Derivative r in physical time is the
 normalized polynomial derivative divided by T_i^r. The cost is
 
 `J = sum_i T_i^-7 sum_(k,l=4..7)

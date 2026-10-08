@@ -23,9 +23,11 @@ specifies the intervention and acceptance criteria.
 At each 20 ms outer-controller update, the original law is evaluated using the
 simultaneous true position and velocity:
 
-```text
-a_requested = a_reference + Kp*(p_reference-p_true) + Kv*(v_reference-v_true).
+```math
+\mathbf a_{\mathrm{req}}=\mathbf a_r+K_p(\mathbf p_r-\mathbf p)+K_v(\mathbf v_r-\mathbf v).
 ```
+
+Subscript $`r`$ denotes the reference; $`\mathbf p,\mathbf v`$ are simulated truth and $`K_p,K_v`$ diagonal gain matrices.
 
 The original command limits, force-to-attitude construction and gains remain.
 The estimator still processes the actual noisy IMU and slow observations. Guards
@@ -100,18 +102,21 @@ a valid constraint, not replacing an estimated velocity with truth during flight
 For a prior error covariance `P`, velocity selector `H_v`, prior nominal velocity
 `v_bar` and independent support-velocity uncertainty `R_s`, the conditioning is
 
-```text
-S = H_v*P*H_v^T + R_s
-K = P*H_v^T*S^-1
-delta_x = K*(0-v_bar)
-P_conditioned = (I-K*H_v)*P*(I-K*H_v)^T + K*R_s*K^T.
+```math
+\begin{aligned}
+S&=H_vPH_v^T+R_s,\qquad K=PH_v^TS^{-1},\\
+\delta x&=K(0-\bar{\mathbf v}),\\
+P^+&=(I-KH_v)P(I-KH_v)^T+KR_sK^T.
+\end{aligned}
 ```
+
+Here $`\bar{\mathbf v}`$ is prior nominal velocity and $`P^+`$ the conditioned covariance.
 
 The candidate is restricted to the current independent navigation/alignment
 profile; this conditioning does not inject an attitude correction.
 
-Under the existing ideal fixture, `v=0` is an exact boundary condition. With its
-independent navigation block and zero mean, `R_s=0` gives zero initial velocity
+Under the existing ideal fixture, $`\mathbf v=\mathbf0`$ is an exact boundary condition. With its
+independent navigation block and zero mean, $`R_s=0`$ gives zero initial velocity
 variance and leaves position, alignment, bias and fresh-sample blocks unchanged.
 That covariance is positive semidefinite and rank deficient: it represents some
 exactly known directions and cannot be inverted as a full-rank matrix. An

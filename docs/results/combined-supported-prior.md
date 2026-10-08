@@ -14,10 +14,11 @@ The existing [supported velocity conditioner](supported-velocity-prior.md) is
 applied exactly once before the initial observations. For the 21-dimensional
 joint endpoint covariance C, H selects the three world-velocity coordinates:
 
-```text
-K = C H^T (H C H^T)^-1
-C_supported = (I - K H) C (I - K H)^T.
+```math
+K=CH^T(HCH^T)^{-1},\qquad C_s=(I-KH)C(I-KH)^T.
 ```
+
+Subscript $`s`$ marks the covariance conditioned on supported velocity.
 
 The implementation solves the innovation system rather than forming an inverse.
 The original mean velocity is already zero and independent of the other prior

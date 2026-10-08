@@ -12,7 +12,7 @@ contains numerical results and evidence identities.
 
 ## Two different budgets
 
-The whole-flight budget is exact accounting of a saved trajectory. Let `e_c[k]`
+The whole-flight budget is exact accounting of a saved trajectory. Let $`\mathbf e_c[k]`$
 be each of the eleven existing physical response channels, with reference
 position subtracted from the reference channel. Then
 
@@ -22,10 +22,10 @@ G_{cd}=\frac1N\sum_k e_c[k]^T e_d[k],\qquad
 \mathrm{MSE}=\mathbf1^T G\mathbf1.
 ```
 
-`G` is an **uncentred** Gram matrix: it retains mean offsets as well as varying
+$`G`$ is an **uncentred** Gram matrix: it retains mean offsets as well as varying
 errors. The diagonal sum is not generally the total MSE. All signed cross terms
-are retained, and the earlier signed shares are the row sums of `G`. The triangle
-bound `sum(sqrt(G_cc))` is a conservative RMS bound for these fixed channel
+are retained, and the earlier signed shares are the row sums of $`G`$. The triangle
+bound $`\sum_c\sqrt{G_{cc}}`$ is a conservative RMS bound for these fixed channel
 histories, not an achievable score after removing one source. Each flight keeps
 its full duration. Separate initialize, takeoff, active and landing windows
 partition it; the scored hover window also includes both 5 s and 11 s endpoints.
@@ -33,22 +33,22 @@ partition it; the scored hover window also includes both 5 s and 11 s endpoints.
 The prospective budget instead describes the existing **local horizontal hover
 model**, with its exact sampled clocks. It does not assume that known saved
 estimation errors predict future errors. The physical state is
-`x=[p,v,u,w,alpha]`, where `u` is inclination-induced horizontal acceleration,
-`w=du/dt`, and `alpha=dw/dt`. Between controller updates:
+$`\mathbf x=[p,v,u,w,\alpha]^T`$, where $`u`$ is inclination-induced horizontal acceleration,
+$`w=\dot u`$, and $`\alpha=\dot w`$. Between controller updates:
 
 ```math
 \dot p=v,\quad\dot v=u,\quad\dot u=w,\quad\dot w=\alpha,
 \quad\tau\dot\alpha=\alpha_h-\alpha.
 ```
 
-At each outer update `u_h=-Kp(p+e_p)-Kv(v+e_v)`. At each inner update
-`alpha_h=Kr[Ka(u_h-u-g eta)-(w+g eta_dot)]`. Here `eta` is the difference in
+At each outer update $`u_h=-K_p(p+e_p)-K_v(v+e_v)`$. At each inner update
+$`\alpha_h=K_r[K_a(u_h-u-g\eta)-(w+g\dot\eta)]`$. Here $`\eta`$ is the difference in
 the horizontal acceleration axes divided by gravity; near level it is a signed
-rotation of roll/pitch error. It is not yaw. `eta_dot` is the corresponding
+rotation of roll/pitch error. It is not yaw. $`\dot\eta`$ is the corresponding
 inclination-rate error, including gyro/attitude estimation effects.
 
-The source fixes `h=2.5 ms`, outer period 20 ms, inner period 10 ms, motor
-time constant 25 ms, `Kp=1`, `Kv=1.8`, `Ka=3`, `Kr=12`, `g=9.81` in SI units.
+The source fixes $`h=2.5\;\mathrm{ms}`$, outer period 20 ms, inner period 10 ms, motor
+time constant 25 ms, $`K_p=1`$, $`K_v=1.8`$, $`K_a=3`$, $`K_r=12`$, $`g=9.81`$ in SI units.
 Every outer period has six input slots: one position sample, one velocity sample,
 and two pairs of inclination/rate samples. Exact lifting gives
 
@@ -58,7 +58,7 @@ x_{m+1}=Ax_m+Bu_m,\qquad p_{m,j}=C_jx_m+D_ju_m.
 
 The matrices retain the original update order and all eight intersample output
 phases. For sinusoidal inputs, phase the two inner samples at their actual
-acquisition times. With that input map `W(omega)`, the frequency response is
+acquisition times. With that input map $`W(\omega)`$, the frequency response is
 
 ```math
 H_j(\omega)=\left[C_j(e^{i\omega T}I-A)^{-1}B+D_j\right]W(\omega).
@@ -67,14 +67,14 @@ H_j(\omega)=\left[C_j(e^{i\omega T}I-A)^{-1}B+D_j\right]W(\omega).
 The grid contains DC and 241 fixed frequencies from 0.01 to 25 Hz. It is an
 analysis grid, not a gain search or a continuous-frequency maximum proof.
 The DC sensitivities, also obtained directly from the equilibrium equations, are
-`[-1, -Kv/Kp, -g/Kp, -g/(Ka Kp)] = [-1, -1.8, -9.81, -3.27]`.
+$`[-1,-K_v/K_p,-g/K_p,-g/(K_aK_p)]=[-1,-1.8,-9.81,-3.27]`$.
 
 ## A usable prospective inequality
 
-For zero initial state, past input coefficients are `C_j A^(lag-1) B` and the
-current-period coefficient is `D_j`. Sum their absolute values by input family
-to obtain `b_c(m,j)`. For a bound `epsilon_c` on the **horizontal vector norm**
-of every sample of input family `c`, triangle inequality gives
+For zero initial state, past input coefficients are $`C_jA^{\ell-1}B`$ and the
+current-period coefficient is $`D_j`$. Sum their absolute values by input family
+to obtain $`b_c(m,j)`$. For a bound $`\epsilon_c`$ on the **horizontal vector norm**
+of every sample of input family $`c`$, triangle inequality gives
 
 ```math
 \|p_{m,j}\|_2\leq\sum_c b_c(m,j)\epsilon_c.
@@ -82,7 +82,7 @@ of every sample of input family `c`, triangle inequality gives
 
 No independence assumption or extra factor of square root of two is needed.
 Adversarial signs aligned with one fixed horizontal direction attain each
-single-input bound. Initial-state response is separately `C_j A^m x_0`.
+single-input bound. Initial-state response is separately $`C_jA^m x_0`$.
 
 Across the inclusive 5..11 s hover window, the maximum coefficients are:
 
@@ -95,7 +95,7 @@ Across the inclusive 5..11 s hover window, the maximum coefficients are:
 
 These ceilings are **not simultaneous allowances**. A prospective joint screen
 must include all four terms, the initial response, and a justified allowance
-`rho` for vertical error, physical disturbances and local-model discrepancy:
+$`\rho`$ for vertical error, physical disturbances and local-model discrepancy:
 
 ```math
 0.999866\epsilon_p+1.799760\epsilon_v+9.808690\epsilon_\eta
@@ -105,13 +105,13 @@ must include all four terms, the initial response, and a justified allowance
 Use unrounded saved coefficients for numerical evaluation. This is a sufficient
 local-model screen only when its input bounds and residual allowance are actually
 established. The previously observed sub-2-mm **RMS** model agreement supplies no
-deterministic peak allowance for `rho`. Gaussian standard deviations are not
+deterministic peak allowance for $`\rho`$. Gaussian standard deviations are not
 bounded errors. No numeric joint allocation is claimed from the available data.
 The whole-flight 15 cm RMS/final-position, 15 cm/s final-speed, completion,
 fault-response and strict no-regression conditions remain separate checks.
 
 For stochastic analysis, the corresponding output spectrum uses the **full**
-joint input spectral matrix: `S_y=H S_u H*`. Marginal noise levels alone cannot
+joint input spectral matrix: $`S_y=HS_uH^*`$. Marginal noise levels alone cannot
 discard cross spectra. Equivalently, a finite-horizon covariance calculation
 must retain all cross-time and cross-channel covariances and nonzero means.
 The present review does not estimate a stationary spectrum from nonstationary
@@ -128,8 +128,8 @@ There is no independent velocity or in-flight inclination observation.
 Differencing adjacent position samples gives 14.142 cm/s per-axis noise, already
 above the single-input deterministic velocity ceiling as a scale comparison,
 not a probability claim. The difference shares a sample with current position:
-`Cov(n_k,(n_k-n_(k-1))/dt)=sigma_p²/dt=0.002 m²/s`. Adjacent velocity differences
-have covariance `-sigma_p²/dt²=-0.01 m²/s²`. Treating either difference as an
+$`\mathrm{Cov}\left(n_k,\frac{n_k-n_{k-1}}{\Delta t}\right)=\frac{\sigma_p^2}{\Delta t}=0.002\;\mathrm{m^2/s}`$. Adjacent velocity differences
+have covariance $`-\frac{\sigma_p^2}{\Delta t^2}=-0.01\;\mathrm{m^2/s^2}`$. Treating either difference as an
 independent sensor double counts information. A three-point acceleration
 difference has 1.224745 m/s² noise. No differentiated observation is proposed.
 
