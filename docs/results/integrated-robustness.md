@@ -1,12 +1,15 @@
 # Integrated observation robustness
 
-This campaign evaluates how the existing cascade, online ESKF and observation
-supervisor behave together during virtual flight. It covers nominal hover and
+This campaign evaluates the nested position/attitude controller (the cascade),
+online error-state Kalman filter (ESKF), and observation supervisor together
+during virtual flight. The supervisor monitors how long usable measurements have
+been missing and can stop the simulation when a timeout expires. The study
+covers nominal hover and
 translation, separate position/altitude loss, rejection and delay, recovery,
 landing loss, wind and mass mismatch. The
-[frozen protocol](../decisions/0023-integrated-robustness-evaluation.md) defines
-all 12 cases and their acceptance criteria before execution. The
-[verification record](../archive/records/integrated-robustness.md) retains the
+[study protocol](../decisions/0023-integrated-robustness-evaluation.md) defines
+all 12 cases and their predeclared acceptance criteria. The
+[verification record (ZIP)](../../evidence/development-records.zip) retains the
 measured results and limitations.
 
 ## Information boundary
@@ -35,7 +38,7 @@ history. The existing mission-result and history formats are unchanged.
 Every case executes twice with identical faults, random streams and original
 cascade parameters: supervision off and supervision on. The health monitor is
 active in both. The original parameter factory is used explicitly; the separate
-version-2 cascade and geometric controller are not silently selected.
+version-2 cascade and geometric controller are not selected by this campaign.
 
 Response acceptance and flight acceptance are separate. A correctly timed
 numerical abort can satisfy a persistent-loss response case while ending the
@@ -78,7 +81,7 @@ comparison is the separately executed and saved `off`/`on` pair; the companion
 copy is not an additional true-state flight or an independent comparator.
 
 Verification checks byte hashes before decoding, requires the recorded
-execution-source fingerprint and frozen protocol, replays every ESKF state and
+execution-source fingerprint and predeclared protocol, replays every ESKF state and
 covariance, reconstructs health transitions, supervisor decisions, references,
 mission guards and controller commands, and recomputes all reported metrics.
 It rejects missing cases and altered claims. The checks establish internal

@@ -3,26 +3,28 @@
 The inner loop answers a simple question: which rotor commands will turn the
 vehicle toward a desired orientation? I use a cascade so the attitude and rate
 responses can be checked separately, then tested together with motor delay.
-Position tracking is handled by the outer loop, not by this controller alone.
+Attitude means orientation; body rate means how fast that orientation is changing.
+The cascade first requests a turning rate, then the moment needed to achieve it.
+Position tracking is handled by the outer loop.
 
 Start with [system design](../guides/system-design.md) for the complete loop or
-[controller tradeoffs](../results/controller-tradeoffs.md) for the current performance
-problem. The equations below are implemented in
+[controller tradeoffs](../results/controller-tradeoffs.md) for the measured performance
+and limitations. The equations below are implemented in
 [attitude_control.py](../../src/quadrotor_math/attitude_control.py) and exercised by
 [attitude_simulation.py](../../src/quadrotor_math/attitude_simulation.py).
 
 The implemented inner loop converts an orientation reference and a collective-thrust
 demand into bounded rotor-speed commands. It includes a pure controller and a deterministic
-true-state six-degree-of-freedom execution harness. The decision and acceptance protocol
-are in [ADR 0011](../decisions/0011-baseline-attitude-control.md); measured outcomes are in the
-[verification record](../archive/records/baseline-attitude-control.md).
+true-state simulation of all three translation and three rotation axes. The
+[acceptance protocol](../decisions/0011-baseline-attitude-control.md) defines the
+tested cases and criteria.
 
 This page describes the inner loop, which alone does not regulate position or altitude.
-The subsequent [position/mission layer](position-control.md) composes it with translational
-feedback and documents the G2 true-state numerical evidence. The separate
-[estimated-feedback integration](estimated-feedback.md) now supplies ESKF outputs
-to the same controller interfaces. The original true-state inner-loop evidence is
-not evidence of estimated-state or hardware flight.
+The [position/mission layer](position-control.md) supplies translational feedback.
+The [estimated-feedback integration](estimated-feedback.md) supplies the estimated
+state from the error-state Kalman filter (ESKF). Tests with exact simulated
+state isolate controller behavior; they do not establish estimated-state or
+hardware performance.
 
 ## Frames, signals and interface boundaries
 
@@ -41,13 +43,13 @@ tolerance; the controller does not silently normalize malformed inputs.
 | attitude_control.compute_attitude_control | Compose the bounded attitude/rate/allocation law | q_WB, omega_B, q_reference_WB, collective_thrust, AttitudeControllerParameters → AttitudeControlCommand |
 | attitude_simulation.simulate_attitude_control | Fixed-grid true-state execution | Explicit initial state/motor speeds, independent truth body/rotor/world, nominal controller and AttitudeControlSchedule → AttitudeSimulationResult |
 
-Arrays use independent C-contiguous read-only float64 storage. The new execution
+Arrays use independent C-contiguous read-only float64 storage. The execution
 boundaries reject malformed shapes, non-real dtypes, NaN/Inf, invalid scalar Booleans,
 arithmetic overflow, nonpositive gains and invalid quaternions. Inertia must be exactly
 symmetric and positive definite. Rotor coefficients and motor time constant must be
 positive, motor parameters complete, and speed bounds ordered and safe to square.
-The existing structural configuration dataclasses retain their historical validation;
-the new execution boundary deliberately applies the stronger requirements it needs.
+Structural configuration dataclasses and executable controllers validate different
+domains; the controller applies the stricter requirements needed for its calculations.
 
 Rate/moment/angle limits and nominal inertia/rotors are explicitly supplied in
 AttitudeControllerParameters. No controller parameter is inferred from the truth plant.
@@ -120,8 +122,8 @@ disturbance or motor lag. Reference orientations are piecewise constant; angular
 trajectory feedforward and reference-rate transport are not implemented.
 
 The attitude-to-rate cascade has an established engineering precedent in the
-[official PX4 controller documentation](https://docs.px4.io/main/en/modules/modules_controller#mc_att_control)
-(accessed 2026-09-24). This repository's local logarithmic P/P law and allocator are
+[official PX4 controller documentation](https://docs.px4.io/main/en/modules/modules_controller#mc_att_control).
+This repository's local logarithmic proportional/proportional (P/P) law and allocator are
 defined above; it does not implement PX4's complete flight-control law.
 
 ## Gain rationale and persistent disturbances
@@ -231,8 +233,8 @@ Stages at u = 0, h/2, h/2, h compose the existing rotor wrench, stage-specific
 wind-relative quadratic drag, supplied body disturbance and body-wrench rigid-body
 derivative. Intermediate and final quaternions are normalized. The final actual motor
 speed uses the exact same held-target solution at u=h. This evaluates changing thrust
-within a step; it leaves the historical constant-command run generator and its splitting
-unchanged.
+within a step. The constant-command sensor-run generator uses a separate
+integration schedule; see [foundations](foundations.md).
 
 The constant-speed/zero-disturbance limit agrees with the existing RK4 integrator.
 Equal-motor spin-up from rest has an independent analytical vertical position/velocity
@@ -265,7 +267,7 @@ flight termination, transport latency, sensor sampling or estimator in this harn
 
 The result validates shape, finiteness, unit quaternions, nonnegative speeds, scale domain
 and control epochs drawn from the increasing truth clock. It is an in-memory interface,
-not a change to the existing run-artifact schema. The experiment JSON stores the complete
+separate from the sensor-run artifact format. The experiment JSON stores the complete
 result plus the frozen protocol, every job identity, per-trial metrics/failures, source hash,
 software provenance, UTC time and worker count. Its protocol digest excludes source/date/
 workers; its separate executable-source digest includes all package and experiment Python
@@ -293,7 +295,7 @@ errors are current-body rotation-vector components, not Euler-angle differences.
 
 ## Reproduce
 
-Use the existing locked Python 3.12 environment and uv 0.12.3. Set ATTITUDE_EVIDENCE
+Use the locked Python 3.12 environment and uv 0.12.3. Set ATTITUDE_EVIDENCE
 to a new directory outside the repository; all result/figure destinations must be new.
 
 ~~~bash

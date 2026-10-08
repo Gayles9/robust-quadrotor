@@ -1,21 +1,20 @@
 # 0011: Bounded Cascaded Attitude and Body-Rate Baseline
 
-- Date: 2026-09-24
-- Baseline: 8fef0ce6c811b64dc2e2ab4558591111254e5628
-- Status: Accepted; implemented and verified in the linked record
-
 See the [control guide](../design/control.md) and
-[verification record](../archive/records/baseline-attitude-control.md).
+[verification record (ZIP)](../../evidence/development-records.zip).
 
 ## Scope
 
-Complete the master plan's Week 7 inner-loop milestone. Add a pure quaternion
-attitude P loop, body-rate P loop, explicit actuator feasibility handling, and
-deterministic true-state closed-loop tests/experiments. Do not implement the
-Week 8 position controller/mission, geometric tracking, or estimated-state feedback.
-Existing estimators, plant equations, sensor/artifact schemas and CI remain unchanged.
-No new dependencies. A level force-balanced initial condition is not an altitude
-controller: tilted tests may drift in position/height, and that is reported.
+The cascade separates two jobs: an attitude loop chooses a desired rotation
+rate, and a body-rate loop requests the moment needed to reach it. Explicit
+allocation limits convert that request into feasible rotor commands.
+
+This decision describes the inner loops and their true-state simulation checks.
+[Position control](0012-position-control-and-missions.md) supplies attitude and
+thrust references, while [estimated feedback](0013-estimated-state-mission-feedback.md)
+replaces true-state measurements with estimator outputs. A level, force-balanced
+initial condition alone is not an altitude controller: the isolated inner-loop
+tests can drift in position and height when tilted.
 
 ## Law and local domain
 
@@ -55,7 +54,7 @@ truth motor lag and mismatches can produce different actual moments.
 
 ## Execution and ownership
 
-New simulation takes independent truth body/rotor/world parameters and controller
+The simulation takes independent truth body/rotor/world parameters and controller
 nominal parameters, plus an explicit initial state/actual rotor speeds. Reference
 quaternion and collective arrays are supplied at controller epochs; body disturbance
 moment arrays at plant interval starts. All commands are zero-order held. Plant
@@ -66,16 +65,17 @@ plant intervals. There is no terminal controller update after the last interval.
 For each projected RK4 stage, obtain rotor speeds from the existing exact motor
 response at the stage's elapsed time, evaluate existing rotor forces, drag and
 rigid-body body-wrench derivatives, and add the held supplied disturbance moment.
-This avoids freezing a changing motor speed throughout the new closed-loop step.
+This avoids freezing a changing motor speed throughout the closed-loop step.
 It does not alter the historical run generator's operator splitting. Compare the
 constant-speed zero-disturbance limit with the existing RK4 integrator.
 
-Return aligned truth state/actual-speed histories plus per-control-interval commands
-and diagnostics with explicit times. Copy arrays, make them read-only, validate
-shape/type/finiteness/inertia/quaternion/limits before execution. Fail atomically;
-no RNG or truth/fault-history input in the pure controller.
+The simulation returns aligned truth-state and actual-speed histories, plus
+per-control-interval commands and diagnostics with explicit times. Arrays are
+copied and exposed read-only. Shape, type, finiteness, inertia, quaternion and
+limit validation occurs before execution; failure leaves caller state unchanged.
+The pure controller has no RNG or truth/fault-history input.
 
-## Verification fixed before implementation
+## Verification
 
 - Independent Rodrigues/relative-matrix error checks; all sign/axis/quaternion
   sign combinations; zero/near-zero/domain-boundary error; overflow rejection.
@@ -132,4 +132,5 @@ attitude/rate to change by <.02 degree/.002 rad/s, respectively.
 
 Any design correction motivated by development evidence must be documented before
 held-out execution. Do not adjust gains or acceptance targets on held-out results.
-G2 remains open until the later position/mission milestone.
+The outer-loop mission evidence is described in
+[ADR 0012](0012-position-control-and-missions.md).

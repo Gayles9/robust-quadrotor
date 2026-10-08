@@ -1,22 +1,25 @@
 # Observation health
 
-The ESKF already records whether each position or altitude observation was
-fused, rejected, stale, disabled or still pending. A single rejected outlier is
-different from losing usable observations for a sustained interval. The
-observation health monitor makes that distinction explicit for each stream.
+The error-state Kalman filter (ESKF) records whether each position or altitude
+measurement was used, rejected, too late to use, disabled or still pending.
+A single rejected outlier is different from losing usable measurements for a
+sustained interval. The observation health monitor makes that distinction
+explicit for each sensor stream.
 
 I keep this monitor passive: it reports evidence that the optional
 [observation supervisor](observation-supervision.md) can use. The monitor itself
 does not change an estimate, command, mission phase or abort decision.
-Accepted observations can still be biased or uninformative about some state
-directions, so HEALTHY means available accepted observations, not proof of
-accuracy, observability or safe flight.
+Accepted observations can still be biased or provide little information about
+some quantities being estimated. HEALTHY therefore means accepted measurements
+are available. It does not establish accuracy, observability (whether the
+measurements can reveal the relevant state), or safe flight.
 
 ## Inputs and timing
 
 [`ObservationHealthMonitor`](../../src/quadrotor_math/observation_health.py) consumes
-the current clock and the current epoch's `EskfReplayEvent` tuple. It receives
-every estimator epoch, including epochs without slow observations. Event
+the current clock and the current epoch's `EskfReplayEvent` tuple. An epoch is
+one estimator update time. The monitor receives every epoch, including times
+when the slower sensors provide no measurement. Event
 indices resolve against that observed clock history, so acquisition and actual
 delivery times stay distinct. It never reads the measurements, estimated state,
 covariance, simulated truth or future delivery queue.
@@ -31,8 +34,9 @@ covariance, simulated truth or future delivery queue.
 
 The current ESKF does not rewind its state for delayed observations. A delivery
 from an older acquisition epoch is therefore stale, even if its innovation
-would have been small. Estimator arithmetic failures raise exceptions; they
-are not converted into rejection events.
+would have been small. Here, an innovation is the difference between a measured
+value and the filter's prediction. Estimator arithmetic failures raise
+exceptions; they are not converted into rejection events.
 
 Every nonaccepted delivery clears the acceptance streak. Every disposition
 other than rejection clears the rejection streak. Silence changes information
@@ -142,16 +146,16 @@ The monitor retains its clock, identities and snapshot history until reset;
 storage grows with run length. It is a simulation interface with no bounded
 real-time memory or flight-hardware claim.
 
-## Verification and remaining work
+## Verification and scope
 
-The [decision](../decisions/0021-observation-health-monitoring.md) freezes the rules.
-The [verification record](../archive/records/observation-health-monitoring.md)
-records timing boundaries, missing/stale observations, repeated rejection,
+The [monitor specification](../decisions/0021-observation-health-monitoring.md)
+defines the rules. [Verification evidence (ZIP archive)](../../evidence/development-records.zip)
+covers timing boundaries, missing/stale observations, repeated rejection,
 recovery, reset, atomic retry and passive integration checks. Integration cases
 compare complete numerical payloads and saved byte digests, reconstruct the
 health history from recorded events, and detect deliberately damaged files.
 
-The separate [supervisor](observation-supervision.md) now implements explicit
+The separate [supervisor](observation-supervision.md) implements explicit
 timed numerical aborts for sustained information loss.
 The [supported alignment component](prearm-component.md) is implemented separately.
 Broader controller qualification, additional sensors and custom ROS/PX4 integration

@@ -1,16 +1,13 @@
 # ADR 0015: Fixed-duration minimum-snap position trajectories
 
-Date: 2026-09-25. Status: accepted for this bounded implementation.
+## Purpose and scope
 
-## Preceding milestone and scope
+A minimum-snap trajectory is a smooth path that minimizes rapid changes in
+acceleration. More precisely, snap is the fourth derivative of position, and
+the solver minimizes its integrated squared magnitude. The waypoint positions
+and segment durations are inputs; the solver determines the connecting curves.
 
-Audit parent: `cad64cf37d945fcf2f2186d070e8f845d19edf25` (PR #10), with
-merged main `f45f610776ec1c6877e896d7f63ec17c87f1d322`.
-I completed the baseline review before starting this planning step.
-Estimated-feedback hover qualification remained open; the fixed-duration
-planner did not depend on resolving that performance miss.
-
-This step implements only the reusable **fixed-duration position solver**:
+The reusable **fixed-duration position solver** supports:
 
 - NED waypoints of shape `(segments + 1, 3)` and supplied positive durations;
 - seventh-degree polynomials on each local normalized interval `[0, 1]`;
@@ -26,7 +23,8 @@ It does not add automatic segment timing, actuator/geofence feasibility,
 obstacle constraints, yaw optimization, a mission-execution adapter, geometric
 control, estimator tuning, new dependencies or ROS/PX4 integration. A smooth
 polynomial is not a dynamically feasible or qualified flight trajectory.
-Closed-loop integration and feasibility/time allocation are the next package.
+[ADR 0016](0016-trajectory-feasibility-and-missions.md) describes the separate
+feasibility, retiming and mission-execution layer.
 
 ## Mathematical contract
 
@@ -51,7 +49,7 @@ acceleration/jerk makes that cubic identically zero. Thus the reduced quadratic
 is positive definite for positive durations. This is a fixed-time spline
 optimality statement, not a nonlinear closed-loop stability proof.
 
-## Acceptance checks frozen before implementation
+## Verification
 
 1. Recover the independent single-segment rest-to-rest polynomial
    `35s^4 - 84s^5 + 70s^6 - 20s^7` and cost `100800 ||delta_p||^2/T^7`.
@@ -65,8 +63,9 @@ optimality statement, not a nonlinear closed-loop stability proof.
    when all durations scale by a and prescribed derivatives scale by a^-r.
 6. Exercise explicit shape, type, finite, duration, out-of-range time,
    conditioning and unrepresentable arithmetic failures and array ownership.
-7. Pass the existing repository lint/format/type/test gate with warnings as
-   errors. Preserve feedback gains, sensor distributions and acceptance limits.
+7. Warning-strict lint, formatting, typing and tests check the implementation.
+   Planner evaluation keeps feedback gains, sensor distributions and flight
+   acceptance limits fixed.
 
 Related literature: Daniel Mellinger and Vijay Kumar, *Minimum snap trajectory
 generation and control for quadrotors*, ICRA 2011, doi:10.1109/ICRA.2011.5980409;

@@ -1,18 +1,22 @@
 # Independent-inclination measurement contract and feasibility
 
-The [bounded study](../decisions/0040-independent-inclination-feasibility.md) is
-complete and **no-go for a measurement component under the current assumptions**.
-The conditional mathematics is useful, but no justified independent orientation
-source/model, calibration, timing or simultaneous error allocation is available.
-This extension study is closed. The [capability ledger](operating-envelope.md)
-and [official report](../report.md) consolidate the evidence with flight failures retained.
+A separate measurement of the vehicle's tilt could help distinguish tilt error
+from accelerometer bias. This study derives the required measurement geometry
+and uncertainty handling, then checks whether the current project provides
+enough evidence to support such a sensor.
+
+**The current assumptions do not justify an implemented measurement component.**
+No independent orientation source/model, calibration, timing or simultaneous
+error allocation is established. The [study protocol](../decisions/independent-inclination-feasibility.md)
+defines the scope; the [capability ledger](operating-envelope.md) and
+[official report](../report.md) place the result alongside the flight evidence.
 
 This is a simulation-first project. Hardware is not required to define a valid
 simulated sensor, but a new sensor still needs an explicit physical model and
 justified assumptions. Adding a camera/pose source would expand the existing
 IMU/position/altitude problem. Perfect simulator orientation, or arbitrary noise
 placed on it, does not establish that an implementable source meets the budget.
-The [record](../archive/records/independent-inclination-feasibility.md) gives the
+The [record (ZIP)](../../evidence/development-records.zip) gives the
 verification results and source identities.
 
 ## Physical source and frame contract
@@ -36,7 +40,7 @@ The current [mission sensors](../../src/quadrotor_math/estimated_mission.py) con
 IMU, local position and barometric altitude. The
 [replay observation kinds](../../src/quadrotor_math/eskf_replay.py) support position
 and altitude. No independent orientation model or calibrated external data is
-present at this boundary. The [compatibility spike](../archive/records/px4-gazebo-compatibility.md)
+present at this boundary. The [compatibility spike (ZIP archive)](../../evidence/development-records.zip)
 establishes that PX4/Gazebo could execute a simulation flight; it does not provide
 this measurement. An attitude output from a system using the same IMU is not
 automatically independent. In-flight accelerometer normalization cannot distinguish
@@ -67,17 +71,17 @@ new observation type or an implemented ESKF correction.
 
 `H_theta` has rank two and annihilates `e3`. The exact unobserved motion is
 `R_WB -> R_WB Exp(psi [e3]x)`: a twist about body down. Away from level, a
-rotation about **world** vertical generally changes `R_WB e3`. Thus the earlier
-phrase "heading free" needs this qualification; body-axis twist and Euler/world
-yaw coincide only in the relevant level configuration. The earlier local hover
-rank calculation remains valid.
+rotation about **world** vertical generally changes `R_WB e3`. Body-axis twist and Euler/world
+yaw coincide only in the relevant level configuration. The local hover rank
+calculation applies at that configuration.
 
 A unit antipodal observation `z=-d_hat` has zero tangent projection. A local
 contract must therefore reject `d_hat.T z <= 0` before evaluating NIS. Passing
 the hemisphere check does not prove that a large residual has a valid linear
 Gaussian likelihood. Nonunit/nonfinite directions, invalid rotations, unknown
-frame registration and invalid uncertainty are also ineligible. Do not silently
-normalize malformed external packets into apparently valid measurements.
+frame registration and invalid uncertainty are also ineligible. Normalizing a
+malformed packet would conceal an invalid measurement rather than establish its
+physical meaning.
 
 Changing tangent basis to `E_W Q`, for orthogonal `Q`, transforms residual,
 Jacobian and covariance together by `Q.T`; NIS and the linear posterior remain
@@ -96,7 +100,8 @@ This is first-order uncertainty propagation. Mounting/reference calibration
 errors, persistent bias, nonlinear curvature and temporal correlation require
 their own justified treatment. They are not removed by projecting to two
 coordinates. If the source also supplies body-origin position, its joint noise
-covariance contains `R_pt=Cov(n_p,epsilon_W) J.T`. Keep that block.
+covariance contains `R_pt=Cov(n_p,epsilon_W) J.T`. This block is part of the
+measurement model and must be retained.
 
 For state error `delta_x`, observation noise `n`, and
 `U=Cov(delta_x,n)`, the linear Gaussian innovation and cross covariance are
@@ -108,8 +113,10 @@ S=HPH^T+HU+U^TH^T+R,\quad C=PH^T+U,
 \delta\hat x=CS^{-1}r,\qquad P^+=P-CS^{-1}C^T.
 \]
 
-Both `[[P,U],[U.T,R]]` and the innovation covariance must satisfy their PSD/PD
-conditions. A reused IMU stream can create `U`, including correlation with the
+Both `[[P,U],[U.T,R]]` and the innovation covariance must satisfy their covariance
+conditions: the joint covariance is positive semidefinite, and the innovation
+covariance is positive definite so its solve is well defined. A reused IMU
+stream can create `U`, including correlation with the
 endpoint sample memory. Assuming zero correlation because the data arrive on a
 different interface is invalid. These equations concern original linear error
 coordinates; a future implementation would still need correct quaternion
@@ -155,8 +162,9 @@ bound. Using the old single-input angle ceiling, an illustrative true-rate
 bound of 1 rad/s would consume the entire allowance after 8.156 ms of age.
 That figure reserves nothing for noise, bias, other estimation errors or physical
 residuals; it is not a selected sensor latency or a demonstrated controller limit.
-Do not fuse a delayed sample as if acquired now. The current same-epoch API must
-retain its timing rule until delayed-state handling is separately justified.
+A delayed sample represents an earlier state and cannot be treated as a current
+measurement. The current API accepts only same-epoch corrections; delayed-state
+handling is not implemented.
 
 For a conditional two-dimensional zero-mean Gaussian innovation, the radial
 tail is `Pr(NIS>c)=exp(-c/2)`, so a 99% threshold would be
@@ -204,14 +212,13 @@ this joint condition. No complete allocation can be established here.
 The mathematical contract passes its checks. Source/model eligibility and the
 joint budget do not pass, so the component decision is no-go. No scientific
 flight, synthetic sensor campaign, production integration or default change
-follows. Startup tuning and the sensor extension are closed under present scope.
-Reopening requires an explicitly justified source/model and a separately frozen
-scope, not another arbitrary noise/rate sweep.
+follows. Implementing this extension would require a justified source/model and
+an acceptance protocol tied to the complete error budget. Varying arbitrary
+sensor noise or rate cannot establish those missing assumptions.
 
-The original-sensor operating envelope and report consolidation are now complete.
-They preserve every failed flight gate and distinguish implemented, tested and
-qualified capabilities. A simulation-only interface would be a separate task
-under [next steps](../next-steps.md); none of this closes G2 qualification.
+The [capability ledger](operating-envelope.md) distinguishes implemented, tested
+and qualified capabilities. Broader flight qualification remains incomplete;
+[planned work](../next-steps.md) is separate from the results established here.
 
 ## Reproduction
 

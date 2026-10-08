@@ -19,5 +19,5 @@ arming procedure. A numerical observation-loss abort does not provide a flight
 fallback. The independent-inclination extension is closed under its current
 unsupported sensor assumptions.
 
-[Earlier plans](archive/previous-plan.md) remain historical records; their next
-actions do not override the current scope.
+The [capability ledger](results/operating-envelope.md) records the implemented
+features and the evidence required to extend their demonstrated scope.

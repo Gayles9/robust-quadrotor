@@ -1,14 +1,12 @@
 # 0003: Environmental Wind and Quadratic Drag
 
-- Date: 2026-09-22
-- Status: Accepted
-
 ## Context
 
-The deterministic quadrotor core needed a bounded environmental-force model before work on
-state estimation and control. The model had to preserve the existing NED world frame, FRD
-body frame, truth/nominal separation, projected-RK4 semantics, canonical manifests, and
-35-array artifact while making wind and drag effects reproducible and explicitly testable.
+Wind changes the air velocity seen by the vehicle, and drag resists that relative
+motion. The simulation uses a simple, reproducible model with explicit NED world
+and FRD body coordinates. It keeps simulated truth separate from the assumptions
+available to the estimator and controller, and records the parameters in the run
+manifest without changing the 35-array artifact format.
 
 A higher-fidelity aerodynamic model would require additional assumptions and parameters that
 the project cannot yet identify or validate. The immediate need is a transparent disturbance
@@ -52,7 +50,7 @@ reference area because those quantities are not independently identified in the 
 model. Gusts and turbulence require a time-varying stochastic environment and its own replay
 contract. Aerodynamic moments require centre-of-pressure and rotational-aerodynamics
 assumptions. CFD and blade-element models would add substantial geometry, calibration, and
-validation scope that is not justified for this gate.
+validation scope beyond this model.
 
 ## Consequences/Risks
 

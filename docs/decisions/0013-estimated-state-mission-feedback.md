@@ -1,24 +1,16 @@
 # 0013: Causal Online ESKF and Estimated-State Mission Feedback
 
-- Date: 2026-09-24
-- Audited baseline: 23197e95feace859c4d7405c4e2574e06f2c33bb
-- Status: Implemented; verification qualified by a noisy-hover performance shortfall
+## Scope
 
-## Bounded scope
+Estimated feedback closes the loop through the sensors: the endpoint ESKF
+estimates position, velocity, attitude and sensor biases, and the cascade uses
+those estimates to control the simulated vehicle. This decision describes that
+causal connection and the original noisy-flight evaluation.
 
-Connect the existing endpoint ESKF, measurement models, and Week 8 cascade in a
-causal numerical mission. Retain all controller gains, plant equations, mission
-references, filter mathematics and historical run schemas. No geometric control,
-trajectory optimization, new estimator, automatic alignment, delayed-state rewind,
-IMU dropout/delay, ROS/PX4, contact dynamics or hardware emergency policy.
-
-The audit-first rule applies to every subsequent implementation step. The source
-audit finds no defect in the preceding position law, quaternion construction or
-mission logic that warrants changing their behavior. Re-run its full tests and
-fixed campaign. A narrow private feedback hook may share the mission execution
-loop; its default true-state path must reproduce the baseline exactly. Extract
-the existing replay correction sequence into one shared implementation so online
-and offline fusion cannot diverge into separately maintained mathematics.
+Online and offline fusion share the correction sequence, preventing two
+independent implementations of the same equations. A private feedback hook
+shares the mission loop while preserving the true-state default. Plant physics,
+controller gains and filter equations are the same in the paired comparison.
 
 ## Information boundary and initialization
 
@@ -75,10 +67,10 @@ not change acquired IMU values. Core stream calls contain no randomness.
 
 ## Evidence contracts
 
-Retain complete truth/reference/control histories, true biases, raw paired IMU,
-all slow acquisition/delivery identities, post-update nominal states and physical
-covariances, the actual rate-feedback vectors, and all observation dispositions
-and innovation diagnostics. All public numeric arrays are finite, independently
+The evidence contains complete truth/reference/control histories, true biases,
+raw paired IMU, all slow acquisition/delivery identities, post-update nominal
+states and physical covariances, actual rate-feedback vectors, all observation
+dispositions and innovation diagnostics. All public numeric arrays are finite, independently
 owned and read-only. No historical RunArtifactData schema is repurposed.
 
 An experimental bundle binds complete per-trial NPZ data by exact-byte SHA-256,
@@ -88,10 +80,9 @@ controller correspondence and metrics. Offline replay comparison is an explicit
 audit, not a substitute for online execution. Truth is allowed only in generation,
 independent safety monitoring and post-run scoring.
 
-## Frozen verification and campaign design
+## Verification and campaign design
 
-- Preserve the existing 2859-test baseline and reproduce all five previous fixed
-  mission histories. Test online/offline equality for first-order and endpoint
+- Reproduce all five fixed true-state mission histories. Test online/offline equality for first-order and endpoint
   modes, same-epoch order, nonzero shared noise memory, gates, stale/disabled
   events, pending ledgers, invalid input, failed-call atomicity and ownership.
 - Independently reconstruct commanded feedback from recorded estimates. Change
@@ -104,7 +95,7 @@ independent safety monitoring and post-run scoring.
 - Noisy fixed hover (60-second hold), square, vertical step and mild wind, plus
   development square seeds 8100..8102. Use the established illustrative 1 kg model,
   gains, bounds, reference durations and completion tolerances unchanged.
-- Freeze code/protocol before validation seeds 90000..90009. All ten estimated
+- Validation seeds 90000..90009 use the fixed code and protocol. All ten estimated
   square missions must complete with no guard or numerical failure, full-mission
   true position RMSE <.15 m, final true position/speed error <.15 m/<.15 m/s,
   estimated position RMSE against truth <.10 m, peak attitude estimation error
@@ -114,10 +105,10 @@ independent safety monitoring and post-run scoring.
   that noisy feedback outperform truth feedback. Keep all failures visible.
 - Test delayed slow measurements as stale/pending and explicit fusion disabling;
   do not claim successful delayed-measurement compensation or broad fault tolerance.
-- Run complete formatting, lint, typing, warnings-as-errors tests, physical/dataflow
-  audits and plot inspection before commit. Verify the exact published commit in CI.
+- Formatting, lint, typing and warnings-as-errors tests complement independent
+  physical/dataflow reconstruction and plot inspection.
 
-This milestone establishes a bounded estimated-feedback numerical baseline, not
+This campaign establishes a bounded estimated-feedback numerical baseline, not
 global stability, statistical recalibration of the filter, hardware readiness,
 or autonomous arming/touchdown. Subsequent robustness and geometric-control work
 requires its own scope and audit.
@@ -128,10 +119,10 @@ The implementation and unit/static gates pass; the first noisy hover exceeds
 the inherited .08 m hold-peak target (.107563 m). That fixed case remains a failed
 acceptance condition even though it completes without limiting. The code, gains,
 seeds and criteria were not changed to turn it into a pass. The complete
-[verification record](../archive/records/estimated-state-feedback.md) separates
+[verification record (ZIP)](../../evidence/development-records.zip) separates
 algorithm/interface correctness, previous-path compatibility and measured performance.
 
-The subsequent bounded gain/prior design is recorded separately in
+The bounded gain/prior design is recorded separately in
 [ADR 0014](0014-estimated-feedback-bandwidth.md) and its
-[qualification record](../archive/records/feedback-design.md).
+[qualification record (ZIP)](../../evidence/development-records.zip).
 It preserves this original profile and its measured miss.

@@ -1,37 +1,33 @@
 # 0014: Damped Estimated-Feedback Cascade
 
-Status update (2026-09-25): I retained the stronger existing comparison
-reference with its measured limitations and proceeded to independent planning.
-The [same-case closeout](../archive/records/repository-audit.md) selects explicit
-version 2. The historical instructions and failed qualification below describe
-the original design cycle; acceptance as a reference does not pass that gate.
+The outer position loop, inner attitude loop and motor response all affect
+how quickly the vehicle recovers from estimation error. Tuning any one loop
+in isolation can miss the combined system's lag and overshoot. This decision
+explains the model used to choose joint gains and a prior covariance matched
+to the simulated initial uncertainty.
 
-- Date: 2026-09-24
-- Audited commit: `94c074ef20d6e862f7143c39b00418799b5c4c6e`
-- Status: Versions 1 and 2 unqualified (29/30 and 28/30); further revision required
+The implemented profiles are explicitly selected by `--design-version`.
+Version 2 is the retained comparison reference; it passed 28 of 30 required
+validation cases, while version 1 passed 29 of 30. Neither passed the full
+qualification requirement. Their local stability calculations and improved
+performance do not erase those misses. The [feedback guide](../design/feedback-design.md)
+connects these profiles to the current comparisons.
 
-## Scope
+## Scope and motivation
 
-Close ADR 0013's noisy-hover performance qualification with a model-based
-joint horizontal/roll/pitch bandwidth profile, moment-matched prior covariance,
-and independent validation. Preserve the existing
-baseline as a reproducible comparison. No changes to filter equations, noise,
-prior mean, sensor timing, motor/plant equations, vertical/yaw gains, limits, references,
-acceptance windows or historical seeds. No new planner, geometric controller,
-automatic alignment, fault response or middleware. This is bounded numerical
-feedback validation, not hardware readiness or global stability.
+The experiment changes horizontal position and roll/pitch bandwidth together
+with the prior covariance. Filter equations, noise, prior mean, sensor timing,
+motor/plant equations, vertical/yaw gains, limits, references and scoring
+windows remain fixed. This isolates a feedback-design question without
+retuning sensor uncertainty to fit the observed flight.
 
-## Audit and hypothesis
-
-The authenticated failed hover reaches 0.10756338079020142 m at 5.395 s.
+The original failed hover reaches 0.10756338079020142 m at 5.395 s.
 The dominant component is north error -0.100275 m; the position-estimation
 error there is about 0.0219 m. Early tilt estimation error produces lateral
 acceleration error (first-second north/east RMS about 0.240/0.218 m/s²).
-The vehicle drifts before the attitude estimate settles and then overshoots
-during recovery. This suggests coupled-loop damping, not a reason to retune
-sensor covariance. No demonstrated estimator/frame/sign defect was identified.
-Fresh baseline tests and full fixed-case reproduction are required before
-changing execution source; exact results belong in the progress record.
+The vehicle drifts before the attitude estimate settles and overshoots during
+recovery. This supports investigating coupled-loop damping; it does not
+demonstrate an estimator, frame or sign defect.
 
 ## Local mathematical design
 
@@ -79,12 +75,12 @@ respectively, without any integral state. Position-estimation error still
 has unit static gain. Higher bandwidth can increase noise-driven control
 effort, so report the measured effort and limits, not just tracking error.
 
-The sampled-data verification must retain 50 Hz outer/100 Hz inner clocks
-and held commands, rather than presenting continuous poles as a discrete
-stability proof. Build the exact local zero-order-hold transition, compare
-its Jacobian with the nonlinear simulator over an outer period, and test
-spectral radius below one. Also reconstruct the local forced response from
-recorded estimation errors, keeping limitations of linearization explicit.
+The sampled-data model includes the 50 Hz outer and 100 Hz inner clocks with
+held commands. Its exact local zero-order-hold transition is compared with the
+nonlinear simulator's Jacobian over one outer period, and its spectral radius
+is checked to be below one. Recorded estimation errors drive a separate
+reconstruction of the local forced response. These checks retain the limits of
+linearization; continuous poles alone are not a discrete stability proof.
 
 ## Initial uncertainty: a distribution-derived design input
 
@@ -107,7 +103,7 @@ unchanged and already match their generators. The noiseless limit still
 has zero prior covariance. This moment match is not a Gaussian-distribution
 claim or new evidence of full closed-loop NIS/NEES calibration.
 
-## Development evidence and design refinement
+## Evidence for the joint profile
 
 The initial inner-only candidate ka=6,kr=24 kept the old outer gains; it
 missed the .08 m target on development hover 8200 (.087947 m). Joint
@@ -124,10 +120,10 @@ therefore combines the declared moment match with greater local disturbance
 rejection and faster recovery. No acceptance threshold, truth distribution,
 seed, reference or scoring window was changed during these iterations.
 
-## Frozen acceptance and sequence
+## Evaluation protocol for version 1
 
-1. Fresh preceding full gate and 5-case reproduction, including unchanged
-   failed hover. Preserve the original protocol and archives.
+1. The five original fixed cases, including the failed hover, provide the
+   reproducible comparison baseline.
 2. Analytic/sign/dimension tests, exact motor transition, nonlinear
    finite-difference correspondence, noise-input response, invalid inputs
    and immutable result contracts for the analysis code.
@@ -136,33 +132,30 @@ seed, reference or scoring window was changed during these iterations.
 4. Fixed: the exact five ADR 0013 identities, now with the declared damped
    profile, paired with true-state runs using that same profile. All must
    pass the unchanged performance targets. Hover remains 5..65 s, .08 m.
-5. Before held-out evaluation freeze execution hashes, all protocol hashes,
-   development/fixed results and the quality gate. New held-out cases:
+5. Execution hashes, protocol hashes and prerequisite development/fixed
+   results identify the inputs to validation. Independent validation cases:
    hover seeds 91000..91019; square seeds 92000..92009. All must complete
    and pass the inherited per-case/estimation/actuator criteria. These
    are finite-sample results, not a universal probability guarantee.
 6. Retain every result, including errors. Audit online/offline equality,
    sensor/force/control reconstruction, covariance validity, complete
    clocks and artifacts. Include unchanged original-path regression.
-7. Render and inspect diagnostics; run the full pinned toolchain with
-   warnings as errors. Publish, verify CI and exact tree, merge the exact
-   tested head, then verify merged state. If a frozen held-out condition
-   fails, record the failure and investigate; do not change that batch
-   and relabel it held-out.
+7. Rendered diagnostics and the full pinned toolchain, with warnings as errors,
+   check the implementation and evidence. A failed validation case keeps its
+   result; changing its conditions cannot turn it into independent validation.
 
 ## Evidence preservation
 
-The new campaign has its own protocol identity and version. Existing
+The campaign has its own protocol identity and version. Existing
 campaign defaults and evidence remain readable. Core control functions
 still accept explicit caller-supplied parameters; this profile is an
 illustrative, documented configuration rather than a hidden change to
 every caller. Full histories remain outside Git; source, tests, derivation,
 commands and verified result summaries are versioned.
 
-## Version 2: settling-margin revision
+## Version 2: maximum stiffness within the all-real pole family
 
-Version 1 is preserved in commit `6eadfa0438663f2fd26bee6298b62ff3b4e0e11d`,
-including all frozen definitions and the recorded 29/30 held-out result. Seed
+Version 1 retains its definitions and recorded 29/30 validation result. Seed
 91001 misses at the unchanged 5.0-s hold entry, with .0813936606 m error; after
 10 s its error stays below .039612 m. All attitude conditions pass. This points
 to insufficient startup settling margin, not a reason to move the scoring window,
@@ -199,20 +192,21 @@ increases slightly from 7.785 to 8. Horizontal position/velocity feedback
 increases. These are local mathematical predictions;
 the nonlinear campaigns decide whether the profile is acceptable.
 
-Keep the version-1 moment-matched prior, all plant/sensor/noise definitions,
-vertical/yaw settings, limits, references, timers and acceptance thresholds.
-The new `--design-version 2` is explicit; version 1 remains the default for
+Version 2 uses the version-1 moment-matched prior, all plant/sensor/noise
+definitions, vertical/yaw settings, limits, references, timers and acceptance
+thresholds.
+The `--design-version 2` selection is explicit; version 1 remains the default for
 backward compatibility and its three existing protocol hashes remain unchanged.
 
-Before opening any new held-out result, require the original five fixed identities
-and thirteen development identities to pass: hover 8200..8205, square 8206..8208,
-and observed diagnostic hover seeds 91001, 91011, 91016, 91019. The latter four
-are reused observed data, not fresh validation. The startup CI regressions for
+The prerequisites for version-2 validation are passes on the original five fixed
+identities and thirteen development identities: hover 8200..8205, square
+8206..8208, and observed diagnostic hover seeds 91001, 91011, 91016, 91019.
+The latter four are reused observed data, not fresh validation. The startup CI regressions for
 30 and 91001 also require a .07 m development margin with takeoff/hold start
 unchanged. Full acceptance still scores the entire 60-second hold against .08 m.
 
-Freeze source, tests, protocols and prerequisites again. The second held-out
-batch is hover **93000..93019** and square **94000..94009**. Retain all outcomes
+The independent version-2 validation
+batch uses hover **93000..93019** and square **94000..94009**. Retain all outcomes
 and require all inherited conditions for each of the 30 planned trials. Do not
 present the first failed batch as a successful version-2 validation.
 
@@ -223,13 +217,12 @@ require exact serial/parallel histories and saved bytes and prove that corruptio
 in a later worker prevents publication. This changes scheduling of verification,
 not numerical execution, mathematical criteria or evidence completeness.
 
-## Further development: stiffness with a damping constraint
+## Rejected alternative: stiffness with a damping constraint
 
-Version 2 is preserved in `a56cdc0cdc79b79926dcf1ef9f446addc5d9d7c9`.
-Its new failures at 5.52 and 7.4125 s are startup recovery peaks, not just
+Version 2's failures at 5.52 and 7.4125 s are startup recovery peaks, not just
 hold-entry samples; changing the scoring window is not a remedy. All attitude
 and numerical conditions pass. The all-real family has exhausted its stiffness
-bound. Extend the same physical model to the equal-decay complex-pole family
+bound. The equal-decay complex-pole alternative uses the same physical model:
 
     D_b(s) = .025*(s+8)*((s+8)^2+b^2)^2.
 
@@ -254,26 +247,25 @@ faster recovery and greater disturbance rejection; control effort and limiting
 must be measured. The sensor/filter prior and every remaining configuration
 field stay as in version 2.
 
-Before implementation, run an explicitly labeled short startup development probe
-with the same takeoff and 5-s hold entry. Require <.065 m over 5..10 s for the
-four known failed identities 30, 91001, 93003 and 93012, with no limiting or
-abort. Additional observed diagnostic seeds retain the original .08 m criterion.
-These short probes are not full-hover qualification.
+The short startup probe keeps the same takeoff and 5-s hold entry. Its
+development condition is <.065 m over 5..10 s for the four known failed
+identities 30, 91001, 93003 and 93012, with no limiting or abort. Additional
+observed diagnostic seeds retain the original .08 m criterion. These short
+probes are not full-hover qualification.
 
-Implementation must preserve versions 1 and 2 and their exact protocol hashes.
-Require the original five full fixed missions and **33 development missions**:
-the thirteen version-2 development identities plus every exposed version-2
-validation hover (93000..93019), including both passes and failures. This broadens
-regression evidence after the two failed qualifications without treating reused
-data as fresh validation. Include nonlinear Jacobian checks for both axes,
-analytic coefficients/sensitivities, strict version and seed boundaries, startup
-regressions, complete replay/artifact audits and the full pinned repository gate.
+The proposed full evaluation would preserve versions 1 and 2 and their exact
+protocol hashes. Its prerequisite comprises the original five fixed missions
+and 33 development missions: the thirteen version-2 development identities plus
+all twenty observed version-2 validation hovers (93000..93019). Reusing those
+observations broadens regression evidence but does not create new validation.
 
-Freeze the complete new execution and prerequisite evidence before using fresh
-hover seeds **95000..95019** and square seeds **96000..96009**. All 30 must pass
-the unchanged full-mission conditions, including the entire 5..65 s hover window
-and .08 m limit. Retain all outcomes and measured effort; qualification remains
-bounded numerical evidence, not a universal stability or hardware claim.
+The reserved validation design comprises hover seeds 95000..95019 and square
+seeds 96000..96009, with all 30 required to meet the unchanged full-mission
+conditions, including the 5..65 s hover window and .08 m limit. This proposal
+did not reach that stage because the startup probe failed. These seed ranges
+are historical protocol identities, not a list of currently unused seeds;
+the [final comparison](../results/final-geometric.md) documents their
+separate use in the completed controller study.
 
 ### Rejected prototype and diagnostic boundary
 
@@ -306,41 +298,40 @@ actuator limiting and requires the final second to be limit-free. This is distin
 from the extra absence-of-any-limiting development condition above. Additional
 complex-pole probes report both conditions separately and keep all actual limits
 unchanged. They do not retroactively qualify either frozen batch or the failed
-strict-margin prototype. New held-out seeds remain unused until a documented
-candidate and its prerequisites have been fixed.
+strict-margin prototype. Qualification requires a candidate that passes its
+prerequisites and a separately fixed validation protocol.
 
 The b=10,12,14 saturation diagnostics all failed even the inherited .08 m startup
 target: seed 93012 reached .0822047, .0826201 and .0913843 m, respectively.
 The b=14 profile additionally failed seeds 91016 and 8200. Across these probes,
 the longest actuator-limiting intervals were .05, .10 and .15 s; brief limiting
 was therefore not the disqualifying inherited condition. Higher bandwidth did
-not resolve the performance issue and increased measured moment effort. Do not
-promote these profiles or open the reserved 95000/96000 validation batches.
+not resolve the performance issue and increased measured moment effort. None
+of these profiles qualified for the proposed validation batch.
 
-The present bounded gain/prior investigation is unqualified. Keep the integration
-PR in draft. Resolve the startup estimation/control coupling with a separately
-scoped design and explicit error/effort requirements before trajectory-planning
-integration. A sampled local pole calculation and a finite recorded-error screen
-do not substitute for that qualification.
+These gain/prior profiles remain limited comparison configurations. A sampled
+local pole calculation and a finite recorded-error screen do not substitute
+for passing the stated nonlinear flight conditions. Startup uncertainty and
+controller comparisons are evaluated separately in the
+[current results](../results/README.md).
 
 ## Protocol identity and numerical backends
 
-Final draft CI exposed a faulty cross-backend assumption in the golden protocol
-test. Local construction reproduced the frozen version-1 validation digest;
-CI produced `de28fa6bedf6986df434a515181c954a28f5dc54f7bcd229ffb8ced90c338f5b`.
+The golden protocol test accounts for a narrow difference between numerical
+backends. One backend reproduces the recorded version-1 validation digest;
+another produces `de28fa6bedf6986df434a515181c954a28f5dc54f7bcd229ffb8ced90c338f5b`.
 Selecting OpenBLAS HASWELL locally reproduces that exact digest. Compared with
 the recorded kernel, only the q_WB y component for hover seed 91010 differs:
 -.011563447064241896 versus -.011563447064241898 (one float64 unit).
 The same audit finds only derived initial-quaternion differences in the other
 protocols across seven kernel selections; all remaining fields are identical.
 
-Correct the test's assumption, not the production experiment. Keep a small
-golden initial-attitude fixture from the authenticated recorded input protocols.
-Before checking the unchanged golden digest, the test may substitute only those
-attitudes and only after each component agrees within four float64 units. Every
-other protocol field remains in the exact digest check. Negative tests must
-reject a five-unit attitude change and retain sensitivity to changes elsewhere.
-Check both design versions and the legacy profile on the observed kernels.
+A small golden initial-attitude fixture retains the authenticated recorded
+inputs. Before checking the unchanged digest, the regression test substitutes
+only those attitudes, and only when each component agrees within four float64
+units. Every other protocol field remains in the exact digest check. Negative
+tests reject a five-unit attitude change and changes elsewhere. Both design
+versions and the legacy profile are checked on the observed kernels.
 
 Production protocol generation, strict report/digest validation, online/offline
 array equality, source behavior and all flight acceptance criteria remain

@@ -1,19 +1,22 @@
 # Nonlinear uncertainty for supported pre-arm alignment
 
-The uncertainty derivation passes its frozen acceptance. The subsequent
-[standalone component](prearm-component.md) now implements its support and
-release contract and passes reference checks. Flight integration is separate.
-This study improves the reported joint uncertainty; it makes
-only a negligible change to the inclination estimate itself.
+This model describes the uncertainty in tilt and sensor bias after stationary
+[pre-arm alignment](prearm-alignment.md). It accounts for products of uncertain
+rotations and sensor errors that a first-order approximation misses. The main
+benefit is a more faithful covariance, not a better tilt estimate: the change
+in the estimated inclination itself is negligible.
 
-The [frozen decision](../decisions/0028-nonlinear-prearm-uncertainty.md) records one
-candidate and all acceptance criteria before execution. The
-[verification record](../archive/records/prearm-nonlinear-uncertainty.md) preserves
-the old failure, independent results, provenance and software checks.
+The [standalone component](prearm-component.md) uses this model and implements
+the physical-support and sample-release contract. The
+[model specification](../decisions/nonlinear-prearm-uncertainty.md) defines
+the candidate and acceptance criteria. [Verification evidence (ZIP archive)](../../evidence/development-records.zip)
+includes the first-order comparison, independent trials, provenance and software
+checks. The nonlinear model passes the stated criteria; flight performance is
+evaluated separately.
 
 ## What the first-order model missed
 
-The original design retained attitude/bias cross-covariance correctly to first
+The first-order model retains attitude/bias cross-covariance correctly to first
 order. Its complete nonlinear Gaussian errors nevertheless produced maximum
 normalized variance 1.11216 against a 1.10 limit. Reconstructing the original
 5,000 errors, covariance matrices, whitened errors and gate statistics gives
@@ -46,21 +49,21 @@ Near level, the leading extra transverse variance is
 \]
 
 The first-order transverse variance conditional on terminal accelerometer bias
-is (V_a-C_a²/P_aT)/g². At the frozen profile, their ratio is **0.07811**.
+is (V_a-C_a²/P_aT)/g². At the specified profile, their ratio is **0.07811**.
 The omitted term is small compared with marginal inclination uncertainty but
 about 7.8% of the much smaller conditional variance. That explains why a
 marginal axis-error check can look good while the complete joint check misses.
 This leading-term calculation explains the scale; it is not added as a fitted
-diagonal adjustment. The candidate propagates the full nonlinear map.
+diagonal adjustment. The model propagates the full nonlinear map.
 
 ## Keep the supported-stationary information boundary
 
 The inputs remain the measured IMU window, declared noise/bias/heading priors
 and an external supported-stationary assertion. True attitude, true bias, flight
-scores and commanded attitude never enter the candidate. The harness alone
+scores and commanded attitude never enter the model. The test harness alone
 uses truth to evaluate errors.
 
-The original 201 samples span 0.5 s at 400 Hz. Motors remain off and support
+The 201 samples span 0.5 s at 400 Hz. Motors remain off and support
 continues through the fresh release sample at 0.5025 s. All sample timing,
 support, motion and data rejection rules remain required. Gravity supplies no
 heading observation, and this single orientation supplies no independent
@@ -69,7 +72,8 @@ unchanged; arbitrary flight is not treated as a stationary interval.
 
 ## Exact Gaussian conditioning before the nonlinear map
 
-Retain the window covariance sums from ADR 0027. The joint Gaussian model of
+The model uses the window covariance sums from the stationary alignment design.
+The joint Gaussian model of
 mean accelerometer error eta and terminal accelerometer-bias error b has
 
 \[
@@ -92,7 +96,11 @@ is still K V_a K^T+D=P_aT. Independent explicit random-walk increments reproduce
 the same decomposition. The independent terminal gyro-bias covariance remains
 Sigma_g/N+W_g A_N exactly as before.
 
-## One positive-weight nonlinear moment calculation
+## Nonlinear mean and covariance calculation
+
+Quadrature approximates an average over uncertain inputs using a fixed set of
+weighted sample points. Here it propagates each point through the nonlinear
+rotation calculation, then computes the resulting joint mean and covariance.
 
 Use four independent standard-normal latent coordinates z. Set
 
@@ -103,7 +111,7 @@ Use four independent standard-normal latent coordinates z. Set
 \]
 
 The inverse gravity-direction map R is the same ZYX inclination construction
-as the original design, now evaluated at every latent point. Five-point
+as the first-order model, evaluated at every latent point. Five-point
 Gauss-Hermite quadrature in each dimension gives **625 fixed nodes**. For
 physicists' Hermite nodes x_j and weights w_j, the standard-normal rule uses
 sqrt(2)x_j and w_j/sqrt(pi). Tensor-product weights are positive and sum to one.
@@ -131,7 +139,8 @@ Let e_i=Log(R_bar^T R_i)-mu. The joint covariance is
 
 This representation retains attitude/bias cross terms and adds only the
 mathematically required independent residual. Positive weights and positive
-conditional covariance make it PSD by construction; the frozen nonzero-noise
+conditional covariance make it positive semidefinite by construction, so no
+direction has negative variance. The specified nonzero-noise
 profile also passes strict Cholesky checks. No regularization or inflation is
 used. With a linearized rotation map, the same node calculation reproduces
 every block of the previous first-order covariance.
@@ -158,9 +167,9 @@ the 0.001 numerical tolerance. Maximum mean difference is 7.09e-18 rad against
 1e-8. The integration error at those points is negligible relative to the
 empirical calibration margin; this is not a uniform error bound over all poses.
 
-The new populations use independently frozen version-two PCG64 streams, with
-the same distributions as ADR 0027. Each contains 5,000 trials, and all trials
-are retained, including any rejections. The original 5,000 Gaussian trials
+The independent validation populations use fixed version-two PCG64 random
+streams, with the same distributions as ADR 0027. Each contains 5,000 trials,
+and all trials are retained, including any rejections. The original 5,000 Gaussian trials
 are checked separately as a regression set.
 
 | Check | First-order model | Nonlinear model | Required limit |
@@ -175,31 +184,31 @@ Its reported local 99% radii span 0.533317–0.700221 degree, within the retaine
 0.75-degree budget. Gaussian marginal axis coverage is 99.26%; that descriptive
 coverage does not replace the nine-dimensional calibration gate.
 
-The independent covariance gate now passes with 8.22% maximum excess variance
+The independent covariance gate passes with 8.22% maximum excess variance
 against a 10% allowance. It is a finite simulation result, not proof of perfect
 calibration or hardware readiness. In particular, the same constant-acceleration
 counterexample still passes the IMU gates: external support remains essential.
 
-## Handoff and next component
+## Component handoff and flight evidence
 
-The nonlinear candidate returns `q_WB`, the full covariance at that mean, the
+The nonlinear model returns `q_WB`, the full covariance at that mean, the
 computed mean shift and convergence diagnostics. Accelerometer-bias mean and
 gyro-bias estimate remain as specified in the original contract. During the
 supported one-sample hold, add only the new bias-walk variances and preserve
 the nonlinear cross-covariance. The fresh independent IMU sample initializes
 endpoint sample memory; earlier samples are never replayed as fresh data.
 
-The [standalone component](prearm-component.md) now completes that implementation
-step with explicit support provenance, sample/clock ownership, fixed priors,
+The [standalone component](prearm-component.md) enforces explicit support
+provenance, sample/clock ownership, fixed priors,
 latched rejection and one-time fresh-sample release. It reproduces all 15,000
 archived covariances exactly and passes complete-session handoff checks.
 
-The later [supported-start flight comparison](../results/supported-start-flight.md) now
+The [supported-start flight comparison](../results/supported-start-flight.md)
 passes the known-seed hover limit and improves nominal/wind tracking using this
-component, with the full original scoring and controller. Mass mismatch and
-the old free-flight failures remain separately labelled. The completed
+component, with the same scoring and controller. Mass mismatch and
+free-flight failures remain separately labelled. The
 [independent validation](../results/independent-supported-start.md) retains one
-hover-limit failure. Later [combined-prior](../results/combined-supported-prior.md)
+hover-limit failure. The [combined-prior](../results/combined-supported-prior.md)
 and [geometric](../results/final-geometric.md) studies are separate comparisons;
 a hardware support procedure and broader qualification remain unestablished.
 
@@ -212,7 +221,7 @@ uv run pytest -q tests/unit/test_prearm_nonlinear_uncertainty.py
 
 The prior path must contain the exact authenticated ADR 0027 report and NPZ.
 Use a new output directory. The source fingerprint binds the experiment and
-core source; the report also records the frozen protocol and software versions.
+core source; the report also records the fixed protocol and software versions.
 
 Rotation log/exp and right-local conventions follow the project's existing
 ESKF and [Sola's quaternion treatment](https://arxiv.org/abs/1711.02508).

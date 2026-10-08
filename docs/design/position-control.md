@@ -4,6 +4,8 @@ To move sideways, a quadrotor must tilt its thrust vector. The outer loop turns
 position and velocity errors into a requested acceleration, then chooses the
 thrust and orientation that would produce it. The supervisor supplies the
 reference and decides when a virtual takeoff, tracking segment or landing ends.
+“True-state” means the controller receives the exact simulated position and
+orientation, so these tests isolate control behavior from sensor and estimator error.
 
 The implementation is split between [position control](../../src/quadrotor_math/position_control.py),
 [mission definitions](../../src/quadrotor_math/missions.py) and
@@ -14,9 +16,8 @@ The position/velocity outer loop closes the translational part of the existing
 [attitude/rate cascade](control.md). It consumes NED position and velocity, a
 position/velocity/acceleration reference and constant mission yaw. It outputs a
 feasible collective thrust and body-to-world orientation for the unchanged inner
-loop. [ADR 0012](../decisions/0012-position-control-and-missions.md) defines the scope
-and predeclared acceptance; the [verification record](../archive/records/position-control-and-missions.md)
-records actual results and limitations.
+loop. The [mission protocol](../decisions/0012-position-control-and-missions.md)
+defines the tested scenarios and acceptance criteria.
 
 This guide documents **true-state simulation feedback**. The separate
 [estimated-feedback integration](estimated-feedback.md) reuses the same control
@@ -77,7 +78,7 @@ e_W=d_W/(m*K_p) at a matched, unsaturated equilibrium, rather than zero position
 error. Constant mass/gravity mismatch likewise produces a vertical offset. Mild-wind
 testing characterizes this baseline limitation; it does not justify a universal
 disturbance-rejection claim. With no integral state, anti-windup/reset logic is not
-needed in this increment.
+needed for this controller.
 
 ## Acceleration, tilt and thrust feasibility
 
@@ -191,7 +192,7 @@ advance the supervisor; stop if terminal; compute the outer demand if due; check
 local attitude domain; compute the inner command if due; advance the plant. The existing
 `attitude_simulation._plant_step` supplies stage-resolved exact motor response, rotor
 wrench, air-relative quadratic drag, and projected RK4. That shared internal helper
-is reused without changing historical run generation or the preceding attitude harness.
+is shared with the attitude simulation harness.
 
 | `MissionResult` fields | Clock / interpretation |
 | --- | --- |
@@ -224,8 +225,8 @@ The CLI stores `report.json` and one compressed `trial-NNN.npz` per numerical su
 with failed identities and diagnostics retained in the ledger. The report binds each
 NPZ's exact bytes by SHA-256, states the protocol/source digests, software provenance,
 UTC generation time and worker count. It is published last into a new-only directory;
-an interrupted directory without the report is incomplete. This is a new experimental
-bundle, not a sensor-run artifact schema migration. It does not claim crash durability
+an interrupted directory without the report is incomplete. This experiment bundle
+is separate from the sensor-run artifact format. It does not claim crash durability
 or authentication against malicious replacement of both report and history.
 
 The loader rejects duplicate JSON keys, nonfinite metadata, wrong formats/filenames,
@@ -248,7 +249,7 @@ step interval. Refinement halves only plant dt and compares the full common trut
 
 ## Run the complete verification campaign
 
-Use the existing locked Python 3.12 / uv 0.12.3 environment; no dependencies were added.
+Use the locked Python 3.12 / uv 0.12.3 environment.
 Choose a new evidence directory outside Git:
 
 ~~~bash
@@ -264,6 +265,6 @@ uv run python -m experiments.plot_position_control --input "$MISSION_EVIDENCE/fi
 uv run python -m experiments.plot_position_control --input "$MISSION_EVIDENCE/validation" --output "$MISSION_EVIDENCE/validation-plots"
 ~~~
 
-Read the verification record before interpreting the numerical outcomes. This bounded
-true-state baseline does not establish arbitrary-gain stability, hardware performance,
+Read the [results overview](../results/README.md) alongside the numerical outputs.
+This bounded true-state baseline does not establish arbitrary-gain stability, hardware performance,
 sensor robustness, estimator/control timing correctness, or safe real-world landing.

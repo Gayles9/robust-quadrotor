@@ -1,11 +1,15 @@
 # Supported-start geometric comparison
 
-This experiment asks whether the existing supported initialization and corrected
-release can rescue the coherent-force geometric controller's hover performance.
-It combines existing implemented mechanisms; it does not search for new gains.
-[ADR 0041](../decisions/0041-supported-geometric-comparison.md) freezes the scope,
-acceptance tradeoffs and conditional validation before scientific execution.
-The [verification record](../archive/records/supported-geometric-comparison.md)
+This experiment tests whether better initialization improves hover with the
+geometric controller. The vehicle starts on a stationary fixture, estimates its
+inclination and sensor biases, and uses a corrected prediction at release. The
+controller smooths its requested force and computes consistent derivatives from
+that smoothed force; this is the coherent-force configuration.
+
+The study combines these implemented mechanisms without searching for new gains.
+The [study protocol](../decisions/supported-geometric-comparison.md) defines
+the scope, predeclared acceptance criteria and conditional validation.
+The [verification record (ZIP)](../../evidence/development-records.zip)
 retains the audited baseline, source identity, commands and measured outcomes.
 
 ## Measured result
@@ -23,7 +27,7 @@ clean cases. Both full hover peaks now pass 8 cm:
 Every candidate clean flight passes its absolute physical/accuracy limits and
 effort comparison. The nominal spline improves RMSE by 19.03% against combined
 cascade, with effort ratio 0.8412. Wind RMSE is 3.73% worse than cascade, with
-effort ratio 0.9187. That wind comparison fails the frozen trajectory gate.
+effort ratio 0.9187. That wind comparison fails the predeclared trajectory criterion.
 Overall development acceptance therefore fails and fresh validation stays closed.
 All eight fault-response comparisons pass, and all 28 planned flights are saved
 and fully audited. Zero of the 40 conditional fresh-validation flights run.
@@ -64,7 +68,7 @@ not reinterpret the earlier strict no-regression study. Eight existing fault
 patterns retain their original response and recovery criteria.
 
 The development ledger contains 28 flights. Only a complete passing result
-permits the 40 frozen fresh-validation flights. A failed development gate stops
+permits the 40 predeclared fresh-validation flights. A failed development gate stops
 the study before reserved seeds are opened. Neither stage automatically promotes
 a default or establishes general flight or hardware qualification.
 
@@ -90,7 +94,7 @@ without new scientific flights. Exit code 1 denotes failed performance; preserve
 the complete report and individual outcomes rather than rerunning a seed.
 
 The [final axis-dependent geometric study](final-geometric.md) is complete under
-a separate frozen protocol and is covered by the [official report](../report.md).
-This earlier study's failed gate and unopened conditional stage retain their
-original status. Controller improvement pauses; middleware, an additional sensor
-and combined integral compensation remain outside this study.
+a separate predeclared protocol and is covered by the [official report](../report.md).
+This study's failed comparison and unexecuted conditional stage retain their
+original status. Middleware, an additional sensor and combined integral
+compensation are not evaluated here.

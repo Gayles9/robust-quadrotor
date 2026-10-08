@@ -1,25 +1,19 @@
 # 0012: True-State Cascaded Position Control and Baseline Missions
 
-- Date: 2026-09-24
-- Audited baseline: 4dded6210a6e07953f309e6426ec7d615060c4fd
-- Status: Accepted; design frozen before implementation, verified in the linked record
-
 See the [interface guide](../design/position-control.md) and
-[verification record](../archive/records/position-control-and-missions.md).
+[verification record (ZIP)](../../evidence/development-records.zip).
 
-## Scope and audit decision
+## Scope
 
-Complete the canonical plan's Week 8 true-state baseline: position/velocity
-feedback, feasible acceleration-to-attitude/thrust mapping, reference primitives,
-mission transitions and guards, and reproducible mission evidence. The preceding
-attitude/rate law, allocator and stage-resolved plant are retained: the source
-audit has found no mathematical defect requiring a different inner loop.
-Reuse the internal plant step rather than duplicate its motor/drag/RK4 equations.
-Existing ESKF, sensors, historical run artifacts, dependencies and CI are unchanged.
+Position control turns a desired path into attitude and thrust requests for
+the inner cascade. The mission layer supplies takeoff, tracking and virtual
+landing references, checks limits, and decides when the run completes or stops.
+It shares the attitude controller's motor, drag and RK4 plant step, so both
+simulations use the same physical equations.
 
-Estimated-state feedback is a subsequent integration milestone with its own
-causal timing and safety contract. No geometric tracking, minimum-snap planner,
-ground-contact dynamics, arming/disarming, hardware or ROS/PX4 adapter is added.
+The evidence here uses true-state feedback: the controller receives the
+simulator's exact state. [Estimated feedback](0013-estimated-state-mission-feedback.md)
+is evaluated separately with explicit sensor timing and uncertainty.
 Landing means converging to the virtual launch plane in the airborne model,
 not making physical ground contact. Abort stops simulation at the detected
 epoch; it is not a hardware emergency-control policy.
@@ -118,7 +112,7 @@ the evidence format was specialized to finite JSON metadata binding per-trial
 compressed NPZ histories by exact-byte SHA-256. This avoids oversized raw exports
 without dropping samples. New-directory publication refuses overwrite.
 
-## Verification plan
+## Verification
 
 1. Independent force reconstruction, NED signs, all headings/near-pi yaw, SO(3)
    orthogonality/determinant, clipping bounds, feasibility endpoints, local PD
@@ -132,5 +126,5 @@ without dropping samples. New-directory publication refuses overwrite.
 4. Fresh full regression/static gates, complete old fixed attitude campaign,
    development before held-out runs, worker-count determinism, failure retention,
    corrupted ledger/metrics/clocks rejection, plot rendering and visual inspection.
-5. Re-audit actual physics from recorded histories independently; verify published
-   tree and clean smoke, GitHub PR CI, merge exact head, and merged-main CI.
+5. Reconstruct the actual forces, moments and commands independently from
+   recorded histories to check the physical and feedback paths.

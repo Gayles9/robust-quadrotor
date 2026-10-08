@@ -1,26 +1,25 @@
 # 0007: Pre-Update ESKF Innovation Diagnostics and Outlier Gating
 
-- Date: 2026-09-23
-- Status: Accepted and implemented
 - Extends: [ADR 0005](0005-eskf-measurement-updates.md) and
   [ADR 0006](0006-eskf-sensor-replay.md)
 - Implementation: `eskf_innovation.py`, `eskf_replay.py`, `eskf_run_replay.py`
 - Evidence: `test_eskf_innovation.py`, `test_eskf_gating.py`, `test_eskf_run_replay.py`,
-  [verification record](../archive/records/eskf-innovation-gating.md)
+  [verification record (ZIP)](../../evidence/development-records.zip)
 
 ## Context and scope
 
 A fresh observation can be numerically valid but incompatible with the current estimate
 and its assumed uncertainty. The existing correction applies every fresh enabled value.
-This increment adds a separate pre-correction diagnostic and an optional fixed upper gate
+The replay layer provides a separate pre-correction diagnostic and an optional fixed upper gate
 for local position and barometric altitude. A rejected observation must not inject an
 error, contract the covariance, or contaminate the prior used for the next observation.
 
-The milestone implements normalized innovation squared (NIS), explicit per-sensor thresholds
-and exhaustive in-memory rejection records. It preserves ADR 0006 initialization, IMU hold,
-observation order and stale policy. It does not add a sensor-fault generator, delay
-compensation, estimator-result persistence, NEES analysis or a consistency campaign.
-The mathematical correction primitives remain unchanged and ungated.
+Normalized innovation squared (NIS) measures how surprising an observation is
+relative to the predicted measurement uncertainty. Each sensor has an explicit
+threshold, and every rejected observation remains in the diagnostic record.
+Initialization, IMU hold, observation order and stale policy follow ADR 0006.
+The mathematical correction primitives remain ungated; replay decides whether
+to call them.
 
 ## Observation mathematics
 
@@ -96,7 +95,7 @@ For a correctly specified zero-mean Gaussian innovation with covariance $S$, whi
 yields independent standard-normal components. NIS then follows a chi-square distribution
 with $m$ degrees of freedom. An upper-tail test compares NIS with a fixed critical value.
 NIST's [distribution definition][nist-distribution] and [critical-value table][nist-table]
-provide the reference for the explicit preset below (accessed 2026-09-23).
+provide the reference for the explicit preset below.
 
 `EskfInnovationPolicy` has two optional, strictly positive finite dimensionless fields:
 
@@ -201,16 +200,13 @@ test-only; the production sensor generator is unchanged. An independent six-case
 comparison checks default replay output bytes. Exact counts and commands are recorded in
 the linked verification record rather than inferred from the statistical reference.
 
-The subsequent [ADR 0008](0008-eskf-consistency-evaluation.md) adds aligned NEES and a
-frozen 100-seed-per-case nominal NIS/NEES campaign; it preserves this gate contract.
-The subsequent [ADR 0009](0009-eskf-completion-validation.md) supplies excited-motion bias
-evidence, held-out fault precision/recall and Q/R sensitivity. It records a full-state NEES
-undercoverage finding rather than asserting an unqualified consistency pass. Universal
-bias observability, delayed fusion, persistence and closed-loop validation are not claimed;
-Gate G2 baseline control remains open. Revisit this decision when adding another
-observation dimension, correlated sensor noise, persistence or a different time policy;
-do not silently reuse these degrees
-of freedom or relax the existing epoch contract.
+[ADR 0008](0008-eskf-consistency-evaluation.md) describes aligned NEES and a
+100-seed-per-case nominal NIS/NEES campaign using this gate contract.
+[ADR 0009](0009-eskf-completion-validation.md) supplies excited-motion bias
+evidence, fault precision/recall and Q/R sensitivity. Its first-order campaign
+shows full-state NEES undercoverage; gating alone is not evidence of statistical
+calibration. New observation dimensions or correlated sensor noise require
+matching measurement covariances and reference distributions.
 
 [nist-distribution]: https://www.itl.nist.gov/div898/handbook/eda/section3/eda3666.htm
 [nist-table]: https://www.itl.nist.gov/div898/handbook/eda/section3/eda3674.htm

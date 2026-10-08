@@ -1,23 +1,29 @@
 # Stationary pre-arm alignment design
 
-This is a defined operating contract and an offline feasibility study, not an
-arming feature. A supported 0.5 s interval provides useful inclination and
-gyro-bias information with the existing IMU. The first-order joint covariance
-missed the frozen calibration limit. The subsequent
-[nonlinear derivation](prearm-nonlinear-uncertainty.md) passes that gate and
-supports the implemented [standalone component](prearm-component.md). This page
-retains the original contract and first-order result. See the frozen
-[ADR 0027](../decisions/0027-stationary-prearm-alignment-design.md) and
-[measured record](../archive/records/prearm-alignment-design.md).
+Pre-arm alignment uses measurements taken before flight to estimate the
+vehicle's tilt and gyroscope bias. A physically supported, stationary 0.5 s
+interval supplies useful information from the inertial measurement unit (IMU).
+It does not reveal heading, establish physical support by itself, or authorize
+arming.
+
+This page explains the physical assumptions and the first-order uncertainty
+model. That model misses the joint calibration limit: some combinations of
+attitude and bias error vary more than its covariance predicts. The
+[nonlinear model](prearm-nonlinear-uncertainty.md) meets that limit and is used by
+the [standalone component](prearm-component.md). The
+[alignment specification](../decisions/stationary-prearm-alignment-design.md)
+and [feasibility evidence (ZIP archive)](../../evidence/development-records.zip) give the
+evaluation criteria and measured results.
 
 ## Required physical condition
 
 An external owner must assert that the vehicle is mechanically supported, motors
 are off, attitude is constant, and world acceleration and angular velocity are
-zero throughout acquisition **and through release**. This could be a declared
-stationary fixture/operator procedure in a later integration. The present
-ordinary free-flight API does not establish that condition. Experimental
-[supported-start flights](../results/supported-start-flight.md) use an explicit modeled fixture.
+zero throughout acquisition **and through release**. A physical fixture and
+an explicit operator procedure would need to establish that condition in a
+hardware integration. The ordinary free-flight API does not establish it.
+Experimental [supported-start flights](../results/supported-start-flight.md)
+use an explicit modeled fixture.
 An arming command, small gyro reading, low sample variance or flight phase label
 does not establish it. Defining this operating mode does not establish that a
 particular vehicle is stationary.
@@ -29,28 +35,29 @@ invalidates the result even if every numerical check passes.
 
 ## Component boundary
 
-These requirements informed the [implemented component](prearm-component.md).
-The table describes the operating contract; use that guide for the exact APIs.
+The table describes the operating contract. The
+[component guide](prearm-component.md) describes the corresponding APIs.
 
 | Input or output | Contract |
 | --- | --- |
 | Support assertion | Unique acquisition ID, responsible source, start/end clock times, mechanical support, motors-off and stationary attestations; explicit revocation and release handshake |
 | IMU window | 201 paired body-FRD accelerometer/gyro samples at 400 Hz, unique monotonically ordered sample IDs and common acquisition clock; t=0 through 0.5 s |
-| Prior | Heading mean and variance; accelerometer and gyro bias prior means/covariances; immutable sensor/noise profile and positive gravity magnitude; this study fixes their original values |
+| Prior | Heading mean and variance; accelerometer and gyro bias prior means/covariances; immutable sensor/noise profile and positive gravity magnitude; this study uses one fixed profile |
 | Admissible prior | Independent heading, accelerometer bias and gyro bias; no unrepresented correlation with position/velocity; unsupported prior structure is rejected, never silently zeroed |
 | Candidate | Unit quaternion `q_WB`, unchanged accelerometer-bias mean, estimated terminal gyro bias, full 9x9 right-local covariance ordered theta/ba/bg, source sample range, reference time and validity deadline |
 | Diagnostics | All gate statistics/thresholds, estimated inclination, world-axis uncertainty radius, reasons, model/profile identity and support provenance |
 | State | `collecting`, `rejected`, or `ready-for-release`; incomplete data cannot be ready, rejection is latched for that acquisition |
 | Release | Recheck support/motors and clocks, receive one fresh disjoint paired sample at t=0.5025 s, then permit downstream initialization; this stage never issues an arm command |
 
-The reference script accepts only the frozen zero-mean bias/heading case and a
+The reference script accepts only the fixed zero-mean bias/heading case and a
 harness support flag. It is not a substitute for the production provenance,
 state machine, sample-ID checks or release handshake. Those are implemented
 separately by `PrearmAlignmentSession` in `src/quadrotor_math/prearm_alignment.py`.
 
 ## Information and estimate
 
-With NED world, FRD body and body-to-world rotation R, supported stationarity gives
+The world frame is North–East–Down (NED), and the body frame is
+Forward–Right–Down (FRD). With body-to-world rotation R, supported stationarity gives
 
 \[
  f_k=-R^T g_W+b_{a,k}+n_{a,k},\qquad
@@ -79,9 +86,10 @@ Gyro bias can be estimated because angular velocity is externally known to be
 zero. The sample mean estimates the window-average bias; its difference from
 the **terminal** bias must remain in the uncertainty.
 
-The original profile has sample sigmas 0.04 m/s² and 0.002 rad/s, bias-walk
-sigmas 0.0002 m/s²/sqrt(s) and 0.00002 rad/s/sqrt(s), accelerometer-bias prior
-sigma 0.03 m/s², gyro-bias prior sigma 0.005 rad/s, and heading sigma 3 degrees.
+The fixed profile has sample standard deviations (sigmas) 0.04 m/s² and
+0.002 rad/s, bias-walk sigmas 0.0002 m/s²/sqrt(s) and 0.00002 rad/s/sqrt(s),
+accelerometer-bias prior sigma 0.03 m/s², gyro-bias prior sigma 0.005 rad/s,
+and heading sigma 3 degrees.
 These are the repository's model assumptions, not independently validated
 hardware specifications. Revalidating them, including environmental effects,
 is a prerequisite for hardware use.
@@ -102,7 +110,7 @@ increment j the mean weight (N-j)/N and terminal weight 1.
 The white accelerometer contribution must satisfy sigma_a/(g sqrt(N)) <=0.02
 degree. Terminal gyro-bias variance is sigma_g²/N+w_g² A_N, constrained to
 three sigma <=0.03 degree/s. Solving these inequalities gives 137 and 132
-samples respectively, hence minimum span 0.34 s. Rounding upward to the frozen
+samples respectively, hence minimum span 0.34 s. Rounding upward to the specified
 0.5 s block gives **201 samples**. This is an analytic allocation, not a
 flight-score duration search.
 
@@ -113,12 +121,16 @@ cannot average away that constant-bias uncertainty. Heading remains 3 degrees
 in its original Euler parameter, even though its body-local covariance entries
 change when tilted.
 
-## Joint covariance and its present limitation
+## Joint covariance and the first-order limitation
+
+Covariance describes both the size of each error and how errors vary together.
+The correlations matter here: the same accelerometer error can affect both
+the inferred tilt and its relationship to the accelerometer bias.
 
 Errors use R_true=R_hat Exp([delta-theta]x), true bias minus estimated bias.
 Let J be the right-local derivative of the inclination estimate with respect
 to s, u=R_hat^T e_D the retained-heading direction, and Sigma_a/g the
-per-sample white-noise covariance. With independent original priors,
+per-sample white-noise covariance. With the stated independent priors,
 
 \[
  V_a=P_{a,0}+W_a A_N+\Sigma_a/N,\qquad
@@ -244,19 +256,19 @@ The first flight prediction uses samples 201 and 202. Never replay samples
 endpoint. Report the 0.5025 s pre-arm overhead separately; it cannot remove
 initial flight time from later scoring.
 
-## Verification and next gate
+## Verification and implemented uncertainty model
 
-The frozen study retains all 5,000 nominal and 5,000 Gaussian outcomes, including
+The feasibility study retains all 5,000 nominal and 5,000 Gaussian outcomes, including
 rejected windows. It uses separate deterministic PCG64 streams and no reserved
 flight seeds. Independent tests cover frame signs, finite-difference Jacobians,
 latent-walk covariance, correlation whitening, uncertainty rejection,
 nonstationarity ambiguity and supported handoff.
 
-The subsequent [nonlinear derivation](prearm-nonlinear-uncertainty.md) completes
-the planned uncertainty step and passes the unchanged <=10% calibration gate.
-It retains the 0.5 s window, priors, sensor model and full correlations without
-an empirical inflation factor. The [standalone component](prearm-component.md)
-is also implemented with its interface and state-machine checks.
+The implemented [nonlinear uncertainty model](prearm-nonlinear-uncertainty.md)
+passes the same <=10% calibration gate. It uses the same 0.5 s window, priors,
+sensor model and full correlations without an empirical inflation factor.
+The [standalone component](prearm-component.md) provides the acquisition,
+rejection and release state machine.
 
 The [supported-start studies](../results/supported-start-flight.md) add a physically
 modeled fixture, paired noise, complete flight durations and unchanged limits.
@@ -276,4 +288,5 @@ Use a new output directory. The report contains source/protocol fingerprints,
 software provenance, both populations, all rejection counts and explicit go/no-go.
 The NPZ preserves errors, covariance matrices, whitened errors, gate statistics,
 axis errors, uncertainty radii and rejection flags for all trials. Raw samples
-are regenerated exactly from the frozen per-trial streams; this is no flight log.
+are regenerated exactly from the fixed per-trial random streams. These are
+stationary alignment trials, not flight logs.

@@ -49,11 +49,11 @@ explains the existing narrow protocol-fixture boundary. Production artifact
 hashes and archive checks remain strict. A new numerical realization must not
 be described as an exact replay of earlier bytes.
 
-Some Markdown is an authenticated experiment input: decision records 0026–0043
-and `docs/progress/2026-09-24-feedback-codesign.md` retain their original paths
-and bytes. Moving or editing these files would change a frozen protocol. The
-remaining historical records live in [the archive](archive/README.md), where
-dates, seed assignments, source identities and scientific outcomes remain intact.
+Some studies authenticate their protocol text as well as their numerical data.
+These immutable inputs live in [experiment protocols](../experiments/protocols/README.md).
+Compatibility links preserve the paths used by the existing loaders, so reader
+documentation can be edited without changing a saved experiment's identity.
+The [evidence index](../evidence/README.md) describes retained supporting records.
 
 New behavioral work should define its scope and acceptance criteria before
 implementation, add relevant tests, and retain failures as evidence. Keep core
@@ -63,11 +63,6 @@ qualification work is listed in [next steps](next-steps.md).
 
 ## Development tooling
 
-I use AI assistance for bounded, repetitive development tasks, including this
-repository's documentation organization and reference review. An example prompt
-is: “Check these moved paths against their callers and documentation links, run
-the existing relevant checks, and report failures without changing equations
-or acceptance criteria.” Explicit inputs and acceptance criteria make that work
-useful because the proposed changes can be checked against concrete evidence.
-This describes the assistance workflow; the equations, tests and retained
-simulation evidence support the project's technical conclusions.
+AI tools assist with repetitive documentation and verification tasks. Concrete
+inputs and acceptance criteria make that assistance checkable. Technical claims
+depend on the implementation, tests and retained simulation evidence.

@@ -1,10 +1,13 @@
 # Why the combined supported prior changes the flight errors
 
-The [combined startup experiment](combined-supported-prior.md) passes the three
-tested 8 cm hover limits but fails its no-regression comparison. This diagnostic
-uses all 27 saved clean histories: three seeds, three missions and three versions.
-It changes no flight behavior. [ADR 0038](../decisions/0038-combined-prior-tradeoff-diagnosis.md)
-freezes the input identities, equations, checks and stopping decision.
+A more accurate starting estimate does not guarantee better tracking throughout
+a flight. The [combined startup experiment](combined-supported-prior.md) passes
+the three tested 8 cm hover limits, but some errors increase relative to its
+controls. This analysis explains that tradeoff using all 27 saved clean histories:
+three seeds, three missions and three configurations. It reconstructs the saved
+flights without changing their behavior. The
+[analysis protocol](../decisions/combined-prior-tradeoff-diagnosis.md)
+specifies the input identities, equations and checks.
 
 ## Observation corrections
 
@@ -21,8 +24,9 @@ K = C H^T S^-1
 correction = K sensor_noise + K prediction_error
 ```
 
-The code uses a linear solve. The original observation gate still decides whether
-to fuse; a rejected observation has zero effective gain for the attribution.
+The code uses a linear solve. The original observation gate, which rejects measurements
+whose residual is too large relative to predicted uncertainty, still decides
+whether to fuse; a rejected observation has zero effective gain for the attribution.
 Position and altitude observations retain their original order. Complete replay
 must match the saved nominal states, covariances, events and command decisions.
 
@@ -78,15 +82,15 @@ Navigation feedback and attitude estimation both improve the seed47001 error
 budget. Seed47002 has smaller navigation contributions but larger attitude
 contributions, producing a small net regression in hover and nominal tracking.
 Both contributions grow for seed47003. The unfitted hover model agrees with all
-nine saved paths to 0.146..0.769 mm horizontal RMS, below the frozen 2 mm bound.
-The [verification record](../archive/records/combined-prior-diagnosis.md) gives
+nine saved paths to 0.146..0.769 mm horizontal RMS, below the predeclared 2 mm bound.
+The [verification record (ZIP)](../../evidence/development-records.zip) gives
 the signed budgets, numerical checks and limits of that explanation.
 
 No correctable implementation defect or justified further startup variant was
-demonstrated. The startup study is closed with the ADR 0037 failure preserved.
-Its implementation remains available experimentally; normal defaults are
-unchanged. A separate whole-flight estimation/control error-budget design is the
-[next bounded task](../next-steps.md), before proposing any further flight candidate.
+demonstrated. The combined prior remains experimental because it fails the
+[paired comparison](combined-supported-prior.md); normal defaults are unchanged.
+The [whole-flight error budget](whole-flight-error-budget.md) extends this
+analysis by relating estimation errors to the controller's tracking limits.
 
 ## Reproduce
 

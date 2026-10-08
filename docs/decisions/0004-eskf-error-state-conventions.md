@@ -1,8 +1,6 @@
 # 0004: ESKF Error-State Conventions
 
-Date: 2026-09-22
-
-Status: Accepted; measurement correction is specified by
+Measurement correction is specified by
 [ADR 0005](0005-eskf-measurement-updates.md).
 
 The first-order equations below remain the default. The explicit sampled-IMU endpoint
@@ -11,8 +9,9 @@ alternative and its matched discrete covariance are specified in
 
 ## Context
 
-The first state-estimation increment needs a single, testable convention for nominal
-IMU propagation and covariance prediction. The repository uses a north-east-down
+The error-state Kalman filter (ESKF) tracks a best estimate, called the nominal
+state, alongside uncertainty in its small local error. Prediction advances both
+using inertial measurement unit (IMU) samples. The repository uses a north-east-down
 (NED) world frame `W`, a forward-right-down (FRD) body and sensor frame `B`, and
 Hamilton scalar-first quaternions. The quaternion `q_WB` maps body-coordinate vectors
 into world coordinates and obeys
@@ -22,7 +21,7 @@ q_dot_WB = 0.5 q_WB ⊗ [0, omega_B].
 ```
 
 Mixing left- and right-local attitude errors would change Jacobian frames and signs.
-This decision fixes those choices before measurement updates are introduced.
+The same convention therefore applies to prediction and measurement correction.
 
 ## Decision
 
@@ -43,9 +42,8 @@ x_nominal = (
 The quaternion sign is not canonicalized. State arrays are finite, independently
 owned, C-contiguous `float64` values and are exposed read-only. Quaternion norm evaluation
 converts finite arithmetic overflow or invalid arithmetic into the existing unit-norm
-validation error without leaking a runtime warning. The September 23 compatibility
-amendment uses the downstream rotation utility's squared-norm check with
-`rtol=1e-12, atol=1e-12`; constructor acceptance and prediction now agree.
+validation error without leaking a runtime warning. The constructor and prediction
+use the rotation utility's squared-norm check with `rtol=1e-12, atol=1e-12`.
 
 ### Error state and injection
 
@@ -191,24 +189,18 @@ the absence of materially negative covariance eigenvalues.
 
 ## Consequences and limitations
 
-This increment provides a deterministic mathematical prediction core, not a complete
-estimator. First-order discretization is intended as a high-rate baseline; its error is
-not equivalent to an exact matrix exponential. The propagation also assumes constant
-IMU measurements and biases over each interval and uses a constant scalar gravity
-magnitude.
+The first-order predictor is a high-rate baseline; its discrete transition is
+not an exact matrix exponential. It assumes constant IMU measurements and biases
+over each interval and a constant scalar gravity magnitude.
 
-The prediction increment itself did not include measurement updates, a Kalman gain or
-innovation, or a covariance-reset Jacobian. Those are now implemented under ADR 0005.
-The bounded replay runner and in-memory execution configuration are now implemented in
-[ADR 0006](0006-eskf-sensor-replay.md), including explicit stale-observation rejection.
-NIS/NEES evaluation was subsequently added under ADR 0008, and the completion campaign,
-fault fixtures and consistency qualification are recorded in
-[ADR 0009](0009-eskf-completion-validation.md). The following remain outside the
-implemented estimator system:
+Measurement correction and covariance reset are described in
+[ADR 0005](0005-eskf-measurement-updates.md); bounded measurement replay in
+[ADR 0006](0006-eskf-sensor-replay.md); consistency evaluation in
+[ADR 0008](0008-eskf-consistency-evaluation.md); and estimator validation in
+[ADR 0009](0009-eskf-completion-validation.md).
+[Online feedback](0013-estimated-state-mission-feedback.md) composes these
+estimator equations with the mission controller.
 
-- delayed-measurement fusion/rewind and asynchronous IMU handling;
-- a live estimator service or continuation API;
-- an estimator persistence/manifest schema;
-- exact matrix-exponential or Van Loan discretization;
-- Earth rotation, Coriolis effects, gravity estimation, or a geodetic model;
-- controller, ROS 2, PX4, or C++ integration.
+The model does not include delayed-measurement rewind, asynchronous IMU handling,
+exact matrix-exponential or Van Loan discretization, Earth rotation, Coriolis
+effects, gravity estimation, or a geodetic model.

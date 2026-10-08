@@ -10,9 +10,8 @@ twelve-case geometric comparison and preserves the distinction between
 implemented capability, bounded evidence and open flight requirements.
 
 The authoritative deliverable is `Robust_Quadrotor.pdf`: 31 PDF pages, including
-the 20-page body and supplements. Its identity was checked against the final
-comparison results and the corrected estimator-coverage interpretation, rather
-than selected from a filename or timestamp alone.
+the 20-page body and supplements. It covers the final controller comparison and
+the estimator's uncertainty evaluation.
 
 | Artifact | Identity |
 | --- | --- |
@@ -20,9 +19,7 @@ than selected from a filename or timestamp alone.
 | PDF SHA-256 | `a8a545c8907f640da63c867ebc4eec92c742df60758497e6d74a538f9c29bd0f` |
 | Editable source package | `Robust_Quadrotor_Source.zip`, 2,613,613 bytes |
 
-The planned PDF location is `reports/Robust_Quadrotor.pdf`. Before adding the
-report artifacts, verify the PDF identity and the matching source package's
-figures, references and build. Preserve the report's scientific content.
+The planned PDF location is `reports/Robust_Quadrotor.pdf`.
 
 The current repository explanations are available in [system design](guides/system-design.md),
 the [final comparison](results/final-geometric.md) and the
@@ -30,7 +27,6 @@ the [final comparison](results/final-geometric.md) and the
 histories remain separate evidence archives; their identities and interpretation
 are described in the [results guide](results/README.md).
 
-Earlier report references and build notes are retained in the
-[secondary archive](archive/report-history.md). They describe earlier report
-packages and must not be used as build instructions for the matching source
-until that package has been inspected.
+Supporting report records are retained with the
+[reproducibility evidence](../evidence/README.md). Build instructions for the
+matching editable source will accompany that package when it is added.

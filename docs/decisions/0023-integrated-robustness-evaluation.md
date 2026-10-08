@@ -1,19 +1,17 @@
 # ADR 0023: bounded integrated robustness evaluation
 
-Status: frozen before implementation and campaign execution, 2026-09-28.
+## Purpose and scope
 
-## Audit and scope
+This paired campaign asks whether observation supervision responds as specified
+when measurements disappear, are rejected or arrive too late. Each case runs
+with supervision disabled and enabled, sharing the same random inputs. Separate
+criteria measure the response to faults and the quality of the flight.
 
-I audited merged `90fae0b1cc082f4061c89394adb0d15765a484a5`, tree
-`677f23b2166fb02e21d49231d8b9e3d27bfdc149`, including the supervisor,
-health/event contracts, mission guard ordering, fault injector and persistence
-validation. Its post-merge CI passed. Fresh health/supervision/fault checks
-passed 136 tests in 63.93 s. No preceding in-scope defect required repair.
-
-This step supplies causal live observation faults and a fixed paired campaign.
-Controllers, estimator equations, health policy and supervisor law remain
-unchanged. This is an engineering evaluation using previously inspected seeds,
-not a new controller qualification or a hardware fallback demonstration.
+Live observation faults connect the existing injector to the online ESKF.
+Controller and estimator equations, the health policy and the supervisor law
+remain unchanged. The campaign uses previously inspected seeds, so it is a
+bounded engineering evaluation rather than new controller qualification or a
+hardware fallback demonstration.
 
 ## Live delivery boundary
 
@@ -34,7 +32,7 @@ and history archive schemas remain unchanged; separate authenticated evidence
 holds the original source ledger, fault configuration and diagnostic traces.
 Empty fault plans must preserve every existing saved payload byte.
 
-## Frozen campaign
+## Campaign definition
 
 Use the unchanged cascade parameters and prior from
 `experiments.estimated_feedback_validation.make_configuration`. State the exact
@@ -72,8 +70,8 @@ limits. They are fixed before observing campaign results.
 
 Every case runs with supervision off and on, with the same fault plan and
 random streams. Twelve cases mean 24 planned executions. Two independent
-process workers may be used with single-threaded BLAS. No omitted case, extra
-gain search, timeout adjustment or reclassification of a failure is permitted.
+process workers may be used with single-threaded BLAS. The case set, gains,
+timeouts and failure definitions are fixed for this comparison.
 A separate short stationary smoke partition exercises persistence in CI; it
 does not substitute for this maneuver campaign.
 
@@ -121,7 +119,6 @@ improvement. Campaign acceptance requires all declared response and applicable
 flight criteria, with no numerical failures. Completing a valid evaluation can
 therefore succeed while the evaluated robustness policy fails its campaign.
 
-Run the full warning-strict software gate and hosted CI before publication.
-If the campaign fails, retain the evidence and define the next narrow repair
-from that evidence. Tuning, new sensors/alignment, geometric qualification,
-middleware and hardware remain separate scopes. Reserved seeds stay unopened.
+The [robustness results](../results/integrated-robustness.md) report the
+response and flight outcomes. Controller tuning, additional sensing, middleware
+and hardware behavior require separate evidence.

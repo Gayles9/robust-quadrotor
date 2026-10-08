@@ -4,30 +4,27 @@ This is the part of the project that closes the loop through measurements.
 It matters because a controller that tracks the simulated truth well may react
 poorly to estimation errors, measurement corrections and sampling delay. See
 [controller tradeoffs](../results/controller-tradeoffs.md) for that behavior and
-[status](../results/README.md) for the current evidence.
+[results overview](../results/README.md) for the measured scope.
 
 The execution code is [estimated_mission.py](../../src/quadrotor_math/estimated_mission.py),
-using [EskfOnlineEstimator](../../src/quadrotor_math/eskf_online.py). The cascade
-reference choice is recorded in the [baseline closeout](../archive/records/repository-audit.md).
-The [geometric guide](geometric-control.md) describes the later optional path.
+using [EskfOnlineEstimator](../../src/quadrotor_math/eskf_online.py). The
+[geometric guide](geometric-control.md) describes the optional alternative to
+the cascade controller.
 
 This layer connects the existing sensor models and endpoint error-state Kalman
 filter (ESKF) to the position/attitude cascade or the selected geometric
 controller. It supplies the chosen controller's inputs without retuning its
-gains. [ADR 0013](../decisions/0013-estimated-state-mission-feedback.md) states the
-original cascade integration scope and frozen acceptance criteria. The
-[verification record](../archive/records/estimated-state-feedback.md) records the
-actual audit and campaign results.
+gains. The [integration protocol](../decisions/0013-estimated-state-mission-feedback.md)
+states the cascade configuration and acceptance criteria.
 
-The original profile described here remains reproducible. A separately named
-[joint bandwidth and prior design](feedback-design.md) investigated its noisy-hover
-failures with explicit horizontal/roll/pitch gains and population-matched
-initial covariance. It uses the same execution boundaries and retains the original
-thresholds, seeds, clocks and sensor noise. Its results must not be attributed to
-the original gains.
+The [joint bandwidth and prior design](feedback-design.md) provides a separate
+profile with different horizontal/roll/pitch gains and an initial covariance
+matched to its declared error population. Both profiles use these execution
+interfaces. Each has its own recorded evaluation; results for one gain set
+should not be attributed to the other.
 
 The ordinary mission API requires an explicit initial prior. The implemented
-[supported alignment component](prearm-component.md) and later release models
+[supported alignment component](prearm-component.md) and release models
 are used by separately scoped experiments, not silently applied at startup.
 There is no delayed-state rewind, general IMU-dropout recovery or hardware adapter.
 
@@ -50,11 +47,10 @@ body-to-world attitude and bias/noise-corrected measured body rate. They retain
 separate nominal model parameters. No true position/velocity/attitude/bias is
 silently substituted for an estimate.
 
-`simulate_mission` remains the original true-state API. A narrow private
-`mission_simulation._simulate_mission` loop now serves both modes; its observer-free
-path is unchanged numerically. `simulate_estimated_mission` supplies a sensor and
-estimator observer, without duplicating motor, drag, RK4 or controller equations.
-The existing historical sensor-run artifacts and offline replay default are unchanged.
+`simulate_mission` uses exact simulated state. The shared private
+`mission_simulation._simulate_mission` loop serves both feedback modes.
+`simulate_estimated_mission` attaches the sensor and estimator observer to that
+loop, sharing its motor, drag, RK4 and controller equations.
 
 ## Frames, sample model and independent assumptions
 
@@ -118,8 +114,8 @@ endpoint as independent. They remain private continuation state, including after
 both same-epoch observations. See the [endpoint derivation](../decisions/0010-eskf-endpoint-propagation.md).
 
 Online and offline correction call the same `_correct_eskf_epoch` implementation.
-This extracts the established ordering, stale/disabled rules, innovation scoring,
-gating, Joseph update and reset, without changing their equations. NIS strictly
+This keeps their ordering, stale/disabled rules, innovation scoring, gating,
+Joseph covariance update and coordinate reset consistent. NIS strictly
 above the configured threshold is REJECTED. Singular or nonfinite arithmetic is
 an error, not a gate rejection.
 
@@ -134,8 +130,8 @@ mode. This is neither true angular rate nor an additional low-pass filter. It ca
 retain measurement noise. Position, velocity, attitude and rate feedback all use
 the same current posterior.
 
-The stream is transactional. It commits its epoch, held IMU, physical/joint state
-and consumed identities only after the entire call succeeds. A failure in the
+Each estimator call either succeeds completely or leaves its state unchanged.
+It saves its epoch, held IMU, physical/joint state and consumed identities only after the entire call succeeds. A failure in the
 second correction cannot leave the first correction applied. Retrying a valid
 call after failure gives the same result as a fresh stream. Returned snapshots
 own independent memory and cannot mutate continuation. This is a synchronous,
@@ -218,13 +214,14 @@ Loading verifies filenames, chunk counts/shapes, digests on the exact decoded by
 duplicate-key rejection, canonical schemas/dtypes and all public contracts. It then
 replays the measurement-only ESKF, checks exact online/offline states/covariances/events,
 reconstructs controller commands and estimated mission phases, and recomputes metrics.
-The paired true-state run is independently validated under the previous protocol.
+The paired true-state run is independently validated under the
+[position-control protocol](position-control.md#reproducibility-and-evidence).
 Nothing is plot-decimated before scoring; each run's RMSE includes its complete
 mission and actual duration. Common-horizon differences use the full shared grid.
 
 ## Reproduce and interpret
 
-No dependencies or tool versions changed. Use the existing locked environment:
+Use the locked environment:
 
 ```bash
 uv sync --locked
@@ -253,12 +250,13 @@ and positive assumed slow-observation R to keep innovations solvable. Its zero-g
 updates leave deterministic endpoint propagation unchanged. It measures numerical
 integration discrepancy, not stochastic calibration.
 
-The first fixed campaign has **4/5 passing cases**. Noisy hover seed 30 exceeds
+The baseline fixed campaign has **4/5 passing cases**. Noisy hover seed 30 exceeds
 the unchanged .08 m hold-peak target (.107563 m), despite completion and no limiting.
 The fixed CLI therefore exits 1 and preserves the full failed trial. Plot `FAIL`
 markers denote overall trial acceptance, not necessarily the metric in that panel;
 `completed=True` in a history title does not mean every acceptance condition passed.
-See the verification record for the unaltered scoring window and all outcomes.
+The [integration protocol](../decisions/0013-estimated-state-mission-feedback.md)
+defines the scoring windows; the generated report retains every trial outcome.
 
 Passing this finite distribution does not establish global stability, arbitrary
 prior recovery, unseen mismatch/fault robustness, universal filter consistency,

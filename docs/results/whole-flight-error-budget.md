@@ -1,10 +1,14 @@
 # Whole-flight estimation/control error budget
 
-The [frozen review](../decisions/0039-whole-flight-error-budget.md) adds a quantitative
-measurement requirement to the closed startup study. It preserves all 27 saved
-clean flights and their failed comparisons. It does not run another flight or
-change a production algorithm. The [dated record](../archive/records/whole-flight-error-budget.md)
-contains numerical results and verification identities.
+An error budget describes how much each source of error can contribute to the
+vehicle's tracking error. This study separates two questions: what produced the
+errors in 27 saved clean flights, and what bounds would be sufficient for a
+local hover model to stay within 8 cm. It uses those saved flights without
+changing their outcomes or the flight algorithms.
+
+The [analysis protocol](../decisions/whole-flight-error-budget.md) specifies
+the method. The [verification record (ZIP)](../../evidence/development-records.zip)
+contains numerical results and evidence identities.
 
 ## Two different budgets
 
@@ -152,32 +156,26 @@ on its inputs does not predict how a proposed estimator changes those decisions.
 Any future design must preserve the original NIS thresholds and explicitly
 evaluate changed gate sequences; no smooth transfer function bridges rejection.
 
-**No-go for implementation with the present sensor assumptions. Go for a bounded
-independent-inclination measurement contract and feasibility study.** The specific
-hypothesis is that a genuinely independent observation of the body-down direction
-in the world frame can constrain the two ambiguous directions throughout flight.
-Its expected benefit is structural information and reduced low-frequency
-inclination/navigation error, not a demonstrated numerical flight improvement.
+**The present sensor assumptions do not justify another flight implementation.**
+An independent observation of the body-down direction could constrain the two
+ambiguous directions throughout flight. The potential benefit is additional
+information about inclination and navigation error; no flight improvement is
+demonstrated by this budget alone.
 
-The next contract must identify a physically justified source, such as an external
-orientation measurement, and specify its world/body calibration, acquisition
-time, latency, angular noise, bias, outages and correlations with existing
-position measurements. A body-down observation lives on the unit sphere; its
-two tangent coordinates leave a twist about the body-down axis unobserved.
-That is not generally a world-vertical yaw rotation when tilted; the subsequent
-[measurement contract](independent-inclination-feasibility.md) makes this
-distinction explicit and completes the feasibility decision.
+The [independent-inclination measurement contract](independent-inclination-feasibility.md)
+evaluates that possibility. A usable source needs a physical model, world/body
+calibration, acquisition time, latency, angular noise, bias, outage behavior and
+correlations with existing position measurements. A body-down observation lies
+on the unit sphere. Its two tangent coordinates leave a twist about body down
+unobserved, which generally differs from world-vertical yaw when tilted.
+
 An orientation derived from the same accelerometer under arbitrary acceleration
-does not satisfy the independent-source assumption. A co-produced external pose
-must retain position/orientation correlation rather than claiming independence.
-
-Before any component or flight proposal, that study must derive the tangent
-measurement/Jacobian, account for joint noise and timing, establish a feasible
-joint error allocation with residual allowance, and freeze rejection and
-acceptance criteria. If no physical source or defensible noise/bias bounds can
-be established, stop at that finding. No sensor hardware is asserted to exist.
-Fresh complete nonlinear flight qualification would still be required after a
-separately accepted implementation; startup tuning stays closed.
+does not provide the assumed independent information. A source that also measures
+position must retain position/orientation correlation. The feasibility study
+verifies the conditional geometry and noise equations, but finds no justified
+source or complete joint error allocation. No sensor component or hardware
+capability is claimed. A separately justified implementation would still need
+complete nonlinear flight validation.
 
 ## Reproduction
 

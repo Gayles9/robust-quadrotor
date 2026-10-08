@@ -1,17 +1,22 @@
 # Supported-hover navigation-feedback isolation
 
-The single frozen intervention reduces seed47001's hover peak from **10.1808 cm
+This diagnostic gives the outer position controller the simulator's exact
+position and velocity while leaving the estimator and inner attitude controller
+in place. This idealized feedback is called an **oracle**: it isolates a possible
+source of error but is unavailable in an ordinary flight.
+
+The intervention reduces seed47001's hover peak from **10.1808 cm
 to 1.9896 cm**, an 80.46% reduction. Whole-flight RMSE falls from 6.4891 cm to
 3.9256 cm, a 39.50% reduction. Both flights complete at 15.5 s. The oracle passes
-every original flight condition and the separately frozen headroom comparison.
+every original flight condition and the separately predeclared headroom comparison.
 
 This demonstrates substantial room for improvement in the outer navigation
 feedback channel. It uses simulated true position and velocity, so it is a
 diagnostic result. The current deployable-input configuration still has the
 original 10.18 cm failure; alignment remains experimental and the cascade default
-does not change. The [dated record](../archive/records/navigation-feedback-isolation.md)
-retains verification and evidence, and [ADR 0033](../decisions/0033-navigation-feedback-isolation.md)
-was frozen before implementation/execution.
+does not change. The [verification record (ZIP)](../../evidence/development-records.zip)
+contains the evidence, and the [study protocol](../decisions/navigation-feedback-isolation.md)
+specifies the intervention and acceptance criteria.
 
 ## What the experiment changes
 
@@ -75,7 +80,7 @@ No terminal-epoch command is permitted.
 Every nonlinear plant and motor reconstruction residual is zero. Independent
 named-stream reconstruction differs by at most 6.971e-15; common-prefix
 accelerometer/gyro/slow-sensor draw differences are at most 7.106e-15, below the
-frozen 1e-12 tolerance. Bias walks and initialization agree exactly. Full replay
+predeclared 1e-12 tolerance. Bias walks and initialization agree exactly. Full replay
 after saving does not execute another scientific flight.
 
 This is one selected failed case, not a reliability population. Truth feedback
@@ -83,7 +88,7 @@ is unavailable to an ordinary controller, and the experiment supplies no new
 sensor, hardware guarantee or general qualification. Mass mismatch remains a
 separate open requirement; geometric qualification remains unchanged.
 
-## Subsequent candidate: supported zero-velocity prior
+## What this implies for a supported zero-velocity prior
 
 The candidate identified by this experiment uses information already promised
 by the supported operating boundary: the vehicle is stationary in the world frame through the
@@ -108,22 +113,25 @@ profile; this conditioning does not inject an attitude correction.
 Under the existing ideal fixture, `v=0` is an exact boundary condition. With its
 independent navigation block and zero mean, `R_s=0` gives zero initial velocity
 variance and leaves position, alignment, bias and fresh-sample blocks unchanged.
-That covariance is positive semidefinite and rank deficient; do not insert an
-arbitrary positive floor or invert it as if it were full rank. A real support
+That covariance is positive semidefinite and rank deficient: it represents some
+exactly known directions and cannot be inverted as a full-rank matrix. An
+arbitrary positive floor would change the stated constraint. A real support
 procedure with nonzero residual motion needs externally justified `R_s`; IMU
 quietness or this oracle's score cannot supply that justification.
 
-The subsequent [supported velocity prior screen](supported-velocity-prior.md)
-derives and implements this single candidate under ADR 0034. Its conditioning,
+The [supported velocity prior screen](supported-velocity-prior.md)
+evaluates this candidate. Its conditioning,
 rank and support rejection checks pass, but all 17 release configurations fail
 the necessary uncertainty screen. The supported left-limit sample causes a
 deterministic integration error much larger than the conditioned prior's first
-propagated uncertainty. Under the frozen rule, no new mission flights run.
+propagated uncertainty. Under the predeclared rule, no new mission flights run.
 
-The [next step](../next-steps.md) is a release-aware first prediction interval before
-revisiting the prior. This oracle never guaranteed that a one-time velocity
-constraint would reproduce its 80.46% improvement or remove position error.
-Fresh validation remains necessary before ordinary mission integration.
+The [release-aware first prediction](../design/release-prediction.md) and
+[nonlinear release uncertainty](nonlinear-release.md) address that boundary.
+The [combined-prior comparison](combined-supported-prior.md) evaluates them with
+the velocity constraint. The oracle's 80.46% improvement is diagnostic headroom,
+not a prediction of what a one-time velocity constraint will achieve.
+Independent validation remains necessary before ordinary mission integration.
 
 ## Reproduce
 

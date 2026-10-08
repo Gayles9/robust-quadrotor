@@ -1,8 +1,5 @@
 # 0002: Frame Conventions
 
-- Date: 2026-08-16
-- Status: Accepted
-
 ## Context
 
 Quadrotor dynamics are sensitive to frame, axis, and sign conventions. The

@@ -1,9 +1,6 @@
 # 0010: Sampled-IMU Endpoint Propagation and Calibration Evaluation
 
-- Date: 2026-09-23
-- Baseline: `bf767d913967b7fa1a9ac11c32413658bf94fa1c`
-- Status: Implemented and verified; design fixed before implementation and held-out evaluation
-- Evidence: [calibration verification record](../archive/records/eskf-endpoint-calibration.md)
+- Evidence: [calibration verification record (ZIP)](../../evidence/development-records.zip)
 - Extends: ADRs 0004–0009
 
 ## Evidence and scope
@@ -15,9 +12,10 @@ attribute the entire discrepancy. The existing prediction freezes world accelera
 and uses a left-held body angular rate, with `Phi=I+F*dt`. Improving covariance alone
 cannot remove the resulting deterministic integration error on changing motion.
 
-Add an explicit endpoint propagation option for paired instantaneous IMU samples.
-Retain the original default and its frozen experiment so historical results remain
-reproducible. The new option uses a discrete sample-noise contract. It does not
+Endpoint propagation uses both IMU samples at the ends of a completed interval,
+rather than holding the first sample constant. It is an explicit option; the
+first-order default and its experiment remain reproducible. The endpoint option
+uses a discrete sample-noise contract. It does not
 reinterpret a continuous spectral density as a sample covariance. Position/altitude
 observations, NED/FRD signs, right-local errors, prior requirements and stale rejection
 retain their established meanings. There are still 15 physical error degrees of
@@ -106,15 +104,15 @@ The temporary noise memory is retained internally until the next prediction.
 Stale, pending, disabled and rejected observations do not condition any joint state.
 The next sensor at the same epoch uses the actual posterior, including noise memory.
 
-All new arrays are independently owned, finite and read-only. Covariances use existing
+All arrays are independently owned, finite and read-only. Covariances use existing
 local scale-aware PSD validation. Invalid inputs, nonpositive intervals, overflow or
 singular innovations fail explicitly and atomically. No jitter, covariance clipping
 or noise inflation is introduced. The endpoint option requires zero in the unused
 legacy continuous covariance field to reject ambiguous noise declarations.
 
-## Verification plan fixed before implementation
+## Verification
 
-1. Reproduce the baseline suite and retain the original campaign and provenance.
+1. Regression checks preserve the original first-order campaign and its provenance.
 2. Analytic equilibrium, constant-rate rotation, constant/linear world acceleration
    and smooth-motion step refinement: demonstrate second-order global convergence.
 3. Central differences for all 21 prior and 12 driver columns, at nontrivial attitude,
@@ -131,7 +129,7 @@ legacy continuous covariance field to reject ambiguous noise declarations.
    supported production mode. Compare exact/noiseless and noisy input on paired data;
    report remaining nonlinear/local-Gaussian limitations honestly.
 
-## Fresh frozen protocol
+## Endpoint evaluation protocol (version 2)
 
 The original version-1 protocol remains unchanged. Version 2 selects endpoint
 propagation and adds a paired `first_order` replay of exactly the same measurements
@@ -148,7 +146,8 @@ Development and deterministic probes may guide debugging. The validation partiti
 is not run until equations, implementation, tests and protocol are fixed. Any change
 informed by its results requires a newly declared validation partition. Q sensitivity
 scales both sample covariance and bias-increment density; R sensitivity is unchanged.
-Record source/protocol hashes, exact commands, versions, failures and all seed results.
+The evidence records source/protocol hashes, commands, environment versions,
+failures and all seed results.
 
 Accept the correction as an improvement only if mathematical/compatibility tests pass,
 all 100 nominal and 20 gated trials remain finite and below existing divergence limits,

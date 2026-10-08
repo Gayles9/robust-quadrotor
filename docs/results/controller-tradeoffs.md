@@ -1,29 +1,29 @@
 # Controller performance and tradeoffs
 
-The main unresolved problem is keeping the vehicle sufficiently close to its
-reference when control uses noisy state estimates. The geometric controller
-performs well in the tested true-state flights. Earlier estimated-feedback
-profiles exceed the original 8 cm hover limit or demand too much moment.
-The later supported-start combination below resolves both tested full hovers
-while retaining a wind-tracking tradeoff.
+The geometric controller follows trajectories accurately when given the
+simulator's true state. When it instead receives noisy estimates, the same
+feedback must balance tracking accuracy, brief error peaks and actuator effort.
+Some tested configurations exceed the original 8 cm hover limit or request too
+much torque (turning moment). No single configuration meets every original
+estimated-feedback requirement.
 
-I have kept the original requirements and failed cases. The aim is to explain
-what causes the tradeoff before choosing another design. The evidence currently
-supports several interacting mechanisms; it does not identify a single defect
-whose removal would guarantee the required performance.
+This page explains the measured tradeoffs and their mechanisms. The comparisons
+retain the original requirements and failed cases; the evidence does not identify
+a single defect whose removal would guarantee the required performance.
 
-The later [supported-start geometric comparison](supported-geometric.md) adds
-positive evidence under its explicit stationary fixture. Full-hold peaks fall
+The [supported-start geometric comparison](supported-geometric.md) evaluates
+initialization on an explicit stationary fixture. Full-hold peaks fall
 from 8.73/18.10 cm to 5.21/4.62 cm. Nominal spline RMSE is 19.03% below matched
 combined cascade, with less moment effort. Wind RMSE is 3.73% higher, and
 geometric average hover error and spline peak errors are also higher than
 cascade's. All absolute candidate limits and eight fault comparisons pass;
-the frozen joint gate still fails on wind, so fresh validation remains unopened.
-The implementation is retained as an experimental option. The later
-[final axis-dependent study](final-geometric.md) addresses its vertical release
-delay, gives both controller families the same outer-gain choices and locks the
-selected profiles for fresh comparisons. That study has its own prospective
-accuracy and effort tradeoffs; it does not rewrite the earlier failed gate.
+the combined acceptance criterion fails on wind, so that study's conditional
+validation stage is not executed. The implementation remains experimental.
+The [axis-dependent study](final-geometric.md) addresses vertical release delay,
+gives both controller families the same outer-gain choices and fixes the selected
+profiles before reserved comparisons. It evaluates a different configuration
+with its own predeclared accuracy and effort criteria; the supported-start
+comparison's failed result remains unchanged.
 
 On twelve reserved cases, that final profile lowers balanced RMSE by 4.7717%
 against the independently selected cascade. Nominal tracking improves 13.7942%
@@ -44,7 +44,7 @@ against the paired cascade and effort within twice the cascade's. The final
 study separately declares a 10% balanced RMSE improvement target, with at most
 5% category regression, 10% individual regression, 25% balanced effort increase
 and twice the effort on any individual case. Absolute limits remain mandatory.
-Those frozen engineering criteria are separate from describing the size of an
+Those predeclared engineering criteria are separate from describing the size of an
 observed improvement; a smaller gain still belongs in the reported results.
 
 Effort here means the time integral of squared actual body moment, in N² m² s.
@@ -72,7 +72,7 @@ within about 1.12e-16 N m. This confirmed the path producing the commands.
 Removing identified correction jumps in an offline reconstruction reduced the
 acceleration-feedforward moment RMS substantially. That diagnosis motivated a
 closed-loop experiment; the reconstruction alone did not establish an improved
-flight. See the [audit](../archive/records/geometric-project-audit.md) for the
+flight. See the [audit (ZIP archive)](../../evidence/development-records.zip) for the
 exact calculations.
 
 ## Why more filtering or higher gains are not automatic fixes
@@ -108,7 +108,7 @@ one bounded scalar integral against the measured mass-mismatch offset. It adds
 health gating, explicit reset and conditional anti-windup to the cascade as an
 opt-in experiment. It does not change the geometric controller, compensate
 horizontal wind, or establish that startup hover is solved. Its
-[dated record](../archive/records/vertical-compensation.md) retains the full
+[verification record (ZIP)](../../evidence/development-records.zip) retains the full
 comparison and acceptance decision under the original flight limits.
 
 ## What I tested
@@ -140,10 +140,10 @@ Hover columns are maxima over the complete required hold interval.
 | Measured acceleration/jerk, original gains | 8.5360 | 1.824 | 11.9179 | 17.4527 |
 | Required | ≤7.4059 | ≤2.000 | ≤8.0000 | ≤8.0000 |
 
-*The original seed-30 hover value comes from the preceding implementation
-record; the other original values were reproduced in the audit. These are
-observed development cases, not independent validation of the new designs.
-The [full results](../archive/records/geometric-project-audit.md#bounded-development-results)
+*The original seed-30 hover value is retained from the implementation evidence;
+the other original values are reproduced by the audit. These are cases used to
+compare designs, not independent validation of the selected design.
+The [full results (ZIP archive)](../../evidence/development-records.zip)
 include both remaining gain profiles.
 
 Rebasing with the original gains nearly meets cascade effort, but worsens
@@ -165,20 +165,23 @@ estimated-feedback comparison profile. Its original 28/30 hover result and
 version 1's 29/30 result also retain their misses. No current profile satisfies
 every original estimated-hover condition.
 
-The subsequent [startup/hover investigation](../archive/records/geometric-transient-closeout.md)
-tested one further mechanism: filtering the force value together with its
-derivatives at a frozen 10 rad/s cutoff. Spline RMSE was 6.77 cm and effort fell
+The [startup/hover investigation (ZIP archive)](../../evidence/development-records.zip)
+tests a separate mechanism: filtering the force value together with its
+derivatives at a fixed 10 rad/s cutoff. Spline RMSE was 6.77 cm and effort fell
 to 0.85 times cascade, but full-hover maxima worsened to 10.87 and 17.33 cm.
 The shaped reference reduces sharp commands while adding delay to the physical
 recovery. This is a useful diagnosis, but fails the unchanged joint requirement.
 
-That bounded study is now closed, with no further gain or cutoff search and no
-reserved validation seeds opened. The cascade default and original geometric
-controller remain unchanged. [Observation health monitoring](../design/observation-health.md)
-now reports persistent accepted-data loss. The
-[observation supervisor](../design/observation-supervision.md) supplies timed numerical
-abort, and the [integrated campaign](integrated-robustness.md) evaluates its
-response alongside flight performance. The [next plan](../next-steps.md) records
-the separate follow-up scope; controller qualification is still open.
-The [geometric guide](../design/geometric-control.md) contains the equations and API, and
-[cascade design](../design/feedback-design.md) explains the coupled local model.
+That configuration fails its development criteria, so its reserved validation
+stage is not executed. Cascade remains the default. Broader controller
+qualification remains incomplete.
+
+[Observation health monitoring](../design/observation-health.md) reports
+persistent accepted-data loss. The [observation supervisor](../design/observation-supervision.md)
+provides timed numerical abort, and the [integrated campaign](integrated-robustness.md)
+evaluates that response alongside flight performance. These checks address
+measurement availability, not the tracking tradeoffs described here.
+
+For equations and API details, see the [geometric guide](../design/geometric-control.md)
+and [cascade design](../design/feedback-design.md). [Planned work](../next-steps.md)
+is separate from the implemented capabilities.

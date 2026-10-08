@@ -1,21 +1,19 @@
 # ADR 0016: Bounded trajectory timing and true-state mission execution
 
-Date: 2026-09-25. Status: accepted for this implementation.
+## Purpose and scope
 
-## Audit and scope frozen before implementation
+A mathematically smooth path can still demand more speed, thrust or tilt than
+the vehicle is configured to provide. This layer checks conservative bounds
+over the entire polynomial path and, where possible, slows the path uniformly
+until the bounds fit. It also connects minimum-snap references to the true-state
+mission supervisor.
 
-Audited main: `76db6eefea09aa25be236b1246cdc21ba44d1557`, tree
-`1e7ccc312ffe3bcbf88b488313e0de1c9bfe31c1`. Post-merge CI run
-`36142551257` passed. A fresh run of the 36 minimum-snap tests passed, and source
-review found no new solver defect. Its constructor intentionally checks numerical
-representation, not C3 continuity or rest endpoints; integration must check those
-properties before using caller-constructed trajectories.
-
-Implement only nominal reference feasibility bounds, bounded uniform retiming,
-and minimum-snap segments in the existing true-state mission supervisor. Keep
-controller gains, plant, motors, observer and original acceptance protocols intact.
-No geometric control, estimator tuning, obstacles, torque feedforward, global
-time-optimal search, fault accommodation, ROS/PX4 or hardware flight qualification.
+The trajectory constructor checks numerical representation, not continuity
+through jerk (C3) or rest endpoints. Mission integration therefore checks those
+properties before accepting caller-constructed trajectories. Controller gains,
+plant equations and estimator assumptions are unchanged by retiming. Obstacle
+avoidance, global time optimization and hardware flight qualification are
+outside this model.
 
 ## Reference feasibility contract
 
@@ -49,13 +47,14 @@ or claim of minimum feasible time.
 
 ## Mission and acceptance
 
-Add a minimum-snap reference kind carrying an owned trajectory. Require C3
-internal joins and zero initial/final v/a/j within stated numerical tolerances,
-connected endpoints, and matching duration. Preserve existing phase scheduling,
-terminal dwell/timeout, truth guards and control clocks. Preflight every new
-polynomial against the nominal controller acceleration/thrust/tilt/rate bounds
-and the mission geofence before any plant step. This package supports true-state
-execution; estimated-state polynomial missions remain a separate validation step.
+A minimum-snap reference carries an owned trajectory. The mission adapter
+requires C3 internal joins, zero initial/final v/a/j within the stated numerical
+tolerances, connected endpoints and matching duration. It uses the existing
+phase scheduling, terminal dwell/timeout, truth guards and control clocks.
+Before any plant step, preflight checks compare each polynomial with the nominal
+controller acceleration/thrust/tilt/rate bounds and mission geofence. This
+interface supports true-state execution; [estimated-state polynomial missions](../design/trajectory-missions.md)
+have separate evidence and assumptions.
 
 Fixed evidence mission: 1 s initialization; 4 s minimum-snap takeoff to [0,0,-1];
 track [0,0,-1], [1,0,-1.2], [1,1,-0.8], [0,1,-1], [0,0,-1] with initial durations
@@ -73,8 +72,9 @@ terminal 0.08 m/0.08 m/s/0.5 s dwell within 8 s timeout, and no inner or outer
 limiting. Refinement agreement: <= 0.005 m position and <= 0.05 degree attitude
 at shared epochs. Preserve any failed attempts and their explanation.
 
-Unit verification must cover analytic between-endpoint excursions, independent
-dense evaluations/finite-difference attitude rates, derivative/time-scaling laws,
+Unit tests cover analytic between-endpoint excursions, independent dense
+evaluations, finite-difference attitude rates, derivative/time-scaling laws,
 conservative rejection, exhausted budgets, numerical/ownership contracts,
-boundary sampling, malformed/discontinuous trajectory rejection, and preflight
-failure before execution. Finish with warnings-as-errors tests, lint and typing.
+boundary sampling, malformed/discontinuous trajectory rejection and preflight
+failure before execution. Warnings-as-errors tests, lint and typing complement
+these numerical and interface checks.

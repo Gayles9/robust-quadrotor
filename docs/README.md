@@ -6,7 +6,7 @@ Start with the [project overview](../README.md), then follow this path:
 2. [Understand the complete flight loop](guides/system-design.md).
 3. Use the subsystem map below to connect equations with implementation.
 4. [Inspect results, validation and limitations](results/README.md).
-5. Read the [official report](report.md) for the complete technical write-up.
+5. See the [report guide](report.md) for the technical write-up's scope and availability.
 
 ## Models and estimation
 
@@ -41,5 +41,5 @@ validation.
 For deeper reasoning, use the [design decision index](decisions/README.md).
 [Development and validation practices](development.md) describes the checks,
 reproducibility contract and tooling. [Next steps](next-steps.md) contains planned
-work. [Historical material](archive/README.md) is retained separately and does
-not define the current project scope.
+work. [Reproducibility evidence](../evidence/README.md) is available separately
+for checking the underlying records and experiment inputs.

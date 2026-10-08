@@ -7,8 +7,8 @@ The exact response accounting assigns -7.729 cm of the -9.693 cm East error at
 the failed peak to navigation-error forcing. This is a useful explanation of the
 observed path, not a claim that deleting those terms would produce a real flight.
 
-The [frozen protocol](../decisions/0032-residual-supported-hover-diagnosis.md) permits
-offline diagnosis only. The [verification record](../archive/records/residual-supported-hover.md)
+The [predeclared protocol](../decisions/residual-supported-hover-diagnosis.md) permits
+offline diagnosis only. The [verification record (ZIP)](../../evidence/development-records.zip)
 preserves all six histories, numerical checks and limitations. No new scientific
 flight, gain change or filter change was made; the 10.18 cm failure still stands.
 
@@ -134,27 +134,24 @@ poles are `-0.849558`, `-1.242003 +/- 1.809948i`, and
 stable while driven by the saved errors. It does not prove stability of the
 joint nonlinear estimator/controller, estimate reliability, or hardware flight.
 
-## Decision and reproduction
+## Interpretation and reproduction
 
-The diagnosis meets its scope. It motivated the completed **bounded navigation
-feedback isolation experiment**: on the failed aligned seed47001 only,
-substitute true position/velocity at the outer controller, leaving the estimator,
-guards, attitude/rate inputs, support, sensor draws and all scoring unchanged.
-The protocol was frozen before execution and compared with this exact saved
-baseline. Truth is diagnostic and cannot be deployed. The response table does
-not justify choosing new gains or filter tuning.
+This accounting explains the saved trajectory, but it does not predict a new
+flight obtained by deleting one contribution. The
+[navigation-feedback isolation](navigation-feedback-isolation.md) directly tests
+that distinction on seed47001. It substitutes true position and velocity only
+at the outer controller; estimator, guards, attitude/rate inputs, support,
+sensor draws and scoring remain unchanged. Hover peak falls to 1.99 cm and
+full-flight RMSE to 3.93 cm. The improvement is diagnostic because true feedback
+is unavailable outside simulation.
 
-The subsequent [navigation-feedback isolation](navigation-feedback-isolation.md)
-now completes that test: hover peak falls to 1.99 cm and full-flight RMSE to
-3.93 cm. The subsequent [supported velocity prior screen](supported-velocity-prior.md)
-rejects a prior-only change on release uncertainty grounds. The
-[release correction](../design/release-prediction.md) and [nonlinear joint model](nonlinear-release.md)
-are now implemented and evaluated; their passing and failed conditions remain
-separate from general flight qualification.
-
-Keep the initializer experiment-only and the cascade default. The 8 cm hover
-gate and separate mass failure remain open; geometric qualification and ordinary
-mission integration are unchanged.
+The [supported velocity prior screen](supported-velocity-prior.md) examines a
+usable support constraint, but rejects a prior-only change on release uncertainty
+grounds. The [release correction](../design/release-prediction.md) and
+[nonlinear joint model](nonlinear-release.md) describe evaluated treatments of
+that boundary. Their results are separate from general flight qualification.
+The initializer remains experimental, cascade remains the default, and this
+study does not close the 8 cm hover or mass-mismatch requirements.
 
 ```bash
 OPENBLAS_NUM_THREADS=1 uv run python -W error -m experiments.residual_hover_diagnostic --campaign SAVED_INDEPENDENT/campaign --output NEW_DIAGNOSIS

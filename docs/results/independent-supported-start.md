@@ -1,10 +1,11 @@
 # Independent supported-start validation
 
-The known-seed [flight comparison](supported-start-flight.md) showed that supported
-pre-arm alignment could improve flight. This separate campaign asks whether the
-benefit repeats and whether the existing observation supervisor still responds
-correctly with the new prior. [ADR 0031](../decisions/0031-independent-supported-start-validation.md)
-freezes the jobs, pairing, operating boundary and acceptance before execution.
+Pre-arm alignment uses stationary measurements before release to estimate the
+vehicle's inclination and sensor biases. This campaign checks whether the
+benefit seen in the [known-seed comparison](supported-start-flight.md) repeats on
+independent random seeds, and whether observation-loss responses still work.
+The [study protocol](../decisions/independent-supported-start-validation.md)
+defines the paired cases, support assumptions and predeclared acceptance criteria.
 
 ## What the pairs establish
 
@@ -51,8 +52,8 @@ promote the initializer.
 All 34 planned flights complete their numerical execution and evidence checks.
 Eight of nine clean comparisons pass, and all eight fault-response comparisons
 pass. Recovery completes with identical supervised/unsupervised histories;
-persistent loss triggers the required numerical abort. The complete software
-suite passes 3,769 tests. These results keep the failed hover condition visible.
+persistent loss triggers the required numerical abort. The failed hover
+condition remains part of the overall result.
 
 | Seed | Unaligned hover peak, cm | Aligned hover peak, cm | 8 cm condition |
 | --- | ---: | ---: | --- |
@@ -60,15 +61,15 @@ suite passes 3,769 tests. These results keep the failed hover condition visible.
 | 47002 | 6.823515 | 5.463810 | PASS |
 | 47003 | 6.868656 | 5.241372 | PASS |
 
-The [verification record](../archive/records/independent-supported-start.md)
+The [verification record (ZIP)](../../evidence/development-records.zip)
 contains every flight score, response result, source identity and software gate.
 The failed seed's aligned thrust-axis estimation error stays below 0.134 degrees
 throughout its hover mission. Its remaining tracking peak is mainly horizontal.
 Those observations are not a causal proof or evidence of a new estimator defect.
 
-Keep alignment experiment-only and the cascade controller as default. The
-previous mass-mismatch failure remains open; this campaign does not combine the
-rejected integral candidate or open geometric qualification seeds. Three fresh
+Alignment remains experimental and the cascade controller remains the default.
+The mass-mismatch failure is unresolved; this campaign does not evaluate the
+rejected integral candidate or geometric control. Three fresh
 seeds are a small independent check, not a high-reliability probability estimate.
 No ground-contact or hardware support procedure is qualified.
 
@@ -99,11 +100,13 @@ Full archived replay requires the recorded source fingerprint and protocol.
 The evidence bundle's NumPy-only verifier independently authenticates payloads,
 recomputes scores, checks handoffs and reconstructs response/comparison decisions.
 
-The subsequent [residual diagnosis](residual-supported-hover.md) now separates
-physical tracking, estimation error and the retained release response. Its
-quantitative explanation led to the [navigation-feedback isolation](navigation-feedback-isolation.md),
-which reduces the failed hover peak to 1.99 cm using true outer position/velocity.
-That diagnostic headroom led to the [supported velocity prior screen](supported-velocity-prior.md).
-The prior-only candidate is rejected before flight because its release uncertainty
-does not cover the known first-interval integration error. The next step addresses
-that boundary; ordinary flight remains unqualified.
+For an explanation of the failed hover, see the
+[residual diagnosis](residual-supported-hover.md), which separates physical
+tracking, estimation error and the release response. The
+[navigation-feedback isolation](navigation-feedback-isolation.md) reduces that
+peak to 1.99 cm using true outer-loop position and velocity; this is diagnostic
+feedback unavailable in an ordinary flight. The
+[supported velocity prior screen](supported-velocity-prior.md) rejects a prior-only
+change because its uncertainty does not cover the first-interval integration
+error. The [combined-prior study](combined-supported-prior.md) evaluates the
+velocity constraint with a corrected release model.

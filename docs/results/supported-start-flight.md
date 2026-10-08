@@ -1,10 +1,11 @@
 # Supported-start flight comparison
 
-This experiment asks whether the verified [pre-arm component](../design/prearm-component.md)
-improves closed-loop flight when a stationary acquisition interval is physically
-provided. [ADR 0030](../decisions/0030-supported-start-flight-evaluation.md) freezes
-four known maneuver cases and eight new flights. Production algorithms and
-controller defaults are unchanged.
+This experiment tests whether estimating inclination and sensor biases while
+the vehicle is held still improves flight after release. It uses the
+[pre-arm component](../design/prearm-component.md) and an explicit stationary
+support fixture. The [study protocol](../decisions/supported-start-flight-evaluation.md)
+specifies four known maneuver cases and eight flights in four pairs. Normal flight
+algorithms and controller defaults are unchanged.
 
 ## Separate alignment from the changed operating condition
 
@@ -23,7 +24,8 @@ Both supported arms retain the original true position and attitude. Their p/v
 estimate and covariance remain the original independent prior. Thus the direct
 aligned-versus-unaligned comparison changes only initial attitude/bias estimation
 and covariance. Comparing either to the original also includes the disclosed
-physical startup change. The old failure remains an old failure.
+physical startup change. Its result therefore cannot replace the original
+initialization's failed result.
 
 ## Mechanical support and the boundary sample
 
@@ -46,9 +48,10 @@ without a special correction. Its startup discretization error is retained in
 all scores. This is an ideal fixture release, not a ground-contact takeoff,
 physical landing or validated hardware support procedure.
 
-The later [supported velocity prior screen](supported-velocity-prior.md) quantifies
+The [supported velocity prior screen](supported-velocity-prior.md) quantifies
 why this retained first-interval error prevents simply reducing the initial
-velocity covariance. The next bounded task derives a release-aware boundary map.
+velocity covariance. The [release-aware prediction](../design/release-prediction.md)
+explains a separately evaluated treatment of this boundary.
 
 ## Information, sample ownership and replay
 
@@ -74,10 +77,10 @@ covariance, event, control command, mission guard and supervisor decision.
 
 ## Results and decision
 
-The frozen startup comparison passes. The aligned hover, nominal tracking and
+The predeclared startup comparison passes. The aligned hover, nominal tracking and
 wind cases pass all their original flight conditions. The mass case still fails
 RMSE, final position and completion. All eight executions and four archived
-comparators are preserved in the [verification record](../archive/records/supported-start-flight.md).
+comparators are preserved in the [verification record (ZIP)](../../evidence/development-records.zip).
 
 | Metric, cm | Original | Supported unaligned | Supported aligned |
 | --- | ---: | ---: | ---: |
@@ -98,16 +101,12 @@ the aligned nominal and wind runs while remaining within their original limits.
 The aligned mass case still has 43.352 cm final error and `landing_timeout` at
 25 s. Better inclination estimation does not supply missing mass compensation.
 
-The result is go for an independently frozen supported-start validation campaign
-covering repeatability and observation-fault responses. Known seeds 30/31 do not
-establish general qualification. Keep the initializer experiment-only until that
-validation is complete; the cascade remains default and the geometric and mass
-limitations remain separate.
-
-The later [independent validation](independent-supported-start.md) now confirms
-improvement in all three fresh hover pairs but retains one 10.18 cm failure.
-That later result blocks normal integration without changing this historical
-known-seed comparison or its acceptance.
+Known seeds 30/31 establish a benefit in these cases, not general qualification.
+The [independent validation](independent-supported-start.md) evaluates
+repeatability and observation-fault responses. It confirms improvement in all
+three independent hover pairs but retains one 10.18 cm failure. The initializer
+therefore remains experimental, the cascade remains the default, and geometric
+control and mass compensation retain their separate limitations.
 
 ## Acceptance and reproduction
 
@@ -120,16 +119,19 @@ failures and all-four-case qualification are reported separately.
 
 Only known seeds 30/31 are used. This is a bounded development comparison;
 reserved qualification seeds, fault campaigns and geometric qualification
-remain outside scope. No result authorizes post-hoc tuning or threshold changes.
+remain outside this comparison. The reported result uses the original settings
+and thresholds without tuning to its outcomes.
 
 ```bash
 OPENBLAS_NUM_THREADS=1 uv run python -W error -m experiments.supported_start_validation --baseline results/original-campaign --output results/supported-start --workers 2
 OPENBLAS_NUM_THREADS=1 uv run python -W error -m experiments.supported_start_validation --baseline results/original-campaign --verify results/supported-start
 ```
 
-The baseline path must contain the authenticated original ADR 0023 campaign.
+The baseline path must contain the authenticated original
+[integrated robustness campaign](integrated-robustness.md).
 Use a new output directory. A valid comparison that misses acceptance exits 1
 and retains its evidence; implementation or evidence errors raise separately.
-Full replay of this archived study requires its recorded source fingerprint;
-PR 29 preserves that revision. Later experiment additions change the global
-source fingerprint even when the original default behavior is retained.
+Full replay of this saved study requires its recorded source fingerprint.
+Use the matching source snapshot identified in the verification record: a global
+fingerprint can change when experiment files change, even if the original
+controller behavior is unchanged.

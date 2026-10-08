@@ -1,7 +1,10 @@
 # Fixed-duration minimum-snap position trajectories
 
-The solver chooses a smooth NED position curve through specified waypoints at
-specified times. Snap is the fourth time derivative of position. The objective
+The solver chooses a smooth position curve through specified waypoints at
+specified times, expressed in the North–East–Down (NED) world frame. Velocity
+describes how quickly position changes; acceleration describes how quickly
+velocity changes; jerk is the rate of change of acceleration; snap is the rate
+of change of jerk, or the fourth time derivative of position. The objective
 penalizes its squared magnitude integrated over time; it is not electrical
 energy or an actuator-feasibility certificate.
 
@@ -29,15 +32,18 @@ For r=4, the integrated squared-snap cost is
 
 The units of J are m²/s⁷. Each segment interpolates both endpoint positions.
 Velocity, acceleration and jerk are shared between adjacent segments, enforcing
-C3 continuity. Their initial and final values are prescribed, zero by default.
+C3 continuity: position and its first three derivatives have no jumps at the
+joins. Their initial and final values are prescribed, zero by default.
 Internal derivatives are free optimization variables; internal waypoints are
 not forced stops.
 
 A fixed 8-by-8 Hermite map converts endpoint p/v/a/j into normalized polynomial
 coefficients. The analytic snap Gram matrix is factored to write the reduced
 objective as `||Bz + b||²`. Time, position and column scaling precede a checked
-SVD least-squares solve. No matrix inverse of a KKT system, regularization,
-external optimizer or new dependency is used.
+singular value decomposition (SVD) least-squares solve. This exposes weakly
+determined directions so poorly conditioned problems can be rejected. The
+solver needs no external optimizer or matrix inverse of a Karush–Kuhn–Tucker
+(KKT) system, and applies no regularization.
 
 The minimizer is unique: a zero-cost feasible variation would be a C3 piecewise
 cubic, hence a global cubic. Its zero initial p/v/a/j force it to vanish. This
@@ -118,10 +124,11 @@ recovery, nonzero endpoint derivatives, quadrature, time/space invariance,
 natural continuity, the 64-segment boundary and explicit invalid/numerical failures.
 Uniform time scaling by a gives derivative scaling a^-r and cost scaling a^-7.
 
-See [ADR 0015](../decisions/0015-minimum-snap-trajectory.md) for the frozen scope and
-[the implementation record](../archive/records/minimum-snap.md) for verification.
+See the [solver specification](../decisions/0015-minimum-snap-trajectory.md) for
+its scope and [verification evidence (ZIP archive)](../../evidence/development-records.zip) for
+the measured checks.
 
-## Subsequent integration
+## Flight integration and scope
 
 The [trajectory mission layer](trajectory-missions.md) implements nominal
 whole-curve thrust/tilt/rate/geofence bounds, bounded uniform retiming and

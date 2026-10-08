@@ -1,15 +1,14 @@
 # 0008: Aligned ESKF Consistency Evaluation and Frozen Nominal Ensemble
 
-- Date: 2026-09-23
-- Status: Accepted
 - Depends on: [error convention](0004-eskf-error-state-conventions.md),
   [correction](0005-eskf-measurement-updates.md),
   [replay](0006-eskf-sensor-replay.md), [NIS](0007-eskf-innovation-gating.md)
-- Evidence: [verification record](../archive/records/eskf-consistency-evaluation.md)
+- Evidence: [verification record (ZIP)](../../evidence/development-records.zip)
 
 ## Responsibility and isolation
 
-This increment evaluates the existing measurement-only estimator. It does not change
+Consistency evaluation asks whether reported uncertainty agrees with actual
+estimation error across repeated simulated trials. It does not change
 prediction, correction, gating, sensor generation, random streams, or persisted artifacts.
 `eskf_consistency.py` reads truth only to construct an evaluation reference, extract
 physical estimation errors and calculate normalized estimation error squared (NEES).
@@ -150,7 +149,7 @@ If a zero-mean Gaussian error has the stated positive-definite covariance, its w
 components are independent unit normal variables and the squared norm follows
 $\chi_d^2$, where $d=15$ for NEES, 3 for position NIS and 1 for altitude NIS. The
 [NIST distribution reference][nist-distribution] and [critical-value table][nist-table]
-provide the distribution and central two-sided interpretation (accessed 2026-09-23).
+provide the distribution and central two-sided interpretation.
 These are assumptions for comparison, not conclusions guaranteed by an ESKF.
 
 For $M$ independent seeds at a **common epoch**,
@@ -263,15 +262,13 @@ change. Generated JSON/logs are not committed.
 
 ## Limits and revisiting the decision
 
-No controller, live service, asynchronous/sparse IMU, delayed correction, fault generator,
-adaptive gate, Q/R tuning, covariance discretization change or plotting dependency is
-introduced. Confidence-band agreement is bounded nominal evidence, not proof of
-consistency, Gaussianity, robustness, observability or full Gate G3 completion. This
-milestone left the broader G3 requirements open. Subsequent
-[ADR 0009](0009-eskf-completion-validation.md) adds the completion evidence and records
-its full-state NEES consistency qualification. G2 remains open. Preserve this fixed protocol when extending
-evaluation to stronger excitation, observation faults or declared model mismatch; define
-new protocols and independent seeds before evaluating them.
+Confidence-band agreement is evidence for the declared nominal distribution, not
+a general proof of consistency, Gaussianity, robustness or observability.
+[ADR 0009](0009-eskf-completion-validation.md) covers stronger excitation and
+observation faults, including a full-state NEES undercoverage finding.
+[ADR 0010](0010-eskf-endpoint-propagation.md) describes the endpoint propagation
+alternative and its separate calibration campaign. Each protocol has its own
+seeds and assumptions; their results must be interpreted separately.
 
 [nist-distribution]: https://www.itl.nist.gov/div898/handbook/eda/section3/eda3666.htm
 [nist-table]: https://www.itl.nist.gov/div898/handbook/eda/section3/eda3674.htm

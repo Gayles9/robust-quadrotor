@@ -1,20 +1,18 @@
 # 0005: ESKF Measurement Correction and Covariance Reset
 
-- Date: 2026-09-23
-- Status: Accepted and implemented
 - Extends: [ADR 0004](0004-eskf-error-state-conventions.md)
 - Implementation: `src/quadrotor_math/eskf.py`
 - Evidence: `tests/unit/test_eskf_update.py` and the
-  [verification record](../archive/records/eskf-measurement-updates-and-contract-audit.md)
+  [verification record (ZIP)](../../evidence/development-records.zip)
 
 ## Context and scope
 
 The prediction core already represents NED position and velocity, a Hamilton scalar-first
-body-to-world quaternion, and FRD accelerometer and gyroscope biases. This increment adds
-correction from the existing local Cartesian position and positive-up altitude sensors.
-It completes the bounded measurement-update milestone identified by the published README
-and prediction-core closeout. It does not introduce a sensor scheduler consumer or a full
-estimator runner.
+body-to-world quaternion, and FRD accelerometer and gyroscope biases. Measurement
+correction combines that prediction with local Cartesian position and positive-up
+altitude observations. An observation changes both the estimated state and the
+uncertainty attached to it; the covariance reset keeps that uncertainty expressed
+about the corrected state. These routines do not schedule sensor delivery.
 
 The existing nominal state has 16 stored scalars and a unit-quaternion constraint. Its
 15-dimensional local error remains
@@ -170,8 +168,8 @@ storage. Read-only flags protect ordinary API use, not adversarial buffer mutati
 
 Zero innovation still updates covariance. When the resulting correction is exactly zero,
 the nominal state is copied byte for byte without quaternion renormalization. The ESKF state
-constructor now uses the downstream rotation utility's squared-norm tolerance
-`rtol=1e-12, atol=1e-12`, removing the previous mismatch between norm and squared-norm tests.
+constructor uses the downstream rotation utility's squared-norm tolerance
+`rtol=1e-12, atol=1e-12`, matching prediction validation.
 
 ## Verification and remaining boundaries
 
@@ -190,12 +188,10 @@ known constant world acceleration.
 
 These are deterministic core-regression results. They do not establish general bias
 observability, calibrated sensor performance, NIS/NEES consistency, outlier robustness,
-delayed-measurement correctness, or closed-loop flight performance. This mathematical
-increment added no runner, estimator configuration, manifest extension, controller,
-ROS 2/PX4 adapter or dependency. The subsequent [ADR 0006](0006-eskf-sensor-replay.md)
-implements bounded replay and in-memory configuration, with explicit stale rejection;
-it does not change these timestamp-free correction equations. Gate G2 baseline control
-remains open.
+delayed-measurement correctness, or closed-loop flight performance.
+[ADR 0006](0006-eskf-sensor-replay.md) describes the separate replay and
+configuration layer, including stale-observation rejection. These correction
+equations themselves have no timestamps.
 
 ## References
 

@@ -1,11 +1,16 @@
 # Standalone supported pre-arm alignment
 
-The standalone component implements the accepted
-[nonlinear uncertainty model](prearm-nonlinear-uncertainty.md). It acquires a
-supported stationary IMU window, checks uncertainty and motion compatibility,
-and releases one initialized endpoint ESKF state. It does not issue an arm
-command or run a flight. The [frozen interface](../decisions/0029-standalone-prearm-alignment.md)
-and [verification record](../archive/records/prearm-component.md) define its scope.
+This component uses a short interval with the vehicle physically supported and
+stationary to estimate its inclination and gyroscope bias before flight. It
+collects accelerometer and gyroscope measurements from the inertial measurement
+unit (IMU), checks their compatibility with stationarity, and quantifies the
+remaining uncertainty with the [nonlinear model](prearm-nonlinear-uncertainty.md).
+
+Its output initializes the endpoint error-state Kalman filter (ESKF), which
+retains the sensor-sample uncertainty needed for the next prediction. The
+component does not issue an arm command or run a flight. See the
+[interface specification](../decisions/standalone-prearm-alignment.md) and
+[verification evidence (ZIP archive)](../../evidence/development-records.zip) for its exact scope.
 
 ## Ownership and physical support
 
@@ -54,7 +59,7 @@ No rejected call can return an ESKF endpoint.
 
 ## Fixed model and information boundary
 
-The approved profile is `adr0028-400hz-ned-frd-v1`: 400 Hz, g=9.81 m/s²,
+The supported profile is `adr0028-400hz-ned-frd-v1`: 400 Hz, g=9.81 m/s²,
 sample sigmas 0.04 m/s² and 0.002 rad/s, bias-walk densities 0.0002 and
 0.00002 in their corresponding units per square-root second. Initial attitude
 sigma is 3 degrees, accel-bias sigma 0.03 m/s² and gyro-bias sigma 0.005 rad/s.
@@ -62,14 +67,16 @@ Only the independent alignment prior, identity attitude mean and zero bias
 means are supported. Unsupported noise, timing, gravity or correlated alignment
 priors raise rather than silently selecting another model.
 
-Position/velocity means and a valid PSD 6x6 covariance are caller supplied.
+Position/velocity means and a valid positive semidefinite (PSD) 6x6 covariance
+are caller supplied. PSD means no direction has negative variance.
 The caller must explicitly declare navigation/alignment independence; both
 cross blocks must be zero. The alignment does not estimate position or velocity.
 Even zero navigation covariance is permitted as a mathematical input and does
 not certify that such a prior is physically justified.
 
-The 625-node positive quadrature preserves the complete right-local attitude,
-terminal accelerometer-bias and terminal gyro-bias covariance at the computed
+The 625-node positive-weight quadrature numerically integrates over uncertain
+inputs. It preserves the complete right-local attitude, terminal
+accelerometer-bias and terminal gyro-bias covariance at the computed
 rotation mean. It retains heading uncertainty and does not independently
 calibrate accelerometer bias. The rotation solver and all three alpha=0.001
 compatibility gates, 0.75-degree local 99% axis radius and 15-degree inclination
@@ -84,7 +91,7 @@ The fresh measurement is not reused in the alignment estimate or gated as
 another alignment observation. This preserves the stated independent-sample
 handoff; one noisy sample does not prove or disprove physical support.
 
-## Verification and next scope
+## Verification and integration limits
 
 All 15,000 archived covariance matrices agree exactly; maximum rotation
 difference is 2.579e-17 rad against 2e-14. Calibration and rejection decisions
@@ -95,21 +102,29 @@ simultaneous failure reasons and one-time release.
 
 This establishes the bounded software component. It does not establish improved
 flight performance, hardware support, real-time scheduling or motor safety.
-The cascade controller and existing endpoint ESKF remain unchanged. The later
-[supported-start comparison](../results/supported-start-flight.md) now demonstrates improved
-known-seed hover and tracking under an explicit fixture model. Its mass failure
-remains open. The [independent validation](../results/independent-supported-start.md) now
-finds improvement across three fresh hover seeds, with one still above the
-8 cm limit. Normal mission integration remains blocked. The subsequent
-[residual diagnosis](../results/residual-supported-hover.md) and
-[navigation oracle](../results/navigation-feedback-isolation.md) now demonstrate a useful
-navigation-channel target. The [supported velocity prior screen](../results/supported-velocity-prior.md)
-rejects the prior-only change with its original release map. The
-[release correction](release-prediction.md), [nonlinear model](../results/nonlinear-release.md)
-and [combined prior](../results/combined-supported-prior.md) are now implemented.
-The combined prior passes the tested absolute limits but fails no-regression.
-The [final geometric comparison](../results/final-geometric.md) uses that explicit
-experimental startup; ordinary mission initialization still requires a supplied prior.
+The cascade controller and endpoint ESKF are unchanged. Supported initialization
+is an explicit experimental option; ordinary mission initialization still
+requires a supplied prior. Its flight evidence has several distinct limits:
+
+- The [supported-start comparison](../results/supported-start-flight.md) improves
+  known-seed hover and tracking under a modeled support fixture. Its mass-mismatch
+  failure remains open.
+- [Independent validation](../results/independent-supported-start.md) improves
+  three fresh hover cases, with one still above the 8 cm limit.
+- The [residual diagnosis](../results/residual-supported-hover.md) and
+  [navigation isolation study](../results/navigation-feedback-isolation.md)
+  identify position/velocity estimation as a useful improvement target.
+- The [velocity-prior-only study](../results/supported-velocity-prior.md) rejects
+  an exact zero-velocity prior with the ordinary release map. The
+  [release correction](release-prediction.md),
+  [nonlinear uncertainty model](../results/nonlinear-release.md) and
+  [combined prior](../results/combined-supported-prior.md) address that startup
+  interaction. The combined prior passes the tested absolute limits but fails
+  the separate requirement that performance must not regress.
+
+The [final geometric comparison](../results/final-geometric.md) uses this
+explicit experimental startup. These bounded studies do not establish it as a
+general replacement for ordinary mission initialization.
 
 ```bash
 OPENBLAS_NUM_THREADS=1 uv run python -W error -m experiments.prearm_component_validation --prior-evidence results/prearm-nonlinear --output results/prearm-component

@@ -2,13 +2,16 @@
 
 The exact zero-velocity prior was **rejected with the original release integration**.
 Its conditioning algebra and support checks pass, but every one of the 17 saved
-release configurations fails the frozen necessary uncertainty screen. No new
+release configurations fails the predeclared necessary uncertainty screen. No new
 mission flights are run. The ordinary supported-hover result remains 10.18 cm
-against the 8 cm limit; this step claims no tracking improvement.
+against the 8 cm limit; the screen establishes no tracking improvement.
+A prior is the estimator's starting belief about a state and its uncertainty.
+Here, the question is whether known stationary support justifies zero initial
+velocity uncertainty.
 
-The [verification record](../archive/records/supported-velocity-prior.md) retains
-the measured results. [ADR 0034](../decisions/0034-supported-velocity-prior.md) freezes
-the screen and its stop-before-flight rule before implementation and evaluation.
+The [verification record (ZIP)](../../evidence/development-records.zip) retains
+the measured results. The [study protocol](../decisions/supported-velocity-prior.md)
+specifies the uncertainty screen and requires it to pass before flight evaluation.
 
 ## Why condition velocity at all?
 
@@ -117,21 +120,21 @@ statistical trials. Passing the broad original prior's screen does not validate
 its calibration or justify using it to hide integration error. Failing the narrow
 candidate's screen is sufficient to reject this combination of prior and map.
 
-## Decision and next step
+## Interpretation and related results
 
 The investigation meets its acceptance criteria and rejects this candidate.
-The 25 conditional regression flights are skipped under the frozen stop rule.
+The 25 conditional regression flights are skipped under the predeclared stop rule.
 The result does not establish whether a velocity prior would improve hover after
 the release model is corrected. The previous truth-feedback oracle remains a
 separate demonstration of available navigation-channel headroom.
 
-The subsequent [release-aware first prediction](../design/release-prediction.md) is now
-implemented and passes its component checks. It removes this ballistic error,
-but the exact velocity prior remains deferred: nonlinear rotation/noise products
-are absent from three singular covariance directions. The later [nonlinear model](nonlinear-release.md) repairs that uncertainty, and
-the [combined comparison](combined-supported-prior.md) subsequently evaluates the
-prior with it. Those studies do not erase this original screen failure. The
-[current plan](../next-steps.md) is authoritative.
+The [release-aware first prediction](../design/release-prediction.md) removes
+this ballistic error and passes its component checks. Its first-order uncertainty
+still omits nonlinear rotation/noise products in three singular covariance
+directions. The [nonlinear model](nonlinear-release.md) accounts for those terms,
+and the [combined comparison](combined-supported-prior.md) evaluates the velocity
+prior with that model. These are different prior/prediction combinations; their
+results do not change the failure of the original combination examined here.
 
 ## Reproduce
 

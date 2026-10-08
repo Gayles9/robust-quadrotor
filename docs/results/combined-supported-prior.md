@@ -1,9 +1,12 @@
 # Supported velocity conditioning with nonlinear release prediction
 
-The boundary-only study repaired the first prediction's joint uncertainty but
-did not fix the failed hover case. This experiment adds the known zero release
-velocity from the existing mechanical support fixture. It is an explicit research
-option; it does not change the normal estimator or controller defaults.
+This experiment combines two pieces of startup information: the vehicle is
+stationary immediately before release, and acceleration changes when its support
+is removed. The [boundary-only study](nonlinear-release.md) accounts for the
+release uncertainty but does not fix the failed hover case. Adding the known
+zero release velocity reduces some tracking errors while worsening others.
+The combination remains a research option; normal estimator and controller
+defaults are unchanged.
 
 ## What changes
 
@@ -30,8 +33,8 @@ patterns are unchanged. Simulated truth is not supplied to the controller.
 
 ## Comparison and limits
 
-[ADR 0037](../decisions/0037-combined-supported-velocity-comparison.md) freezes
-25 candidate flights: nine clean flights and eight off/on fault pairs. Every
+The [study protocol](../decisions/combined-supported-velocity-comparison.md)
+specifies 25 candidate flights: nine clean flights and eight off/on fault pairs. Every
 candidate is compared with both the original aligned and boundary-only saved
 controls. The complete saved histories are authenticated and reconstructed.
 The original 8 cm hover, 15 cm tracking and 15 cm/s landing limits remain, along
@@ -41,10 +44,10 @@ All nine clean flights pass their absolute conditions. Hover peaks are 6.75,
 5.69 and 5.56 cm. The first improves substantially, while the other two increase
 slightly. Four of nine clean comparisons and all eight fault-response comparisons
 pass. The overall comparison fails; the candidate remains experimental and
-fresh validation is incomplete. The [dated record](../archive/records/combined-supported-prior.md)
-preserves every outcome and the exact evidence identities. The subsequent
-[saved-history diagnosis](combined-prior-diagnosis.md) explains the tradeoff and
-closes the startup study without promoting this candidate.
+fresh validation is incomplete. The [verification record (ZIP)](../../evidence/development-records.zip)
+preserves every outcome and exact evidence identity. The
+[saved-history diagnosis](combined-prior-diagnosis.md) explains how changes in
+estimator corrections and feedback produce the tradeoff.
 
 ## Source and reproduction
 
@@ -63,4 +66,5 @@ OPENBLAS_NUM_THREADS=1 .venv/bin/python -W error -m experiments.combined_support
 The verification mode uses saved data and runs no new scientific flights. A
 completed comparison that fails acceptance exits with status 1; inspect the
 complete report to distinguish that result from an interrupted software error.
-Valid flights must not be retried or used to tune the frozen design.
+The protocol retains every valid flight and fixes the design before evaluation;
+retrying selected outcomes would change the meaning of the comparison.

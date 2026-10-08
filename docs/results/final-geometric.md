@@ -1,17 +1,24 @@
 # Final bounded geometric comparison
 
-The [preceding supported-start study](supported-geometric.md) makes geometric
-control competitive, but its isotropic force filter adds a vertical release
-transient and leaves a small wind RMSE regression. This study implements
-axis-dependent coherent force shaping and compares selected geometric and
-cascade configurations under the same physical and estimation assumptions.
-[ADR 0042](../decisions/0042-final-geometric-comparison.md) freezes the complete
-search, comparator selection, later cases, metrics and stopping rules.
+This study compares geometric control with the nested position/attitude
+controller (the cascade) under matched simulation conditions. It smooths the
+geometric controller's requested force more slowly in the horizontal plane than
+vertically, allowing a faster vertical response after release while limiting
+horizontal sensitivity to noisy estimates. This is called axis-dependent force
+shaping.
 
-## Fresh tracking result
+The [supported-start comparison](supported-geometric.md) explains the
+configuration using the same filter on every axis. The
+[study protocol](../decisions/final-geometric-comparison.md) defines the
+search, independent comparator selection, reserved evaluation cases, metrics
+and acceptance rules.
+
+## Tracking result on reserved cases
 
 The selected geometric controller has **4.7717% lower balanced whole-flight
 RMSE** than the independently selected cascade on twelve reserved cases.
+Here RMSE means root-mean-square position error over the complete flight;
+"balanced" gives hover, nominal tracking and wind tracking equal weight.
 All twenty-four selected-controller clean flights pass the original absolute
 conditions. This is a measured average accuracy benefit, with retained
 tradeoffs; the predeclared 10% balanced-improvement target is not met.
@@ -49,7 +56,7 @@ interval of `[0.929789, 0.974011]`, corresponding to 2.60..7.02% improvement.
 It describes resampling sensitivity within these twelve cases, with only four
 per category. It is neither an additional acceptance gate nor a general
 operating-envelope guarantee. The data support a modest bounded accuracy gain;
-they do not meet the stronger frozen 10% claim or dominate every metric.
+they do not meet the stronger predeclared 10% claim or dominate every metric.
 
 The complete reserved ledger contains 36 clean executions and sixteen fault
 executions. All eight fault-response comparisons and all saved-history audits
@@ -57,9 +64,10 @@ pass. Of the eight primary acceptance conditions, only balanced accuracy fails.
 The original cascade's single small absolute miss is confined to the declared
 secondary comparison. Both selected profiles pass every clean absolute limit.
 
-The [complete numerical record](../archive/records/final-geometric-comparison.md)
+The [complete numerical record (ZIP)](../../evidence/development-records.zip)
 retains every seed and metric, the original-cascade comparison and all fault
-responses. Controller improvement pauses after this bounded study.
+responses. The results apply to these tested conditions and do not change the
+default controller.
 
 ## Why separate the axes
 
@@ -146,7 +154,7 @@ evaluation contains four hovers, four nominal splines, four wind splines and
 eight supervisor off/on fault pairs. The primary opponent is the independently
 selected cascade; the original cascade is also retained when different.
 
-The frozen fresh accuracy-advantage criterion requires at least 10% lower
+The predeclared fresh accuracy-advantage criterion requires at least 10% lower
 balanced RMSE, no category more than 5% worse and no individual case more than
 10% worse. All original physical conditions, fault responses and evidence audits
 must pass. Balanced squared-moment effort may increase by at most 25%, with no
@@ -165,7 +173,7 @@ qualification. The supported start is an explicit stationary fixture assumption.
 - [Fixed study runner and selection](../../experiments/final_geometric_comparison.py).
 - [Independent filter/plant tests](../../tests/unit/test_axis_shaped_geometric.py).
 - [Selection, replay and seed-gate tests](../../tests/unit/test_final_geometric_comparison.py).
-- [Dated verification record](../archive/records/final-geometric-comparison.md).
+- [Verification record (ZIP)](../../evidence/development-records.zip).
 
 Use new output directories. Later stages authenticate all parent payloads and
 the fixed source/decision before constructing their seed-dependent fixtures:
@@ -182,13 +190,15 @@ sample-noise memory, controller, plant, supervision and support. True-state
 verification authenticates and rescores the saved histories. A failing gate
 returns exit code 1 while preserving the complete stage ledger.
 
-The archived development's executable code is preserved in commit
-`c97d4786f6bb729cddd2b1af95d65410f4d12eca`.
-The first regression exposed an estimated-only keyword incorrectly passed to the
-true-state cascade simulator. [ADR 0043](../decisions/0043-geometric-regression-adapter.md)
-records the adapter correction and the exact unchanged development report that
-can be reused. Corrected regression and fresh validation use commit
-`6e79406b8bc75be50ce4304dd7d403f3c751c5a2`. To verify the historical development
-report directly, check out its original commit; verify the later stages at the
-corrected commit. A new complete reproduction can run all stages at the corrected
-commit. The failed attempt remains in the evidence, and no tuning follows it.
+Saved reports require matching execution source identities:
+
+| Evidence | Required source commit |
+| --- | --- |
+| Saved development report | `c97d4786f6bb729cddd2b1af95d65410f4d12eca` |
+| Corrected regression and reserved validation | `6e79406b8bc75be50ce4304dd7d403f3c751c5a2` |
+
+A complete new reproduction can run all stages at the corrected commit. The
+[adapter compatibility record](../decisions/geometric-regression-adapter.md)
+identifies the unchanged development report accepted by the corrected runner.
+The retained failed regression attempt is a call-interface error, not a valid
+flight outcome; it does not alter the scientific settings or reported results.

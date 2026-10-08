@@ -1,8 +1,8 @@
-# Retained protocol input
+# Protocol compatibility path
 
-The dated [feedback co-design record](2026-09-24-feedback-codesign.md) remains
-here because an experiment reads and authenticates this exact file. Its path,
-date and contents are part of the frozen reproduction contract.
+This directory contains a symbolic link used by an existing experiment loader.
+The immutable input lives with the [experiment protocols](../../experiments/protocols/README.md).
 
-Other records are retained in [the archive](../archive/records/README.md).
-Start with [results and validation](../results/README.md) for the current project.
+The [feedback-design guide](../design/feedback-design.md) explains the controller
+and its evaluation. [Results and validation](../results/README.md) summarizes
+the current evidence.

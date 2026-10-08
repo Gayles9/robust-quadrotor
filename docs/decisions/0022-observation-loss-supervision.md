@@ -1,19 +1,14 @@
 # ADR 0022: bounded supervision of observation loss
 
-Status: accepted for the numerical mission interface, 2026-09-28.
+## Purpose and scope
 
-## Audit and scope
+The passive health monitor reports missing or rejected observations. The
+supervisor adds a decision: stop the numerical mission if a required stream
+remains unhealthy beyond an explicit time budget. It uses only the monitor's
+clock and health states, so it cannot anticipate a fault or inspect simulated
+truth. It is optional and does not change the estimator or controller equations.
 
-I audited `d01e440594c4a588f78291455242618e6db5e41b`, including the
-passive observation monitor, mission phase transitions, guard priority and
-terminal command handling. The preceding merge's GitHub CI passed. Fresh
-monitor/integration/mission checks passed 103 tests in 21.77 s. I found no
-in-scope defect in the preceding milestone.
-
-This step adds an opt-in, causal observation supervisor. It does not tune the
-estimator or either controller, add automatic alignment, or qualify flight.
-
-## Policy frozen before implementation
+## Supervision policy
 
 - Local position is required in every active phase: INITIALIZE, TAKEOFF,
   TRACK and LAND. The position controller already runs during initialization
@@ -47,28 +42,28 @@ estimator or either controller, add automatic alignment, or qualify flight.
 
 ## Acceptance and deterministic protocol
 
-1. Reject invalid/disabled-required configurations and skipped/repeated
-   monitor epochs; preserve state on failed supervisor calls. Verify reset,
+1. Invalid or disabled-required configurations and skipped/repeated monitor
+   epochs are rejected without changing supervisor state. Tests cover reset,
    immutability, independent clocks, deadline equality, recovery before/at
-   expiry, and latched abort after recovery.
-2. Drive the real online ESKF with explicit, deterministic observation
-   dropouts, offsets and delays. Cover an isolated outlier, persistent
-   rejection, independent stream loss, incomplete/full recovery and identical
-   prefixes with different future faults. Keep fault labels out of the
-   monitor and supervisor. This component protocol does not claim feedback
-   flight performance under dropout.
-3. Exercise public closed-loop mission integration with seed 31, a short
-   initialization/takeoff/track/virtual-land plan, both controllers, fixed
-   sensor schedules, and explicit independent delayed/rejected streams.
-   Compare every legacy numerical/event payload for nominal equivalence;
-   verify unchanged command prefixes, phase boundaries, guard priority,
-   abort before completion, and absence of commands at terminal epochs.
-4. Authenticate saved complete mission histories using the existing digest
-   boundary and reconstruct health/supervisor decisions solely from delivered
-   events and clock. Do not change the existing evidence format.
-5. Run the complete warning-strict software gate and GitHub CI. Record all
-   outcomes, including unrelated baseline flight limitations. The reserved
-   geometric qualification seeds remain unopened.
+   expiry and latched abort after recovery.
+2. Deterministic observation dropouts, offsets and delays drive the real online
+   ESKF. Cases cover an isolated outlier, persistent rejection, independent
+   stream loss, incomplete/full recovery and identical prefixes with different
+   future faults. Neither the monitor nor the supervisor receives fault labels.
+   This component protocol does not establish feedback flight performance
+   under dropout.
+3. Public closed-loop integration tests use seed 31, a short initialization/
+   takeoff/track/virtual-land plan, both controllers, fixed sensor schedules
+   and explicit independent delayed/rejected streams. Comparisons cover every
+   legacy numerical/event payload for nominal equivalence, unchanged command
+   prefixes, phase boundaries, guard priority, abort before completion and
+   absence of commands at terminal epochs.
+4. The existing digest boundary authenticates saved complete mission histories.
+   Delivered events and clock alone reconstruct health/supervisor decisions;
+   the evidence format is unchanged.
+5. Warning-strict software checks complement the component and integration
+   checks. Existing flight-performance limitations remain separate from
+   whether the supervisor implements its timeout policy correctly.
 
 The test budgets are bounded simulation examples. Their suitability for a real
 vehicle, all model mismatches, heading observability, or safe landing is not

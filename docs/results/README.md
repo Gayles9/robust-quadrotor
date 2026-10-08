@@ -14,6 +14,10 @@ hovers, four nominal trajectories and four mild-wind trajectories. Both selected
 controllers pass every clean absolute condition. The original cascade remains
 the default.
 
+Reserved cases were kept out of controller selection. A clean case has no
+injected sensor fault. Absolute conditions are limits that each controller must
+meet on its own, before comparing one controller with the other.
+
 | Metric | Geometric change versus selected cascade |
 | --- | ---: |
 | Balanced whole-flight RMSE | 4.7717% lower |
@@ -23,7 +27,8 @@ the default.
 | Balanced whole-flight peak error | 15.2880% higher |
 | Balanced squared-moment effort | 1.6736% higher |
 
-The balanced metric weights the three categories equally using log ratios. The
+The balanced metric uses log ratios to give hover, nominal flight and wind equal
+influence on the overall relative comparison. The
 4.7717% improvement misses the predeclared 10% target. Eight fault-response
 comparisons pass. These are bounded results under the declared simulation and
 supported-start assumptions; they do not establish general superiority or
@@ -39,7 +44,7 @@ mechanisms and why better average tracking can coexist with larger peaks.
 | True-state flights | Controller behavior when the simulated state is available | [Position control](../design/position-control.md), [trajectory missions](../design/trajectory-missions.md) |
 | Sensor replay and ESKF calibration | Estimator consistency within declared motion, prior and noise assumptions | [Estimation](../design/estimation.md) |
 | Noisy estimated-feedback flights | Closed-loop behavior under the exact evaluated scenarios | [Final comparison](final-geometric.md), [integrated robustness](integrated-robustness.md) |
-| Saved reports and full histories | Authentication, independent rescoring and replay of recorded executions | Each study's reproduction section and [retained records](../archive/records/README.md) |
+| Saved reports and full histories | Authentication, independent rescoring and replay of recorded executions | Each study's reproduction section and [retained records](../../evidence/README.md) |
 | Consolidated technical write-up | Implemented methods, evaluation and reported results | [Official report guide](../report.md) |
 
 The endpoint estimator's nominal study reports 95.29% central-95% NEES coverage.
@@ -49,16 +54,16 @@ pooled statistic across all of them and does not qualify closed-loop flight.
 
 ## Supporting studies
 
-| Question | Study |
+| Topic | Study |
 | --- | --- |
-| What happens during observation loss and model mismatch? | [Integrated robustness](integrated-robustness.md), [bounded vertical compensation](vertical-compensation.md) |
-| What causes the original mass and hover failures? | [Early-flight diagnosis](early-flight-diagnosis.md), [attitude startup audit](attitude-startup-audit.md) |
-| What does stationary support improve? | [Supported-start flight](supported-start-flight.md), [independent repeatability](independent-supported-start.md) |
-| Why does residual hover error remain? | [Residual diagnosis](residual-supported-hover.md), [navigation-feedback isolation](navigation-feedback-isolation.md) |
-| What changes when support is removed? | [Velocity-prior screen](supported-velocity-prior.md), [nonlinear release](nonlinear-release.md), [combined prior](combined-supported-prior.md) |
-| How do estimation channels interact? | [Combined-prior diagnosis](combined-prior-diagnosis.md), [whole-flight error budget](whole-flight-error-budget.md) |
-| Would an additional inclination measurement close the gap? | [Independent-inclination feasibility](independent-inclination-feasibility.md) |
-| What preceded the final controller comparison? | [Supported geometric study](supported-geometric.md) |
+| Observation loss and model mismatch | [Integrated robustness](integrated-robustness.md), [bounded vertical compensation](vertical-compensation.md) |
+| Mass and hover failure mechanisms | [Early-flight diagnosis](early-flight-diagnosis.md), [attitude startup audit](attitude-startup-audit.md) |
+| Stationary support and initialization | [Supported-start flight](supported-start-flight.md), [independent repeatability](independent-supported-start.md) |
+| Residual hover error | [Residual diagnosis](residual-supported-hover.md), [navigation-feedback isolation](navigation-feedback-isolation.md) |
+| First prediction after support removal | [Velocity-prior screen](supported-velocity-prior.md), [nonlinear release](nonlinear-release.md), [combined prior](combined-supported-prior.md) |
+| Coupling between estimation errors | [Combined-prior diagnosis](combined-prior-diagnosis.md), [whole-flight error budget](whole-flight-error-budget.md) |
+| Additional inclination information | [Independent-inclination feasibility](independent-inclination-feasibility.md) |
+| Shared startup with geometric control | [Supported geometric study](supported-geometric.md) |
 
 Earlier failures retain their original scope and acceptance criteria. A later
 study does not retroactively turn them into passes. Test counts in the archived

@@ -5,7 +5,11 @@ and altitude observations remain available. The optional
 [`ObservationSupervisor`](../../src/quadrotor_math/observation_supervision.py)
 uses that evidence to stop a numerical mission after a declared unhealthy-time
 budget expires. This makes persistent loss actionable without giving the
-supervisor simulated truth or claiming that fresh data proves accuracy.
+supervisor access to the simulated vehicle's exact state. Fresh data alone does
+not prove that an estimate is accurate.
+
+The monitor answers whether usable measurements are arriving. The supervisor
+answers how long this particular simulation may continue without them.
 
 ## Requirements and action
 
@@ -105,9 +109,10 @@ exactly. If numerical execution raises, only the observed diagnostic prefix
 remains; no partial mission result is returned. Histories grow with run length
 and are intended for simulation, not embedded real-time memory management.
 
-The [decision record](../decisions/0022-observation-loss-supervision.md) freezes the
-acceptance protocol; the [verification record](../archive/records/observation-loss-supervision.md)
-contains the results. Core fault tests use the real online ESKF with explicit
+The [supervision specification](../decisions/0022-observation-loss-supervision.md)
+defines the acceptance protocol; [verification evidence (ZIP archive)](../../evidence/development-records.zip)
+contains the results. Core fault tests use the real online error-state Kalman
+filter (ESKF) with explicit
 dropouts, offsets and delayed deliveries. Closed-loop tests use short stationary
 phase fixtures with independent stale/rejected streams and both controllers.
 They verify response correctness and unchanged nominal behavior, not general

@@ -1,24 +1,23 @@
-# ADR 0017: Reimplement the missing geometric controller
+# 0017: Geometric tracking with filtered force derivatives
 
-Date: 2026-09-26. Status: accepted implementation scope; performance unqualified.
+## Purpose and scope
 
-## Starting point and scope
+Geometric control compares the actual and desired orientations as rotation
+matrices, avoiding a local roll/pitch/yaw error representation. The implemented
+controller combines a geometric moment law with a twice-differentiated
+force-to-attitude map and a 30 rad/s causal derivative filter. It is optional;
+the cascade remains the default.
 
-Audit base `23936ebd8403a3620f755a53143fa7c9f641d491` matches current main.
-The published cascade, estimator and trajectory modules exist; the geometric
-implementation described in master-log chapters 26–28 does not. This is new
-source and fresh verification, not recovery of the missing implementation.
+Fixed-yaw HOLD, quintic SMOOTH and minimum-snap references are supported; STEP
+is rejected because its discontinuity does not provide the needed derivatives.
+SMOOTH uses analytic one-sided jerk and snap at segment boundaries. No true
+acceleration, drag, wind, actual motor state or true bias enters the controller.
+The nominal-model derivative closure is excluded because it produced wind bias.
 
-Rebuild the corrected geometric moment law, twice-differentiated force-to-attitude
-map, 30 rad/s three-pole causal derivative filter, and opt-in true/estimated-state
-mission composition. Retain the cascade default and its legacy call signature.
-Support fixed-yaw HOLD, quintic SMOOTH and minimum-snap references; reject STEP.
-SMOOTH uses the analytic one-sided jerk/snap at segment boundaries. No truth
-acceleration, drag, wind, actual motors or true biases enter the controller.
-
-Do not resurrect the superseded nominal-model derivative closure that caused
-wind bias. Preserve its negative result in the historical log. No dependency,
-tool-version, estimator, sensor, plant, cascade-gain or threshold changes.
+The equations below define the original filtered-force configuration. Its
+finite-case performance criteria are distinct from a proof of stability.
+The [geometric guide](../design/geometric-control.md) connects this configuration
+to the implemented alternatives and completed comparisons.
 
 ## Equations
 
@@ -32,7 +31,7 @@ Use L(s)=w/(s+w), D1=s L^3, D2=s² L^3, w=30 rad/s.
 Three trapezoidal low-pass sections give D1=w(y2-y3),
 D2=w²(y1-2y2+y3). Initialize all sections to c[0]; this yields zero
 feedback derivatives at startup. Own state, require consecutive sample indices,
-commit filter state only after successful finite arithmetic. Require 0<w*h<=1.
+update filter state only after successful finite arithmetic. Require 0<w*h<=1.
 
 b3d=normalize(u); b1d=normalize(heading_y cross b3d);
 b2d=b3d cross b1d. Differentiate normalization/cross products twice.
@@ -52,7 +51,7 @@ Held reference jets and filtered derivatives are approximations; the ideal
 continuous-time Lyapunov identity is a unit-test oracle, not a sampled-system proof.
 Reference: Lee, Leok, McClamroch, CDC 2010, DOI 10.1109/CDC.2010.5717652.
 
-## Frozen fresh acceptance, before implementation
+## Evaluation criteria for the original configuration
 
 1. Independent normalization derivatives, moving-frame inertia/energy identity,
    quaternion sign, NED hover/thrust direction, finite/domain checks and ownership.
@@ -73,11 +72,9 @@ Reference: Lee, Leok, McClamroch, CDC 2010, DOI 10.1109/CDC.2010.5717652.
    60-second hovers, seeds 30 and 93012, preserve the original 5..65 s / 8 cm gate.
    Use the original geometric position gains and matched cascade gains for spline
    pairs; also report the established v2 cascade for full-hover context.
-6. Fresh full make check with warnings as errors. Commit tested experimental
-   code even if performance promotion fails, recording all failures. Qualification
-   requires fresh evidence for this implementation; historical test counts do not
-   transfer to it. No automatic gain search is part of this reconstruction.
+6. Warning-strict software checks and authenticated saved histories verify the
+   implementation independently of the performance outcome. A controller can
+   pass its implementation tests while failing flight-performance criteria.
 
-Generated histories/logs stay outside Git. Publish source and tests on the
-reimplementation branch so the implementation remains recoverable independently
-of the local working directory.
+The criteria are specific to this configuration and campaign. Later comparison
+results do not retroactively pass a failed original case.

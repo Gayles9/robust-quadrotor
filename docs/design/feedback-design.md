@@ -10,17 +10,15 @@ The model is implemented in [cascade_analysis.py](../../src/quadrotor_math/casca
 and the profiles in [feedback_bandwidth_validation.py](../../experiments/feedback_bandwidth_validation.py).
 For the broader interpretation, read [controller tradeoffs](../results/controller-tradeoffs.md).
 
-Current reference decision (2026-09-25): retain explicit `design_version=2` as
-the limited numerical reference after the [same-case comparison](../archive/records/repository-audit.md).
-The historical 8 cm qualification failures below remain unchanged.
+Select `design_version=2` explicitly for the documented numerical reference.
+It does not satisfy every flight requirement: both available profiles have
+recorded failures against the 8 cm hover-peak limit. Version 1 remains the API
+default for reproducibility.
 
-This is the bounded numerical profile in
-`experiments.feedback_bandwidth_validation`, developed to address the noisy-hover
-qualification in [ADR 0013](../decisions/0013-estimated-state-mission-feedback.md).
-[ADR 0014](../decisions/0014-estimated-feedback-bandwidth.md) records its scope,
-development decisions and frozen acceptance rules. The original experiment is
-preserved, including its failed result. The plant, controller algorithms and ESKF
-equations are unchanged; the new profile has explicit gains and initial covariance.
+The profiles in `experiments.feedback_bandwidth_validation` use the same plant,
+controller equations and error-state Kalman filter (ESKF). They specify the gains
+and initial covariance explicitly. The [feedback protocol](../decisions/0014-estimated-feedback-bandwidth.md)
+defines the evaluation conditions and acceptance rules.
 
 ## Why the loops must be designed together
 
@@ -63,7 +61,9 @@ the underlying controller implementation has the wrong sign or frame.
 
 ## Coefficient-matched profile and sampled implementation
 
-Version 2 uses the all-real target
+Version 2 places all five continuous-model poles at a decay rate of 8 s^-1.
+A pole describes a mode of the local response: a negative real pole decays
+without oscillation. The target polynomial is
 
 ```text
 D2(s) = .025*(s+8)^5
@@ -87,11 +87,10 @@ and nonlinear stochastic performance must still be checked independently.
 
 Version 1 remains available with target
 `.025*(s+3)^2*(s+6)*(s^2+28*s+392)` and gains `3528/1003`, `3192/1003`,
-`6018/773`, `773/40`. Its 29/30 held-out result is an explicitly retained failed
-qualification. The observed miss is startup settling at the unchanged 5-s hold
-entry. Version 2 changes only these four gains relative to version 1; its
-moment-matched prior is identical. The earlier failed batch is not reused as
-fresh validation for the revised design.
+`6018/773`, `773/40`. Its held-out result is 29/30 passing cases: the failing
+case has not settled sufficiently by the 5-s hold entry. Version 2 differs only
+in these four gains; its moment-matched prior is identical. Each profile has
+a separate validation batch.
 
 `cascade_analysis.HorizontalCascade` constructs both the continuous generator
 and a sampled-data transition. Its state is `[p,v,eta,r,a]`. The latter is sampled
@@ -127,7 +126,7 @@ with tracking accuracy. No integral state or zero-offset robustness claim is add
 ## Moment-matched initialization
 
 The original prior was conservative relative to the experiment's known initial
-error population. The new prior retains the identical mean: zero position,
+error population. The population-matched prior uses the same mean: zero position,
 velocity and biases, identity body-to-world attitude. For each independent
 zero-mean uniform error on `[-a,a]`,
 
@@ -172,46 +171,47 @@ Verification includes independent characteristic coefficients, exact motor decay
 constant-input polynomial trajectories, the semigroup identity, explicit
 multirate execution, a continuous-time limit, and central finite differences of
 the nonlinear rotor/controller/RK4 execution for both horizontal frame signs.
-The new profile's initial covariance is checked by independent quadrature and
+The population-matched initial covariance is checked by independent quadrature and
 seed-independence tests. A bounded CI startup regression preserves the original
 takeoff and 5-s hover start; the separate campaign scores the complete 60-s hold.
 
 Every trial pairs estimated feedback with true-state feedback using **the same
-new gains**. This avoids attributing a changed controller to estimator degradation.
-The old profile remains a separate reproducible reference. The existing archive
-and online/offline replay audits are reused with explicit configuration; the
-paired true-state audit now also reconstructs every inner command and limit flag.
+gains**. This avoids attributing a changed controller to estimator degradation.
+Each profile is a separate reproducible reference. Stored evidence is checked
+by measurement replay, explicit configuration validation and reconstruction
+of every inner command and limit flag in the paired true-state run.
 Corruption tests demonstrate that changed commands, covariances, metrics, profiles,
 trial identities or archive bytes cannot be silently accepted.
 
 Design version 1 remains the default so existing calls and all three frozen
 protocol hashes are preserved. Select version 2 explicitly. The experiment
-uses new held-out hover seeds 93000..93019 and square seeds 94000..94009.
-Its thirteen development jobs explicitly include four already observed hover
-seeds as diagnostics. The five fixed identities and every acceptance condition
-are inherited unchanged. Report validation can use independent worker processes;
+uses held-out hover seeds 93000..93019 and square seeds 94000..94009.
+Its thirteen development jobs include four hover seeds used for diagnostics;
+those cases are not independent validation. The fixed partition contains five
+cases, with the same acceptance criteria as the baseline feedback experiment.
+Report validation can use independent worker processes;
 every full-history check must finish before publication. Tests prove exact
 serial/parallel saved bytes for identical report metadata and failure propagation
 from later workers. CLI provenance separately records the chosen worker count.
 
 ## Qualification status
 
-Both implemented profiles remain **unqualified**: version 1 passes 29/30 fresh
-cases, and version 2 passes 28/30. The failures concern the unchanged .08 m hover
+Both implemented profiles fail the complete acceptance criteria: version 1
+passes 29/30 held-out cases, and version 2 passes 28/30. The failures concern the unchanged .08 m hover
 peak criterion; numerical, replay and independent physical audits pass.
-Subsequent complex-pole and bounded-integral development probes do not close the
-gap and are not maintained controller options. The 95000/96000 seed families
-were subsequently used in the [final geometric comparison](../results/final-geometric.md);
-they are now reproduction evidence, not unused validation seeds. See the complete
-record before interpreting local poles or individual plots as system qualification.
+Complex-pole and bounded-integral development probes do not close the gap
+and are not maintained controller options. The 95000/96000 seed families belong to the
+[final geometric comparison](../results/final-geometric.md); rerunning them
+is reproduction of known cases, not new independent validation. Local poles
+or individual plots do not establish that the complete system meets its requirements.
 
 ## Reproduction
 
 Exact protocol bytes and numerical replay also depend on the floating-point
 backend. The same NumPy build with another OpenBLAS kernel can change a derived
 initial-quaternion component by one float64 unit and therefore change the raw
-protocol digest. This was reproduced locally for the final CI mismatch; it is
-not a change to the seeded population or feedback equations. NumPy's
+protocol digest. Such a byte-level difference can occur without a change to
+the seeded population or feedback equations. NumPy's
 [compatibility policy](https://numpy.org/doc/stable/reference/random/compatibility.html)
 likewise limits exact reproducibility to tightly matched execution conditions.
 
@@ -241,7 +241,7 @@ uv run python -m experiments.plot_feedback_bandwidth --workers 3 --input "$EVIDE
 uv run python -m experiments.plot_feedback_bandwidth --workers 3 --input "$EVIDENCE/validation" --output "$EVIDENCE/validation-plots"
 ```
 
-The [verification record](../archive/records/feedback-design.md) distinguishes
-measured results from the local model, retains development misses and documents
-the exact tested source and commands. No hardware, real-time, delayed-fusion,
-automatic alignment, ground-contact or fault-accommodation capability is implied.
+Read the [controller tradeoffs](../results/controller-tradeoffs.md) alongside
+the measured results. This profile does not establish hardware performance,
+real-time execution, delayed fusion, automatic alignment, ground contact or
+fault accommodation.

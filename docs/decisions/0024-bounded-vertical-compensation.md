@@ -1,18 +1,18 @@
 # ADR 0024: one bounded vertical disturbance-compensation candidate
 
-Status: frozen before implementation and candidate flights, 2026-09-28.
-Outcome: implemented and evaluated; candidate rejected. The
-[complete record](../archive/records/vertical-compensation.md) retains all
+The vertical compensation candidate is implemented and evaluated, but rejected. The
+[complete record (ZIP)](../../evidence/development-records.zip) retains all
 24 executions, 12 passing response cases, and the mass-RMSE and hover comparison
 failures. The frozen policy and acceptance conditions below are unchanged.
 
-## Audit and diagnosis
+## Motivation
 
-Audited main is `0f1702f080690b572bafee819deb6522acaadf25`, tree
-`d1814de6b03cfa3bd8ff930ea00609737bbe7372`; its post-merge CI passed.
-Fresh live-fault, evidence and position-control checks pass 163 tests in 62.80 s.
-The saved mass pair authenticates and reconstructs exactly. No preceding defect
-requires repair. Its report SHA-256 is
+A proportional–derivative (PD) controller can settle with a nonzero position
+error when its assumed mass is too small. Integral action accumulates that
+error to supply the missing steady force. This study tests one bounded vertical
+integrator while keeping the existing PD gains and estimator fixed.
+
+The saved baseline mass case has report SHA-256
 `ec85a0d6b55acc278acb18b1c7af7b02cb56c6e985dc48eaf66fbc7fd520bb09`.
 
 The 1.1 kg truth / 1.0 kg nominal case has mean vertical error 0.436975 m over
@@ -22,55 +22,58 @@ ranges 9.81..11.317405 N. The nominal PD equilibrium predicts
 `(1.1/1.0 - 1)*9.81/2.25 = 0.436 m`, matching the persistent offset.
 
 The earlier bounded-integral prototype targeted horizontal startup response
-and reached its 0.5 m/s² bound while failing the hover requirement. This task
-does not revive that architecture or repeat its gain search. It addresses the
-newly measured vertical steady-force deficit with one independently specified
+and reached its 0.5 m/s² bound while failing the hover requirement. The vertical
+candidate addresses the steady-force deficit with one independently specified
 scalar state. Estimator, references, PD gains and geometric control stay fixed.
 
 ## Candidate and state contract
 
-Add an explicit opt-in vertical integral acceleration `I` in NED m/s²:
+The explicit opt-in vertical integral acceleration `I` uses NED m/s²:
 `a_command = a_PD + [0, 0, I]`, with `I_dot = 0.5*(z_reference-z_estimate)`.
-Keep the existing position-control feasibility projection and all bounds.
+The existing position-control feasibility projection and all bounds also apply
+to the compensated command.
 The integral gain is **0.5 s^-3**, update period **0.02 s**, and state bound
-**±1.5 m/s²**. Initialize/reset to zero. No mass or fault label is an input.
+**±1.5 m/s²**. Initialization and reset set the integral state to zero. No mass or fault label is an input.
 
 The gain follows `(s+0.5)^2*(s+2) = s^3+3s^2+2.25s+0.5` for the nominal
 unsaturated vertical model with the existing PD gains. The 1.1 kg case with
 0.025 s linear motor lag has continuous poles approximately -37.1202, -1.8277,
 -0.6195 and -0.4326 s^-1. This is a design rationale, not a nonlinear proof.
 The state bound exceeds the required -0.981 m/s² steady correction without
-changing the existing ±2 m/s² acceleration limit. No gain sweep is permitted.
+changing the existing ±2 m/s² acceleration limit. The study evaluates this one
+gain without a parameter sweep.
 
-At each outer epoch, apply the current state to the command, then prepare the
-next state using forward Euler and the current estimated error. Learning is
-allowed only when both observation streams are HEALTHY. WAITING, DEGRADED,
-LOST and RECOVERING freeze the state; confirmed recovery resumes learning.
-Retain compensation across phase changes and loss, avoiding an abrupt reset.
+At each outer epoch, the current integral state contributes to the command.
+Forward Euler then computes the next state from the current estimated error.
+Learning occurs only when both observation streams are HEALTHY. WAITING,
+DEGRADED, LOST and RECOVERING freeze the state; confirmed recovery resumes
+learning. Compensation persists across phase changes and observation loss,
+avoiding an abrupt reset.
 Terminal mission guards execute before controller calls. An attitude-domain
 abort may retain a computed-but-unused outer attempt, explicitly diagnostic.
 
-Freeze integration when the previous inner command had rate, moment or
-allocation limiting. At an outer acceleration/thrust limit, reject only an
-increment that drives further into the vertical limit; allow unwinding.
-Use 1e-12 m/s² only to distinguish a projected vertical limit from roundoff.
-Finally clip the proposed integral state to its declared bound. This is bounded
+Integration freezes when the previous inner command had rate, moment or
+allocation limiting. At an outer acceleration/thrust limit, an increment is
+rejected only if it drives further into the vertical limit; unwinding remains
+allowed. A 1e-12 m/s² tolerance distinguishes a projected vertical limit from
+roundoff. The proposed integral state is then clipped to its declared bound. This is bounded
 conditional integration, not a complete actuator-dynamics anti-windup proof.
-Validate calls atomically; reject wrong clocks, nonfinite inputs, reused state,
-controller mismatch, disabled/missing health streams and geometric combination.
+Validation rejects wrong clocks, nonfinite inputs, reused state, controller
+mismatch, disabled/missing health streams and geometric combination without
+partially updating state.
 
-Keep mission and saved-history dataclasses unchanged. Record applied/next
-integral state, error, health/limit flags and update reason in a separate
-authenticated trace. Reconstruct it and every affected command on replay.
+Mission and saved-history dataclasses are unchanged. A separate authenticated
+trace records applied/next integral state, error, health/limit flags and update
+reason. Replay reconstructs that trace and every affected command.
 
-## Frozen evaluation and acceptance
+## Evaluation and acceptance
 
 Reuse all twelve ADR 0023 cases, both supervision modes, original seeds, priors,
 plant/sensor clocks, fault plans, references, controller gains, response budgets
-and flight limits. Run **24 new candidate executions**, with at most two process
-workers and single-threaded BLAS. Compare with the immutable, already audited
-24-execution baseline above; authenticate all baseline bytes again and retain
-its full report and evidence identity. Do not silently generate a new baseline.
+and flight limits. The **24 candidate executions** use at most two process
+workers and single-threaded BLAS. The comparator is the authenticated, immutable
+24-execution baseline above, identified by its complete report and evidence
+hashes rather than replaced by a newly generated baseline.
 
 Candidate acceptance requires zero numerical/evidence failures, all twelve
 inherited response checks, mass-case completion within every inherited flight
@@ -86,14 +89,13 @@ The canonical campaign protocol SHA-256 is
 `6bab1e089730485310a9d69a3d49361618c73982663b75f2a9efe8fc9fa9635e`,
 anchored in tests before the candidate maneuver campaign.
 
-The candidate remains an explicit experimental option even if this vertical
-scope passes. Whole-flight qualification, fresh seeds, a default-controller
-change and physical fallback remain separate decisions. A failure ends this
-single-candidate study with its evidence retained; do not retune or relax limits.
+The rejected candidate remains an explicit experimental option for reproduction.
+It is not the default controller, a qualified whole-flight solution or a physical
+fallback procedure. Its measured failures retain the original acceptance limits.
 
 Software acceptance includes independent sign/step/anti-windup tests, strict
 causal and invalid-call checks, unchanged default payloads, exact saved ESKF,
 health, mission, controller and compensation-trace reconstruction, rejection of
-changed protocol/claims/trace, and retained numerical failures. Use short smoke
-fixtures for CI, not as flight qualification. Run the complete warning-strict
-software gate and hosted CI before merging. Save full evidence outside Git.
+changed protocol/claims/trace, and retained numerical failures. Short smoke
+fixtures check these paths in CI; they are not flight qualification. Full
+experimental histories are kept separately from the source repository.

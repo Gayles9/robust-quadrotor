@@ -1,7 +1,5 @@
 # 0006: Measurement-Only ESKF Sensor Replay
 
-- Date: 2026-09-23
-- Status: Accepted and implemented
 - Extension: [ADR 0007](0007-eskf-innovation-gating.md) adds optional pre-update scoring,
   fixed gates and `REJECTED` events while preserving this epoch and default execution policy.
 - Extension: [ADR 0010](0010-eskf-endpoint-propagation.md) adds explicit endpoint IMU
@@ -11,7 +9,7 @@
 - Implementation: `src/quadrotor_math/eskf_replay.py`,
   `src/quadrotor_math/eskf_run_replay.py`
 - Evidence: `tests/unit/test_eskf_replay.py`, `tests/unit/test_eskf_run_replay.py`,
-  [verification record](../archive/records/eskf-sensor-replay.md)
+  [verification record (ZIP)](../../evidence/development-records.zip)
 
 ## Context and selected scope
 
@@ -29,10 +27,8 @@ timing indices and explicit estimator assumptions. It cannot inspect simulator t
 The run adapter reads only the clock and sensor/delivery fields. It does not read true
 position, velocity, attitude, angular velocity, IMU bias histories or rotor commands.
 
-This is the next bounded execution increment identified by the measurement-update
-closeout and README. It supports the master plan's Week 11 measurement-only execution
-requirement, but does not close all Week 11 experimental targets or Gate G3. Gate G2
-baseline control also remains open. No controller or closed-loop integration is implied.
+Replay is a deterministic way to evaluate recorded measurements. Online control
+uses the separate [streaming interface](0013-estimated-state-mission-feedback.md).
 
 ## Clock, initialization and IMU interval
 
@@ -214,11 +210,12 @@ The input and configuration validate before execution. If later arithmetic fails
 after an earlier successful correction, no partial public result is returned and no caller
 state, file or RNG has been changed. The whole operation can be repeated deterministically.
 Diagnostics are in memory only: neither the 35-array run schema nor its manifest is extended.
-There is no checkpoint, continuation or live-stream API in this increment.
+This batch replay API has no checkpoint or continuation state; the streaming
+interface owns its own continuation memory.
 
 ## Verification and limits of evidence
 
-The 246 new tests include independent analytic altitude and kinematic references, exact
+The replay tests include independent analytic altitude and kinematic references, exact
 composition against the public prediction/correction boundaries, left/right endpoint traps,
 an arbitrary-axis Rodrigues reference with nonzero IMU bias, quaternion-sign equivalence,
 first/final/one-row/nonuniform epochs, canonical ordering, future-prefix causality,
@@ -232,11 +229,11 @@ Twenty-four fixed-seed stationary/constant-velocity regression cases meet their 
 position-RMSE comparison, and a separate vertical-bias fixture verifies correction of
 dead-reckoning drift. Their precise durations and assertions are in the verification record.
 
-These are regression and integration results, not held-out NIS/NEES consistency, general
-IMU-bias observability, robust-flight certification or the master plan's 100-seed target.
-The initial replay increment added no outlier gate; ADR 0007 now supplies that opt-in
-extension with its own verification evidence. No estimator-result persistence schema,
-sensor-fault generator, delayed-state rewind, asynchronous IMU treatment, closed-loop
-control or ROS/PX4 integration is added by either increment.
+These are regression and integration results, not held-out consistency evidence,
+general IMU-bias observability or flight certification.
+[ADR 0007](0007-eskf-innovation-gating.md) describes opt-in outlier gating, and
+[ADR 0009](0009-eskf-completion-validation.md) describes the separate consistency
+and fault campaign. Replay does not implement delayed-state rewind, asynchronous
+IMU treatment or middleware transport.
 Revisit this contract when one of those capabilities requires new timing or data semantics;
 do not silently relax the adapter or treat stale data as current.

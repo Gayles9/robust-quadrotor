@@ -13,7 +13,9 @@ explicit parameters and random seeds, and retain failures alongside successes.
 - A nonlinear flight model with rotor allocation, motor response, wind and drag.
 - Simulated inertial, position and altitude sensors, with recorded measurements
   and a 15-state error-state Kalman filter (ESKF) for estimating motion and bias.
-- Cascaded and geometric controllers, plus virtual takeoff, tracking and landing.
+- Two control approaches: nested position and attitude feedback loops, and a
+  geometric controller that works directly with rotations. Both support virtual
+  takeoff, tracking and landing.
 - Minimum-snap trajectory planning: smooth polynomial paths through timed waypoints.
 - Deterministic tests, saved-history replay and bounded comparison studies.
 
@@ -45,14 +47,14 @@ for each run; generated results are excluded from Git.
 
 ## Explore the project
 
-| Your next question | Start here |
+| Topic | Documentation |
 | --- | --- |
-| How do I install, run a flight and inspect its outputs? | [Getting started](docs/guides/getting-started.md) |
-| How does the flight loop fit together? | [System design](docs/guides/system-design.md) |
-| Where are the equations and implementation interfaces? | [Technical documentation](docs/README.md) |
-| What has been demonstrated, and under which assumptions? | [Results and validation](docs/results/README.md) |
-| Why do the controllers behave differently? | [Controller tradeoffs](docs/results/controller-tradeoffs.md) |
-| What does the official technical write-up cover? | [Report guide](docs/report.md); PDF and source will be added separately |
+| Installation, examples and outputs | [Getting started](docs/guides/getting-started.md) |
+| Flight loop and component boundaries | [System design](docs/guides/system-design.md) |
+| Equations and implementation | [Technical documentation](docs/README.md) |
+| Demonstrated performance and limitations | [Results and validation](docs/results/README.md) |
+| Controller behavior and tradeoffs | [Controller tradeoffs](docs/results/controller-tradeoffs.md) |
+| Official technical write-up | [Report guide](docs/report.md); PDF and source will be added separately |
 
 Core algorithms are in [`src/quadrotor_math`](src/quadrotor_math), reproducible
 study runners and plotters in [`experiments`](experiments), and checks and small

@@ -1,9 +1,15 @@
 # Measurement-Driven Error-State Kalman Filter
 
-The estimator combines fast but drifting IMU integration with slower position
-and altitude observations. It maintains both an estimated state and uncertainty
-about that state. I use a three-component local rotation error so attitude
-corrections respect the quaternion's unit-length constraint.
+The estimator combines fast but drifting inertial measurement unit (IMU) readings
+with slower position and altitude observations. The IMU contains an accelerometer
+and gyroscope. Integrating their readings predicts motion between observations;
+position and altitude measurements then correct that prediction.
+
+An error-state Kalman filter (ESKF) tracks uncertainty in small corrections to
+its best estimate. I use a three-component local rotation error so attitude
+corrections respect the quaternion's unit-length constraint. A quaternion is
+a four-number representation of orientation; its unit-length constraint leaves
+three independent rotation coordinates.
 
 The core is in [eskf.py](../../src/quadrotor_math/eskf.py), with the sampled-IMU
 extension in [eskf_endpoint.py](../../src/quadrotor_math/eskf_endpoint.py) and live
@@ -12,28 +18,40 @@ epoch handling in [eskf_online.py](../../src/quadrotor_math/eskf_online.py).
 [controller tradeoffs](../results/controller-tradeoffs.md) explains why an accurate estimate
 at one instant does not guarantee a small physical tracking error.
 
-The estimator is a known-prior, fixed-gravity, 15-error-state inertial navigation filter.
-It estimates NED position and velocity, body-to-world attitude and FRD accelerometer and
-gyroscope biases from paired IMU samples, local Cartesian position and positive-up
-altitude. Its runtime mathematics and measurement replay use NumPy only. The completion
-boundary and predeclared acceptance protocol are in [ADR 0009](../decisions/0009-eskf-completion-validation.md).
-Measured outcomes belong to the completion verification record; execution success alone
-does not establish statistical consistency or observability.
+The filter requires an initial estimate and covariance supplied by the caller
+and assumes known, fixed gravity. Its 15 error coordinates describe position,
+velocity, attitude, accelerometer bias and gyro bias, with three coordinates
+each. Position and velocity use north-east-down (NED) axes; sensor biases use
+forward-right-down (FRD) body axes. Runtime mathematics and measurement replay
+use NumPy only. The [evaluation protocol](../decisions/0009-eskf-completion-validation.md)
+defines the tested motion, noise and acceptance conditions.
 
-The original [completion record](../archive/records/eskf-completion.md) documents 100 held-out
+A covariance matrix describes uncertainty and how errors in different coordinates
+are related. **NEES** (normalized estimation error squared) compares actual
+state error with that covariance. **NIS** (normalized innovation squared)
+compares a measurement's prediction error with its expected uncertainty.
+NEES requires simulated truth and is used for evaluation; NIS can be calculated
+from measurements and the filter alone. Neither a successful run nor a single
+low error proves that the uncertainty model is calibrated.
+
+## Demonstrated estimator performance
+
+The [first-order evaluation (ZIP archive)](../../evidence/development-records.zip) contains 100 held-out
 30-second nominal trajectories with no divergence and the completed fault/bias/sensitivity
 evaluation. Full-state NEES coverage is 88.84%, below the declared investigation band.
-That calibration finding remains explicit; the basic implementation and engineering
-evidence are complete, while an unqualified statistical-consistency claim is not supported.
-The explicit endpoint method in [ADR 0010](../decisions/0010-eskf-endpoint-propagation.md)
-addresses numerical propagation and its sampled-noise covariance together. The original
-first-order method remains the default for compatibility; select endpoint mode explicitly
-as described below. Its [separate evaluation](../archive/records/eskf-endpoint-calibration.md)
-used 100 fresh held-out seeds and 380 replays across distinct evaluation groups.
+The first-order method therefore does not support an unqualified
+statistical-consistency claim.
+The [endpoint method](../decisions/0010-eskf-endpoint-propagation.md)
+addresses numerical propagation and its sampled-noise covariance together. The
+first-order method is the API default; select endpoint mode explicitly
+as described below. Its [separate evaluation (ZIP archive)](../../evidence/development-records.zip)
+uses 100 held-out seeds and 380 replays across distinct evaluation groups.
 For the nominal endpoint group, central-95% NEES coverage was **95.29%** with
-mean **14.60**, versus 91.99% and 16.96 for the paired original method. The
-coverage statistic averages the epoch-wise fractions across the nominal seeds;
-it does not pool all 380 nominal and fault replays.
+mean **14.60**, versus 91.99% and 16.96 for the paired first-order method.
+At each sampled time, coverage is the fraction of nominal runs whose NEES
+lies inside the central 95% chi-square interval for 15 degrees of freedom.
+The reported statistic averages those fractions over time. It does not pool
+all 380 nominal and fault replays.
 Mean position RMSE was .06739 m versus .06809 m. There were no numerical failures or
 nominal/gated divergences, and the declared bias/fault/recovery targets passed. This
 supports improved consistency for the tested distribution; it is not a universal guarantee.
@@ -71,6 +89,11 @@ record remains separate from the known-prior statistical-calibration campaign ab
 
 ## State, prediction and correction
 
+Prediction advances the estimate using the IMU; correction adjusts it when
+an observation arrives. The **prior** is the estimate before that correction,
+and the **posterior** is the estimate afterward. An **epoch** is one sampled
+time.
+
 The nominal state is `(position_W, velocity_W, q_WB, accelerometer_bias_B,
 gyroscope_bias_B)`. The Hamilton scalar-first unit quaternion `q_WB` maps FRD body
 coordinates to NED world coordinates. There are 16 stored scalars but only 15 local
@@ -88,7 +111,8 @@ noise signs, first-order transition and covariance equations are specified in
 [ADR 0004](../decisions/0004-eskf-error-state-conventions.md). Bias random walks increase
 uncertainty even though the nominal biases remain constant during prediction.
 
-The position prediction is `p_W + assumed_position_bias_W`; the altitude prediction is
+The predicted position measurement is `p_W + assumed_position_bias_W`;
+the altitude prediction is
 `reference_altitude - p_W[2] + assumed_altitude_bias`. Thus a positive altitude innovation
 corrects the NED-down coordinate negatively. Sensor biases here are explicit assumptions,
 not additional estimated states. For observation `z`, prediction `h`, Jacobian `H`, prior
@@ -99,9 +123,10 @@ covariance, and the SO(3) right Jacobian resets its attitude coordinates and eve
 attitude cross-covariance. See [ADR 0005](../decisions/0005-eskf-measurement-updates.md).
 
 The caller must supply a meaningful initial pose/velocity/bias estimate and covariance
-at the first IMU timestamp. There is no automatic stationary alignment, magnetometer
-heading, Earth-rate/geodetic correction or unknown-pose bootstrap. Small local attitude
-errors and meaningful uncertainty are part of the filter model; passing array validation
+at the first IMU timestamp. These APIs do not perform automatic stationary
+alignment or unknown-pose initialization. There is no magnetometer heading
+or Earth-rate/geodetic correction. Small local attitude errors and meaningful
+uncertainty are part of the filter model; passing array validation
 does not make arbitrary large-error initialization reliable.
 
 ## Endpoint integration and matched sample-noise covariance
@@ -148,7 +173,9 @@ $$C_1=AC A^T+B\operatorname{diag}(\Sigma,Wh)B^T.$$
 `C` is joint covariance and `W` is bias-increment spectral density. The 12 driver
 coordinates are new accelerometer/gyro noise followed by accelerometer/gyro bias
 increments. All derivatives, including signs of endpoint bias effects and the SO(3)
-right Jacobian, are specified in ADR 0010. No empirical covariance multiplier is used.
+right Jacobian, are specified in the
+[endpoint derivation](../decisions/0010-eskf-endpoint-propagation.md).
+No empirical covariance multiplier is used.
 
 Corrections have joint Jacobian `[H,0]`. `update_eskf_endpoint` conditions both the
 physical estimate and the current sample-noise mean, uses a full Joseph covariance,
@@ -248,7 +275,8 @@ Central differences independently verify `p_dot=v`, `v_dot=a` and
 the existing left-held nominal integration has first-order error for changing inputs.
 The stationary control uses zero motion. The translating/yaw control uses NED velocity
 `[.5,-.25,.1]` m/s and yaw rate `.2` rad/s. Excited motion uses the predeclared independent
-amplitude/frequency/phase distributions in ADR 0009. It is a rigid-body kinematic
+amplitude/frequency/phase distributions in the
+[evaluation protocol](../decisions/0009-eskf-completion-validation.md). It is a rigid-body kinematic
 estimator test, not evidence of achievable thrust, closed-loop tracking or rotor feasibility.
 
 Measurements add true bias and independent Gaussian white sample noise. Bias increments
@@ -273,7 +301,10 @@ source. Reindexed survivors preserve acquisition order; the ledger retains origi
 identities. Delays beyond the horizon become pending. Unknown/duplicate source IDs,
 invalid offsets and arithmetic overflow fail atomically. No IMU samples are altered.
 
-Precision is `TP/(TP+FP)`, recall is `TP/(TP+FN)` and false-positive rate is
+Precision is the fraction of rejected readings that are injected outliers;
+recall is the fraction of injected outliers that are rejected. With TP/FP
+denoting true/false positives and TN/FN true/false negatives, precision is
+`TP/(TP+FP)`, recall is `TP/(TP+FN)` and false-positive rate is
 `FP/(FP+TN)`. A positive label means an injected nonzero outlier; a positive decision
 means NIS rejection. Dropped, stale, pending, disabled and unscored observations are
 counted separately and never treated as true negatives. An empty denominator is `null`,
@@ -329,16 +360,13 @@ the frozen protocol/hash, complete unique trial/variant identities and clocks, t
 recomputes aggregate results, counters and assessments. Inconsistent evidence is rejected
 before output creation. Version 1 remains readable through its verified fixed-clock
 convention; the original report and source provenance are preserved. These checks detect
-truncation or stale summaries, but do not authenticate the underlying execution. See the
-[post-merge audit](../archive/records/eskf-post-merge-audit.md) for the corrections and
-numerical compatibility evidence.
+truncation or stale summaries, but do not authenticate the underlying execution.
 
-## Interpreting completion
+## Interpreting the evidence
 
-The acceptance target is a functioning basic ESKF under its documented input, prior,
-noise and timing contracts, with measured estimation and fault evidence. The code reports
-execution success separately from numerical performance and statistical findings. The
-90–98% consistency investigation band is not an automatic tuning objective. Repeated
+The evidence applies to the documented input, prior, noise and timing contracts.
+The code reports execution success separately from numerical performance and
+statistical findings. The 90–98% consistency investigation band is not an automatic tuning objective. Repeated
 epochs are correlated; the independent-replicate count is the number of seeds at an
 epoch, not the number of time samples. Pointwise bands are not simultaneous guarantees.
 
@@ -348,6 +376,6 @@ apply to the excited evaluation distribution, not every flight or every initial 
 Default propagation remains first order; endpoint mode has its explicit discrete sample
 contract and second-order smooth-motion accuracy. Both retain local Gaussian assumptions. Persistent
 observation loss, sustained wrong-model rejection, large attitude errors, hardware faults,
-unknown datums and unobservable states remain technical limits. The separate control gate,
-live transport, estimator continuation/persistence, delayed correction and flight-stack
-integration are not established by this estimator-only completion.
+unknown datums and unobservable states remain technical limits. Estimator-only
+tests do not establish closed-loop flight performance, live transport, saved
+estimator continuation, delayed correction or flight-stack integration.

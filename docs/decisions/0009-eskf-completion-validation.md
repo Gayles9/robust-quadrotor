@@ -1,42 +1,37 @@
 # 0009: Estimator Completion Scope and Validation Protocol
 
-- Date: 2026-09-23
-- Baseline: `a95fbfcc2054a9a18151cb4c7d58d3b5817d4642`
-- Status: Implemented; protocol specified before implementation and held-out execution
-- Evidence: [completion verification record](../archive/records/eskf-completion.md)
+- Evidence: [completion verification record (ZIP)](../../evidence/development-records.zip)
 
-## Completion boundary
+## Evaluation scope
 
-Complete the measurement-driven, known-prior, fixed-gravity 15-state ESKF described
-by ADRs 0004–0008 and the master plan's Weeks 10–12. Prediction, position/altitude
-correction, bias estimation, Joseph covariance, right-local injection/reset and NIS
-gating already exist. This task closes their remaining validation and experiment
-requirements. It does not assert that an arbitrary Kalman filter can estimate an
-unobservable state or that a finite test campaign proves correctness everywhere.
+The validation campaign tests the known-prior, fixed-gravity, 15-state ESKF
+described in ADRs 0004–0008. It covers prediction, position/altitude correction,
+bias estimation, Joseph covariance updates, right-local injection/reset and NIS
+gating. The question is whether those components work together under stated
+motion, noise and fault distributions. Finite tests cannot establish correctness
+everywhere or recover a state that the observations do not make observable.
 
-Retain explicit stale rejection: the plan allows a non-rewinding filter and names
-history rewind as stretch scope. Live transport, asynchronous IMU, unknown-pose
-initialization, controllers, mission logic, ROS/PX4 and flight validation are separate
-integration work. G2 is not closed by estimator-only evidence.
+The filter rejects stale observations instead of rewinding its history. Live
+transport, asynchronous IMU and unknown-pose initialization are outside this
+campaign; estimator-only evidence does not qualify closed-loop flight.
 
-## Work packages and evidence
+## Evidence
 
-1. Independent continuous analytic rigid-body motion, with exact position derivatives,
-   Euler-composed body-to-world quaternion and analytically differentiated body rates.
-   Verify derivatives numerically and compare noise-free integration under step refinement.
-   These are estimator fixtures, not dynamically feasible rotor-command trajectories.
-2. Deterministic, immutable position/altitude fault injection: dropout, additive single
-   outlier or burst, and additional delivery delay. Preserve acquisitions, reindex surviving
-   streams explicitly, and keep original identities and fault labels outside the estimator.
-   Verify ordering, pending/stale behavior, ownership, invalid inputs and atomic failure.
-3. A frozen Monte Carlo protocol with distinct development and held-out seeds, measured
-   errors, NIS/NEES, bias convergence, paired dead reckoning, fault detection, uncertainty
-   growth/recovery and Q/R sensitivity. Count every failed or divergent seed.
-4. Headless, reproducible plots and compact scalar/position-velocity Kalman examples with
-   analytical tests. Matplotlib is a development dependency only; core remains NumPy-only.
-5. Compatibility checks, full tests/static checks, documentation, GitHub CI and merge review.
+1. Independent continuous analytic rigid-body motion supplies exact position
+   derivatives, Euler-composed body-to-world quaternions and differentiated body
+   rates. Numerical differentiation and step refinement check these fixtures.
+   They are estimator references, not rotor-feasible flight trajectories.
+2. Deterministic position/altitude faults cover dropout, isolated and burst
+   outliers, and delayed delivery. Original identities and fault labels remain
+   outside the estimator; tests check ordering, stale/pending behavior and ownership.
+3. A Monte Carlo protocol uses distinct development and validation seeds to
+   measure errors, NIS/NEES, bias convergence, fault detection, uncertainty
+   growth/recovery and Q/R sensitivity, retaining every failure.
+4. Headless plots and scalar/position-velocity Kalman examples make the measured
+   behavior inspectable. Matplotlib is a development dependency; the mathematical
+   package depends only on NumPy.
 
-## Protocol v1 (frozen before evaluation)
+## First-order evaluation protocol (version 1)
 
 - Independent PCG64 streams use `SeedSequence([0x45534B43,1,stream_id,seed],pool_size=4)`.
   Stream IDs: motion 0, prior 1, initial biases 2, accelerometer white 3, gyro white 4,
@@ -89,18 +84,18 @@ integration work. G2 is not closed by estimator-only evidence.
 - Q/R sensitivity is diagnostic; it intentionally includes wrong assumptions and has no
   fabricated consistency-pass threshold. Nominal and fault failures still fail the CLI.
 
-## Review and reproducibility rules
+## Reproducibility
 
 The canonical finite JSON protocol and source digests are recorded before each campaign.
 Exact seeds, trajectory parameters, priors, failures, event counts and measured summaries
 are retained. A failed variant suppresses its complete-ensemble summary; finite divergent
 trials remain included. Plots derive only from stored results and preserve failures and
-out-of-band findings. Generated reports/figures/logs stay out of Git. Record commands,
-versions, commits and results in the completion progress record after verification.
+out-of-band findings. Generated reports, figures and logs stay outside Git;
+the evidence records command, environment and source identities.
 
-Production behavior must not be changed just to improve reported metrics. If analytic
-checks expose a mathematical error, fix and test its cause, document the protocol revision
-and use fresh held-out seeds; do not conceal the original evaluation.
+Validation data is not tuning data. A mathematical correction requires its own
+verified implementation and fresh validation seeds; the original evaluation
+retains its outcome.
 
 ## Recorded consistency qualification
 
@@ -112,7 +107,7 @@ target is **not** marked passed. NIS coverage was 94.9568% (position) and 94.768
 
 Development-only exact/noiseless and step-refinement probes identify a deterministic
 integration contribution. They are diagnostic evidence, not replacement held-out results
-or a proof that every contribution has been isolated. Basic ESKF implementation and the
-G3 engineering-evidence scope are complete with this documented calibration limitation;
-an unqualified statistical-consistency claim is not supported. The verification record
-contains the exact results, interpretation, commands and source identity.
+or a proof that every contribution has been isolated. The first-order campaign
+does not support an unqualified statistical-consistency claim. The separate
+[endpoint campaign](0010-eskf-endpoint-propagation.md) evaluates a matched
+sampled-IMU propagation and covariance model.

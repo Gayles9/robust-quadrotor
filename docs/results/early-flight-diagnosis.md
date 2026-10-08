@@ -1,9 +1,11 @@
 # Early-flight diagnosis
 
-The current mass and hover failures have different mechanisms. The bounded
-[ADR 0025 investigation](../decisions/0025-causal-early-flight-diagnosis.md) separates
-them without changing a production controller, seed, scoring window or limit.
-The [dated evidence](../archive/records/early-flight-diagnosis.md) retains the
+A vehicle that is heavier than the controller assumes and a vehicle with an
+initial tilt-estimation error can both track poorly, for different reasons.
+This [investigation](../decisions/0025-causal-early-flight-diagnosis.md) separates
+those mechanisms without changing controller settings, seeds, scoring windows
+or limits.
+The [verification evidence (ZIP archive)](../../evidence/development-records.zip) retains the
 measured results and their limits.
 
 ## Mass transient
@@ -72,7 +74,7 @@ RMS values of these terms are descriptive and are not additive percentages of
 closed-loop causation. Endpoint diagnostics hold the last command; they do not
 represent a new terminal command.
 
-The default remains cascade. Geometric control and vertical compensation keep
-their existing research status. The subsequent [startup audit](attitude-startup-audit.md)
-and supported-start studies are complete; [current results](README.md) explain
-their outcomes. This diagnosis does not authorize gain tuning or controller promotion.
+Cascade remains the default. Geometric control and vertical compensation remain
+research options. The [startup audit](attitude-startup-audit.md) explains the
+available attitude information, while the [results overview](README.md) places
+this diagnosis alongside the supported-start flight studies.

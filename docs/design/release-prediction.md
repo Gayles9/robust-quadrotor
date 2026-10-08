@@ -1,21 +1,29 @@
 # First prediction after support removal
 
-The experiment-only release correction passes its equation, derivative, sample
-ownership and replay checks. It removes the previous 1.22625 cm/s ballistic
-velocity bias in all 17 saved release configurations. This first-order model
-does not justify an exact zero-velocity prior: it misses nonlinear uncertainty
-in three directions that its covariance reports as exact constraints. The later
-[nonlinear model](../results/nonlinear-release.md) handles those terms and the
-[combined-prior study](../results/combined-supported-prior.md) evaluates their flight effect.
+Removing physical support changes the forces on the vehicle abruptly. The
+accelerometer sample taken while supported therefore cannot represent the
+force acting just after release. This experiment-only correction treats that
+first prediction interval explicitly, removing a 1.22625 cm/s ballistic velocity
+bias in all 17 saved release configurations.
 
-The [frozen decision](../decisions/0035-release-aware-prediction.md) and
-[verification record](../archive/records/release-aware-prediction.md) separate
-these outcomes. This step runs no new scientific flight. The existing 10.18 cm
-hover peak still fails the original 8 cm requirement; cascade remains default.
+The correction passes its equation, derivative, sample-ownership and replay
+checks. Its first-order uncertainty model does not justify an exact
+zero-velocity prior, which would declare the initial velocity known without
+uncertainty. It misses nonlinear uncertainty in three directions that its
+covariance reports as exact constraints. The [nonlinear model](../results/nonlinear-release.md)
+handles those terms; the [combined-prior study](../results/combined-supported-prior.md)
+evaluates their flight effect.
+
+The [release specification](../decisions/release-aware-prediction.md) and
+[verification evidence (ZIP archive)](../../evidence/development-records.zip) distinguish
+model correctness from flight performance. This study reuses saved release
+configurations and does not run new flights. Its input campaign's 10.18 cm hover
+peak exceeds the 8 cm requirement. The cascade controller remains the default.
 
 ## Causal first interval
 
-The fresh sample at release measures the supported left limit. The first
+The fresh sample at release measures the supported left limit: the condition
+immediately before support disappears. The first
 post-release sample arrives h=0.0025 s later. Support disappears between them,
 so averaging their accelerometer values treats a force discontinuity as a ramp.
 No additional simultaneous sample is available or invented.
@@ -134,7 +142,7 @@ terms do not establish large flight error. They establish that an exact singular
 Gaussian constraint is not justified by this first-order calculation. The old
 broad prior remains rank 21; that is also not proof of full calibration.
 
-## Reproduce and continue
+## Reproduce and interpret the result
 
 ```bash
 OPENBLAS_NUM_THREADS=1 uv run python -W error -m experiments.release_prediction_validation --campaign results/independent-supported-start --output results/release-prediction
@@ -142,17 +150,17 @@ OPENBLAS_NUM_THREADS=1 uv run python -W error -m experiments.release_prediction_
 uv run pytest -q tests/unit/test_release_prediction.py
 ```
 
-The input is the authenticated original 34-flight campaign. Both commands exit
-zero when execution/verification succeeds; the explicit report decision still
-rejects the exact velocity prior. Generated evidence includes all 170,000
+The input is the authenticated 34-flight independent supported-start campaign.
+Both commands exit zero when execution/verification succeeds; the explicit
+report decision still rejects the exact velocity prior. Generated evidence includes all 170,000
 nonlinear outputs and their paired linear outputs, full covariances, the old
 screens and an independent NumPy-only verifier.
 
-The subsequent [nonlinear joint model](../results/nonlinear-release.md) now retains these
+The [nonlinear joint model](../results/nonlinear-release.md) retains the missing
 rotation/bias/noise products and passes the full uncertainty checks. Its isolated
-original-prior flight comparison does not fix the failed hover requirement.
-That later result supersedes this component record's next action, not its
-first-order mathematics. The later [combined-prior comparison](../results/combined-supported-prior.md) is also
-complete and fails no-regression; fresh validation remains necessary before
-normal mission integration. Mass
-compensation and geometric qualification remain separate.
+flight comparison with the broad velocity prior does not fix the failed hover
+requirement. The [combined-prior comparison](../results/combined-supported-prior.md)
+passes its tested absolute limits but fails the separate no-regression criterion.
+Fresh validation remains necessary before ordinary mission integration. These
+results concern startup estimation; they do not establish mass compensation or
+general geometric-controller performance.

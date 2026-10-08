@@ -1,21 +1,24 @@
 # Nonlinear joint release uncertainty
 
-The experiment-only first-release predictor now includes the nonlinear
-rotation/bias/sample-noise terms that first-order propagation omitted. Its full
-joint uncertainty passes the fixed mathematical checks under both the original
-and exact supported-velocity priors. Mathematical acceptance does not establish
-better flight performance or authorize using the exact prior in a mission.
+Removing mechanical support changes acceleration abruptly. The estimator's
+first prediction must account for that boundary and for how uncertain rotation,
+sensor bias and measurement noise interact. This experimental predictor includes
+those nonlinear interactions, which first-order propagation omits.
 
-The [frozen protocol](../decisions/0036-nonlinear-release-flight-comparison.md)
+Its full joint uncertainty passes the fixed mathematical checks under both the
+original and exact supported-velocity priors. Passing these checks does not by
+itself establish better flight performance or justify normal mission integration.
+
+The [study protocol](../decisions/nonlinear-release-flight-comparison.md)
 separates that prerequisite from 25 isolated flight comparisons. Only the original
 velocity prior enters these flights. Controller settings, support conditions,
 sensor draws, subsequent estimator intervals and acceptance thresholds remain
-unchanged. The [verification record](../archive/records/nonlinear-release.md)
+unchanged. The [verification record (ZIP)](../../evidence/development-records.zip)
 reports implementation, measured benefit and adoption separately.
 
 This isolates the release-prediction package from velocity conditioning. It does
 not separately identify the flight effects of the one-sided force rule, nonlinear
-mean adjustment and nonlinear covariance; they form one frozen candidate.
+mean adjustment and nonlinear covariance; they form one predeclared candidate.
 
 ## Derivation
 
@@ -127,11 +130,11 @@ comparison; that is different from an execution or evidence exception. Saved
 verification reconstructs results without rerunning a scientific flight.
 Evidence is written through durable no-clobber staging and retained outside Git.
 
-The initializer and correction remain experimental. The subsequent
+The initializer and correction remain experimental. The
 [combined-prior study](combined-supported-prior.md) uses these boundary-only
-results as controls under its separately frozen scope. Fresh validation must
-precede normal integration. Cascade remains the default; geometric qualification
-and mass compensation are separate unresolved work.
+results as controls for evaluating exact supported velocity. Independent
+validation is required before normal integration. Cascade remains the default;
+broader controller qualification and mass compensation remain unresolved.
 
 The completed 25-flight comparison passes six of nine clean no-regression
 comparisons and all eight fault-response comparisons. Only two of three hover

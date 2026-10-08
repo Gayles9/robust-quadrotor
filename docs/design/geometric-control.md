@@ -4,26 +4,25 @@ The geometric controller works directly with rotation error. It also uses the
 desired angular velocity and acceleration to anticipate the turning motion
 needed to follow a changing thrust direction. This feedforward helps in the
 tested true-state flights, but requires reliable derivatives of the desired
-force. With noisy estimated feedback, that derivative calculation is the main
-design difficulty.
+force. A derivative describes how quickly a quantity changes. Computing it
+from noisy estimates can magnify noise, so derivative filtering is a central
+design concern.
 
-I keep this controller opt-in while its measured benefits, remaining tradeoffs
-and integration requirements are assessed. Read
+I keep this controller opt-in because its measured tracking benefits come
+with higher peak errors and moment effort in the final comparison. Read
 [controller problems and tradeoffs](../results/controller-tradeoffs.md) and the
 [final bounded comparison](../results/final-geometric.md) for the current evidence before
 the equations below.
-The [baseline implementation record](../archive/records/geometric-reimplementation.md)
-and [tuning audit](../archive/records/geometric-project-audit.md) document its
-fresh verification under [ADR 0017](../decisions/0017-geometric-reimplementation.md).
-
-The later [supported-start comparison](../results/supported-geometric.md) combines the
-existing coherent-force profile with supported alignment, exact initial velocity
-and nonlinear release prediction. It has its own prospective gate and does not
-change the recorded decisions for the earlier geometric studies.
+The [geometric protocol](../decisions/0017-geometric-reimplementation.md)
+defines the baseline evaluation. The [supported-start comparison](../results/supported-geometric.md)
+combines a filtered-force profile with supported alignment, exact initial
+velocity and nonlinear release prediction. These are separate experimental
+configurations with their own evaluation criteria.
 
 The [final axis-dependent shaping study](../results/final-geometric.md) implements separate
-horizontal and vertical force-filter poles with coherent derivative jets. It
-compares independently selected geometric and cascade gains, then locks both
+horizontal and vertical force-filter poles. Its force value and derivatives
+come from the same filtered signal, so they describe a consistent reference.
+The study compares independently selected geometric and cascade gains, then locks both
 profiles for regression and reserved validation. The experiment remains outside
 the default mission path and preserves the original rotation-based moment law.
 
@@ -83,6 +82,10 @@ abort because clipped references require different derivative equations.
 
 ## Causal filter
 
+A causal filter uses only measurements already available. It smooths the
+feedback signal before estimating its derivatives, trading sensitivity to
+noise against response delay.
+
 By default, `FeedbackDerivativeFilter(period_s, pole_rad_s=30)` estimates the
 derivatives of `c`. The force value itself remains unfiltered; planned derivatives remain
 analytic. Three cascaded sections implement the bilinear images of
@@ -106,13 +109,13 @@ for a new run or period. Require resolved coefficients and `0<w*h<=1`.
 
 This removes the artificial derivative feedforward at constant feedback error.
 It does not remove steady wind position error or estimator bias. Since the force
-is unfiltered while its derivatives are filtered, the jets approximate the raw
-feedback reference; they are not its exact continuous derivatives.
+is unfiltered while its derivatives are filtered, the derivative estimates
+approximate the raw feedback reference; they are not its exact continuous derivatives.
 
 ### Optional estimator-correction rebasing
 
-[ADR 0018](../decisions/0018-geometric-estimator-corrections.md) adds
-`GeometricControllerParameters(rebase_estimator_corrections=True)`.
+`GeometricControllerParameters(rebase_estimator_corrections=True)` enables
+[estimator-correction rebasing](../decisions/0018-geometric-estimator-corrections.md).
 It separates accepted ESKF position/velocity revisions from physical motion.
 For an injected world-frame correction `(delta_p, delta_v)`, accumulate
 `delta_c=m*(Kp*delta_p+Kv*delta_v)` between outer ticks. Translate the filter's
@@ -166,8 +169,8 @@ sensor and estimator inputs. This snippet constructs the controller selection;
 the complete experiment commands below construct and execute a flight.
 
 Use the existing `AttitudeControllerParameters` for nominal inertia, rotors and
-limits, and `PositionControllerParameters` for translational gains. The new
-parameters specify scalar geometric gains and the derivative pole. Defaults
+limits, and `PositionControllerParameters` for translational gains. The geometric
+parameters specify scalar gains and the derivative pole. Defaults
 continue to select the cascade. For an explicit estimated cascade minimum-snap
 comparison, use `allow_minimum_snap=True`.
 
@@ -182,7 +185,7 @@ separate labelled truth safety guards. No terminal command is recorded on abort.
 Mission startup creates fresh filter memory. Legacy diagnostic calls retain
 exactly their original positional arguments when the option is absent.
 
-Run the fresh, fixed campaign with:
+Run the fixed baseline campaign with:
 
 ```bash
 OPENBLAS_NUM_THREADS=1 uv run python -m experiments.geometric_reimplementation_validation \
@@ -206,15 +209,15 @@ ratio 0.9 (`Kp=frequency**2`, `Kv=1.8*frequency`). Vertical/attitude gains,
 estimator prior, sensor distributions and the filter pole stay fixed.
 The implemented `--stage qualification` would run the original 28-case matrix
 plus twelve reserved cases after a candidate clears development. That stage
-was not run for these six rejected profiles. That unopened conditional stage
-retains its original status; the later [final comparison](../results/final-geometric.md)
-uses a separate protocol. The runner reports candidate qualification separately
-from known comparator hover failures.
+was not run for these six rejected profiles, so it has no reported results.
+The [final comparison](../results/final-geometric.md) uses a separate protocol.
+The runner reports candidate qualification separately from known comparator
+hover failures.
 
 ### Measured physical derivatives
 
-[ADR 0019](../decisions/0019-measured-geometric-derivatives.md) provides another
-explicit experiment: `use_measured_acceleration=True`, mutually exclusive with
+The [measured-derivative experiment](../decisions/0019-measured-geometric-derivatives.md)
+selects `use_measured_acceleration=True`, mutually exclusive with
 rebasing. The estimated adapter computes
 `a_hat=R_hat*(f_measured-bias_a-conditional_noise_a)+g*e3` from available IMU
 and posterior ESKF quantities. At outer ticks, the filter takes `F=m*a_hat`
@@ -235,8 +238,8 @@ For the two additional rebasing profiles, `--stiffness 1.28` selects the gain
 derived from critical roll damping at frequencies 1 or 1.5. The original
 three profiles keep stiffness 0.64.
 
-**All six profiles were rejected for performance promotion.** The
-[project audit](../archive/records/geometric-project-audit.md) retains the
-complete results and explains the tradeoffs. Fresh validation cases remain
-unopened because no candidate clears the known development conditions.
-The cascade default and the original geometric defaults are unchanged.
+**All six correction-study profiles failed their development performance
+criteria.** Their conditional qualification stage was not run. The
+[controller tradeoffs](../results/controller-tradeoffs.md) explain these limits;
+the [final comparison](../results/final-geometric.md) reports a separate
+axis-dependent force-shaping study. The cascade remains the default controller.

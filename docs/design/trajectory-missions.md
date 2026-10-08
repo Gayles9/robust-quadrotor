@@ -1,19 +1,25 @@
 # Trajectory bounds, timing and true-state missions
 
 This layer checks whether a planned path is reasonable to ask the controller to
-follow. A bounded retimer slows the minimum-snap trajectory until its nominal
-reference limits pass. The mission runner then measures actual tracking,
-completion and limiting separately. A feasible reference is only the first
+follow. A bounded retimer searches a fixed range of slower timings for a
+minimum-snap trajectory that meets the nominal reference limits. It rejects
+the trajectory if no attempted timing passes. The mission runner then measures
+actual tracking, completion and limiting separately. A feasible reference is only the first
 check; actuator lag and feedback error can still affect the flight.
 
 The implementation is in [trajectory_feasibility.py](../../src/quadrotor_math/trajectory_feasibility.py)
 and [mission_simulation.py](../../src/quadrotor_math/mission_simulation.py).
-[ADR 0016](../decisions/0016-trajectory-feasibility-and-missions.md) defines the
-original true-state scope and acceptance criteria. The later
-[geometric integration](geometric-control.md) also supports experimental
-estimated-state spline missions, whose performance limitations remain explicit.
+[The mission specification](../decisions/0016-trajectory-feasibility-and-missions.md)
+defines the true-state scope and acceptance criteria. True-state feedback gives
+the controller the exact simulated state, isolating tracking behavior from
+estimation error. [Geometric integration](geometric-control.md) also supports
+experimental estimated-state spline missions, whose performance limitations remain explicit.
 
 ## Whole-curve reference bounds
+
+Checking a few sampled points can miss a peak between them. Polynomial bounds
+instead enclose every point on a curve segment. The method below uses that
+property to check the complete reference path, including between waypoints.
 
 For a degree-n polynomial in normalized segment time,
 
@@ -67,7 +73,7 @@ do not include drag compensation, obstacles, uncertain parameters or continuous
 truth-state safety. The existing sampled truth guards remain active in flight.
 For example, the reference speed stays below its 0.6 m/s planning limit while
 the nominal simulated vehicle reaches 0.612397 m/s. The planning limit bounds
-the reference; actual speed is not capped by the historical controller.
+the reference; actual speed is not capped by the controller.
 
 ## Bounded timing policy
 
@@ -93,8 +99,8 @@ Geofence rejection ends the search because this retimer never changes geometry.
 phase. It validates ownership, C3 internal joins, rest endpoints, supplied endpoint
 positions and exact agreement with the stored total duration. One segment can
 carry a multi-waypoint curve with nonzero velocity at internal waypoints.
-Its separate dataclass leaves the historical `MissionSegment` serialization
-unchanged, including the frozen experiment protocol hashes.
+Its separate dataclass preserves `MissionSegment` serialization and the
+experiment protocol hashes that identify reproducible configurations.
 
 The existing `mission_reference` evaluates analytic p/v/a within the segment and
 holds its endpoint outside it. Right-continuous phase selection, controller
@@ -103,14 +109,14 @@ Before any plant step, `simulate_mission` checks every polynomial against the
 mission box and nominal controller acceleration, thrust, tilt and rate bounds.
 The reference rate norm is bounded by the smallest configured component rate
 limit, which conservatively fits all three components. There is no speed limit
-in the historical controller, so that preflight omits speed; planning can impose
+in the controller, so that preflight omits speed; planning can impose
 its own tighter speed limit. `simulate_estimated_mission` accepts polynomial
 missions with an explicit geometric controller, or with
 `allow_minimum_snap=True` for a cascade comparison. The default estimated
 cascade call still rejects polynomial missions. These opt-ins support the
 comparison experiments; they do not imply noisy-flight qualification.
 
-## Fixed evidence and reproduction
+## Evaluation and reproduction
 
 ```bash
 uv run pytest -q -W error tests/unit/test_trajectory_feasibility.py tests/unit/test_trajectory_missions.py tests/unit/test_trajectory_mission_validation.py
@@ -118,7 +124,7 @@ OPENBLAS_NUM_THREADS=1 uv run python -m experiments.trajectory_mission_validatio
 OPENBLAS_NUM_THREADS=1 PYTEST_ADDOPTS='-W error' make check
 ```
 
-The frozen mission initializes for 1 s, takes off to 1 m altitude in 4 s, follows
+The evaluation mission initializes for 1 s, takes off to 1 m altitude in 4 s, follows
 a four-leg 3D loop, holds 1 s and lands in 4 s. The track starts with 1 s per leg.
 Planning imposes speed 0.6 m/s, component acceleration 0.6 m/s², thrust [7,13] N,
 tilt 10 degrees, reference angular speed 0.4 rad/s and the existing mission box.
@@ -134,10 +140,10 @@ opposite initial offsets and mild wind/drag. Controller gains and sensor/estimat
 code are unchanged. Full-grid NPZ histories are bound by SHA-256 in the JSON report.
 The report records whether source hashes remain unchanged throughout execution.
 These are bounded engineering cases, not a Monte Carlo qualification campaign.
-See the [verification record](../archive/records/trajectory-missions.md) for results.
+See the [verification evidence (ZIP archive)](../../evidence/development-records.zip) for results.
 
-The subsequent [geometric comparison](geometric-control.md) is implemented and
-has passing bounded true-state results. The [final noisy-feedback comparison](../results/final-geometric.md)
+The [geometric comparison](geometric-control.md) has passing bounded true-state
+results. The [final noisy-feedback comparison](../results/final-geometric.md)
 reports a modest balanced accuracy gain with retained peak and effort costs.
 [Controller tradeoffs](../results/controller-tradeoffs.md) explains the earlier
 failures and current limits; [next steps](../next-steps.md) separates planned work.

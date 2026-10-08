@@ -1,7 +1,7 @@
 # Decision 0021: causal observation health monitoring
 
-Contract frozen before implementation on 2026-09-28. Audited baseline:
-`21b37eed5849de754281a94c3fbcc814083663a7` (PR #18).
+Observation health describes whether usable measurements are arriving on time.
+It is deliberately separate from whether those measurements are accurate.
 
 ## Purpose and boundary
 
@@ -17,7 +17,7 @@ Only `FUSED` refreshes accepted-observation age. Rejection is statistical;
 estimator arithmetic errors raise and are not health events. The existing
 truth and estimate mission guards remain separate from this diagnostic.
 
-## Frozen policy
+## Availability policy
 
 Each stream explicitly supplies its acquisition period T, configured delivery
 delay D, monitoring clock interval h, warning and loss period counts w and l,
@@ -74,10 +74,9 @@ a passive snapshot after ESKF correction. The monitor retains an immutable
 history; a failed mission leaves only the observed prefix, and reuse requires
 reset. Existing mission results and saved flight schemas stay unchanged.
 
-The initial integration sketch added a result field. Inspection of the evidence
-writer showed that it serializes every result field, so that sketch would alter
-existing archives. The caller-owned observer boundary was selected before the
-integration tests; it keeps availability diagnostics outside the flight schema.
+The evidence writer serializes every mission-result field. Keeping diagnostics
+in a caller-owned monitor therefore preserves the flight archive schema instead
+of adding availability state to every saved flight.
 
 ## Acceptance
 
